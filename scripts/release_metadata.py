@@ -25,8 +25,17 @@ def main():
     args = parser.parse_args()
     folder = args.dist
     files = {p.name: p for p in folder.iterdir() if p.is_file()}
-    generated = {'SHA256SUMS', 'altstore-source.json', 'scoop-haneoka.json', 'Haneoka.Haneoka.installer.yaml', 'Haneoka.Haneoka.locale.en-US.yaml', 'Haneoka.Haneoka.yaml', 'haneoka.rb', 'haneoka-windows-x64.appinstaller', 'haneoka-windows-arm64.appinstaller'}
-    files = {name: path for name, path in files.items() if name not in generated}
+    generated = {'release-version.json', 'SHA256SUMS', 'altstore-source.json', 'scoop-haneoka.json', 'Haneoka.Haneoka.installer.yaml', 'Haneoka.Haneoka.locale.en-US.yaml', 'Haneoka.Haneoka.yaml', 'haneoka.rb', 'haneoka-windows-x64.appinstaller', 'haneoka-windows-arm64.appinstaller'}
+    files = {name.replace(f'haneoka-{args.version}-', 'haneoka-', 1): path
+             for name, path in files.items() if name not in generated}
+    # Keep logical package keys for manifest generation; public package filenames
+    # include the release version. Feed and package-manager manifest names stay
+    # stable so installed clients can continue checking for updates.
+    for name, path in list(files.items()):
+        if name.startswith('haneoka-') and not path.name.startswith(f'haneoka-{args.version}-'):
+            destination = folder / name.replace('haneoka-', f'haneoka-{args.version}-', 1)
+            path.rename(destination)
+            files[name] = destination
     hashes = {name: digest_file(path) for name, path in files.items()}
     for name in generated:
         (folder / name).unlink(missing_ok=True)
@@ -54,12 +63,12 @@ def main():
     for arch in ['x64', 'arm64']:
         name = f'haneoka-windows-{arch}.zip'
         if name in files:
-            architectures['64bit' if arch == 'x64' else 'arm64'] = {'url': base + name, 'hash': hashes[name]}
+            architectures['64bit' if arch == 'x64' else 'arm64'] = {'url': base + files[name].name, 'hash': hashes[name]}
         for extension, installer_type in [('msi', 'wix'), ('exe', 'inno')]:
             name = f'haneoka-windows-{arch}' + ('-setup.exe' if extension == 'exe' else '.msi')
             if name in files:
                 installers.append({'Architecture': arch, 'InstallerType': installer_type,
-                                   'Scope': 'user', 'InstallerUrl': base + name,
+                                   'Scope': 'user', 'InstallerUrl': base + files[name].name,
                                    'InstallerSha256': hashes[name].upper()})
     if architectures:
         scoop = {'version': args.version, 'description': 'Our Notes catalogue and save reader',
@@ -94,7 +103,7 @@ def main():
         ET.register_namespace('', namespace)
         stable = f'https://github.com/{args.repository}/releases/latest/download/'
         installer = ET.Element(f'{{{namespace}}}AppInstaller', Uri=stable + f'haneoka-windows-{arch}.appinstaller', Version=identity.get('Version'))
-        ET.SubElement(installer, f'{{{namespace}}}MainPackage', Name=identity.get('Name'), Publisher=identity.get('Publisher'), Version=identity.get('Version'), ProcessorArchitecture=arch, Uri=base + name)
+        ET.SubElement(installer, f'{{{namespace}}}MainPackage', Name=identity.get('Name'), Publisher=identity.get('Publisher'), Version=identity.get('Version'), ProcessorArchitecture=arch, Uri=base + files[name].name)
         settings = ET.SubElement(installer, f'{{{namespace}}}UpdateSettings')
         ET.SubElement(settings, f'{{{namespace}}}OnLaunch', HoursBetweenUpdateChecks='24', ShowPrompt='true', UpdateBlocksActivation='false')
         ET.SubElement(settings, f'{{{namespace}}}AutomaticBackgroundTask')
@@ -106,7 +115,7 @@ def main():
   arch arm: "arm64", intel: "x64"
   version "{args.version}"
   sha256 arm: "{hashes[mac_arm]}", intel: "{hashes[mac_intel]}"
-  url "{base}haneoka-macos-#{{arch}}.dmg"
+  url "{base}haneoka-{args.version}-macos-#{{arch}}.dmg"
   name "Haneoka"
   desc "Our Notes catalogue and save reader"
   homepage "https://haneoka.org"
@@ -114,6 +123,7 @@ def main():
   app "haneoka.app"
 end
 ''')
+    (folder / 'release-version.json').write_text(json.dumps({'version': args.version, 'buildNumber': args.build_number}) + '\n')
     checksums = {}
     for path in sorted(folder.iterdir()):
         if path.is_file() and path.name != 'SHA256SUMS':

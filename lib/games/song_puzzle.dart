@@ -13,6 +13,13 @@ import '../ui/theme.dart';
 import '../ui/tile.dart';
 import 'puzzle_model.dart';
 
+Future<SolveResult> _solveInBackground(
+  int size,
+  List<int> start,
+  List<int> goal,
+  int budget,
+) => Isolate.run(() => solvePuzzle(size, start, goal, budget));
+
 class _Song {
   const _Song(this.id, this.name, this.band, this.cover);
   final String id;
@@ -213,9 +220,7 @@ class _SongPuzzleScreenState extends State<SongPuzzleScreen> {
       _busy = true;
     });
     final revision = _revision;
-    final result = await Isolate.run(
-      () => solvePuzzle(size, start, goal, budget),
-    );
+    final result = await _solveInBackground(size, start, goal, budget);
     if (!mounted || revision != _revision) return;
     setState(() {
       _busy = false;

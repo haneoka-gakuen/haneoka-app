@@ -100,7 +100,7 @@ class IosBackup {
   /// [password] is the backup's own password, needed only when [encrypted].
   Future<int> scan(SaveCollector collector, {String? password}) async {
     final keys = encrypted
-        ? await Isolate.run(() => _BackupKeys.unlock(_manifest, password ?? ''))
+        ? await _unlockBackup(_manifest, password ?? '')
         : null;
     final database = keys == null
         ? File(p.join(path, 'Manifest.db'))
@@ -181,6 +181,11 @@ class IosBackup {
     'il2cpp',
   };
 }
+
+Future<_BackupKeys> _unlockBackup(
+  Map<String, Object?> manifest,
+  String password,
+) => Isolate.run(() => _BackupKeys.unlock(manifest, password));
 
 class BackupPasswordException implements Exception {}
 

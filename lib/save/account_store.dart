@@ -8,6 +8,13 @@ import 'package:path_provider/path_provider.dart';
 
 import 'game_save.dart';
 
+// Keep isolate closures outside AccountStore: its pending write Future and
+// ChangeNotifier listeners cannot be sent to another isolate.
+Future<Object?> _decodeAccount(String text) =>
+    Isolate.run(() => jsonDecode(text));
+Future<String> _encodeAccount(Map<String, Object?> data) =>
+    Isolate.run(() => jsonEncode(data));
+
 /// The accounts imported on this device, kept in the app's private storage
 /// so they are still there next time. Nothing leaves the device.
 class AccountStore extends ChangeNotifier {
@@ -45,7 +52,7 @@ class AccountStore extends ChangeNotifier {
     for (final file in files) {
       try {
         final text = await file.readAsString();
-        final json = await Isolate.run(() => jsonDecode(text));
+        final json = await _decodeAccount(text);
         if (decode(json) case final save?) _saves.add(save);
       } catch (_) {
         // A damaged file is skipped; importing again replaces it.
@@ -68,7 +75,7 @@ class AccountStore extends ChangeNotifier {
   Future<void> put(GameSave save) => _exclusive(() async {
     final folder = await _folder();
     final json = encode(save);
-    final text = await Isolate.run(() => jsonEncode(json));
+    final text = await _encodeAccount(json);
     final target = File(
       p.join(folder.path, '${Uri.encodeComponent(_key(save))}.json'),
     );

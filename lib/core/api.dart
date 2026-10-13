@@ -9,6 +9,9 @@ import 'package:path_provider/path_provider.dart';
 import 'net.dart';
 import 'storage.dart';
 
+Future<Object?> _decodeResponse(List<int> bytes) =>
+    Isolate.run(() => jsonDecode(utf8.decode(bytes)));
+
 /// Haneoka's public API, the same one the website reads. Responses are kept
 /// on disk per release, so a release's data is downloaded once and the app
 /// works offline with what it has seen.
@@ -204,7 +207,7 @@ class HaneokaApi {
       throw HttpException('HTTP ${response.statusCode}', uri: Uri.parse(path));
     }
     final bytes = response.bodyBytes;
-    return (await Isolate.run(() => jsonDecode(utf8.decode(bytes))), bytes);
+    return (await _decodeResponse(bytes), bytes);
   }
 
   Future<Object?> _get(String path) async {

@@ -24,6 +24,9 @@ import 'engine_client.dart';
 import 'pt_controller.dart';
 import 'settings.dart';
 
+Future<EngineMaster> _compileMaster(Doc data) =>
+    Isolate.run(() => compileTeamData(data));
+
 class ManualTeam {
   const ManualTeam({
     this.members = const [null, null, null, null, null],
@@ -87,7 +90,7 @@ class TeamBuilderController extends ChangeNotifier {
     notifyListeners();
     try {
       final data = await loadTeamData(server);
-      final master = await Isolate.run(() => compileTeamData(data));
+      final master = await _compileMaster(data);
       final visuals = await CatalogVisuals.of(state.api)
           .then<CatalogVisuals?>((v) => v, onError: (Object _) => null);
       if (_server != server) return;

@@ -10,11 +10,20 @@ import 'net.dart';
 const appReleasesUrl = 'https://github.com/haneoka-gakuen/haneoka-app/releases';
 
 class AppRelease {
-  const AppRelease(this.version, this.notes, this.url, this.download);
+  const AppRelease(
+    this.version,
+    this.notes,
+    this.url,
+    this.download, {
+    this.buildNumber,
+  });
   final String version;
   final String notes;
   final Uri url;
   final Uri? download;
+  final int? buildNumber;
+  String get identity =>
+      buildNumber == null ? version : '$version+$buildNumber';
 }
 
 /// Checks published stable releases, sharing a request across startup and Settings.
@@ -84,10 +93,41 @@ class AppUpdates extends ChangeNotifier {
           '',
         );
         final url = _releaseLink(data['html_url']);
+        int? buildNumber;
+        var newer = _newer(version, package.version);
+        if (!newer &&
+            version == package.version &&
+            data['draft'] == false &&
+            data['prerelease'] == false &&
+            url != null) {
+          final metadata = (data['assets'] as List? ?? const [])
+              .whereType<Map>()
+              .where(
+                (asset) =>
+                    asset['name'] == 'release-version.json' &&
+                    asset['state'] == 'uploaded',
+              )
+              .firstOrNull;
+          final metadataUrl = _releaseLink(metadata?['browser_download_url']);
+          if (metadataUrl != null) {
+            final response = await netClient
+                .get(metadataUrl)
+                .timeout(const Duration(seconds: 15));
+            if (response.statusCode == 200) {
+              final metadata = jsonDecode(response.body);
+              if (metadata is Map && metadata['version'] == version) {
+                buildNumber = int.tryParse('${metadata['buildNumber']}');
+                newer =
+                    (buildNumber ?? 0) >
+                    (int.tryParse(package.buildNumber) ?? 0);
+              }
+            }
+          }
+        }
         if (data['draft'] != false ||
             data['prerelease'] != false ||
             url == null ||
-            !_newer(version, package.version)) {
+            !newer) {
           available = null;
         } else {
           final arch = Platform.version.toLowerCase().contains('arm64')
@@ -119,7 +159,12 @@ class AppUpdates extends ChangeNotifier {
           final assets = (data['assets'] as List? ?? const []).whereType<Map>();
           for (final name in assetNames) {
             for (final asset in assets) {
-              if (asset['name'] == name && asset['state'] == 'uploaded') {
+              final versioned = name.replaceFirst(
+                'haneoka-',
+                'haneoka-$version-',
+              );
+              if ((asset['name'] == versioned || asset['name'] == name) &&
+                  asset['state'] == 'uploaded') {
                 download = _releaseLink(asset['browser_download_url']);
                 if (download != null) break;
               }
@@ -131,6 +176,7 @@ class AppUpdates extends ChangeNotifier {
             '${data['body'] ?? ''}',
             url,
             download,
+            buildNumber: buildNumber,
           );
         }
       }
@@ -152,14 +198,14 @@ class AppUpdates extends ChangeNotifier {
     return (await SharedPreferences.getInstance()).getString(
           'updates.dismissed',
         ) !=
-        available!.version;
+        available!.identity;
   }
 
   Future<void> dismiss() async {
     if (available != null) {
       await (await SharedPreferences.getInstance()).setString(
         'updates.dismissed',
-        available!.version,
+        available!.identity,
       );
     }
   }

@@ -20,6 +20,11 @@ import 'controller.dart';
 import 'screenshot_import_screen.dart';
 import 'widgets.dart';
 
+Future<List<BoxCandidate>> _parseFiles(List<Uint8List> data) =>
+    Isolate.run(() => parseBoxFiles(data));
+Future<List<BoxCandidate>> _parseText(String text) =>
+    Isolate.run(() => parseBoxText(text));
+
 Future<void> openBoxImport(
   BuildContext context,
   TeamBuilderController c, {
@@ -278,7 +283,7 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
     final data = <Uint8List>[
       for (final file in files) await file.readAsBytes(),
     ];
-    await _parse(() => Isolate.run(() => parseBoxFiles(data)));
+    await _parse(() => _parseFiles(data));
   }
 
   void _pasted() {
@@ -287,7 +292,7 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
     if (isInventoryListText(text)) {
       _list(text);
     } else {
-      _parse(() => Isolate.run(() => parseBoxText(text)));
+      _parse(() => _parseText(text));
     }
   }
 
