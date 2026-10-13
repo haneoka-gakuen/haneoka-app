@@ -117,9 +117,12 @@ class AppUpdates extends ChangeNotifier {
               final metadata = jsonDecode(response.body);
               if (metadata is Map && metadata['version'] == version) {
                 buildNumber = int.tryParse('${metadata['buildNumber']}');
-                newer =
-                    (buildNumber ?? 0) >
-                    (int.tryParse(package.buildNumber) ?? 0);
+                var installedBuild = int.tryParse(package.buildNumber) ?? 0;
+                // Flutter's split APKs add 1000 * ABI_VERSION to versionCode.
+                if (Platform.isAndroid && installedBuild >= 1000) {
+                  installedBuild %= 1000;
+                }
+                newer = (buildNumber ?? 0) > installedBuild;
               }
             }
           }
