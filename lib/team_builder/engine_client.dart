@@ -1031,6 +1031,12 @@ const _shardsPerWorker = 4;
 
 /// The engine isolates (`engine/client.ts`): a search runs one song at a
 /// time; quick proofs spread over the pool, harder songs split by leader.
+class _ShardRun {
+  _ShardRun(this.floor);
+  double floor;
+  bool retry = false;
+}
+
 class _EngineCoordinator {
   _EngineCoordinator(this.data, this.chartUrl) {
     final encoded = _encodeData(data);
@@ -1371,7 +1377,29 @@ class _EngineCoordinator {
       if (completeResponse(latest)) return latest;
       final gekiso = request.goal is GekisoGoal;
       final songs = requestSongs(request);
+      final eventGoal = request.goal;
+      final missions =
+          eventGoal is EventGoal &&
+              eventGoal.gekiso != null &&
+              request.k == 1 &&
+              eventGoal.songs.length == 1
+          ? intListOf(
+              objectRow(
+                objectRow(
+                  objectRow(data['songs'])['${eventGoal.songs.first.songId}'],
+                )['gekisou'],
+              )['missionTypes'],
+            )
+          : <int>[];
+      final wholeReward =
+          missions.isNotEmpty &&
+          missions.every((kind) => kind == 2 || kind == 3);
+      final phasedReward =
+          nativeLuckAvailable &&
+          missions.isNotEmpty &&
+          missions.every((kind) => kind == 1);
       final parallel =
+          !wholeReward &&
           _pool.length > 1 &&
           request.members.length >= _parallelMinMembers &&
           request.goal is! PlanGoal &&
@@ -1419,86 +1447,208 @@ class _EngineCoordinator {
         await Future.wait([for (final worker in _pool) runSong(worker)]);
         return merged();
       }
-      var seeds = request.seeds;
-      if (gekiso) {
-        final seeding = await send(_idlest(), request.copyWith(seedOnly: true));
-        publish(seeding);
-        seeds = [for (final r in seeding.results) ...r.hits];
-      } else if (!request.noFloor) {
-        final quick = await send(
-          _idlest(),
-          request.copyWith(
-            deadline: math.min(deadline, executionClock() + _quickMs),
-          ),
-        );
-        publish(quick);
-        if (completeResponse(quick)) return quick;
-        seeds = [for (final r in quick.results) ...r.hits];
-      }
-      final goal = request.goal;
-      final sampledRewards = goal is EventGoal && goal.gekiso != null;
-      final count = gekiso || sampledRewards
-          ? (request.constraints.leader == null ? _pool.length : 1)
-          : _pool.length * _shardsPerWorker;
-      final responses = [
-        for (var i = 0; i < count; i++) emptyResponse(request),
-      ];
-      for (final response in responses) {
-        for (final result in response.results) {
-          result.hits = seeds
-              .where((hit) => hit.song == result.song)
-              .take(request.k)
-              .toList();
-        }
-      }
-      var next = 0, done = 0;
-      EngineResponse merge() =>
-          mergeShardResponses(responses, request.k, executionClock() - started);
-      Future<void> runShard(_Worker worker) async {
-        while (!stopped && remaining(deadline) > 0 && next < count) {
-          final index = next++, current = merge();
-          final floors = {
-            for (final result in current.results)
-              if (result.song != null && result.hits.length >= request.k)
-                result.song!.key: result.hits[request.k - 1].key,
-          };
-          final response = await send(
-            worker,
-            request.copyWith(
-              seeds: seeds,
-              seeded: gekiso,
-              shard: (index: index, count: count),
-              floors: floors,
-            ),
-            (value) {
-              if (stopped ||
-                  value.contextKey != request.contextKey ||
-                  value.requestId != request.requestId) {
-                return;
-              }
-              responses[index] = value.response;
-              publish(merge());
-            },
-            false,
+      Future<EngineResponse> runShards(
+        EngineRequest request,
+        void Function(EngineResponse) publish, [
+        int stage = -1,
+      ]) async {
+        var seeds = request.seeds;
+        if (gekiso) {
+          final seeding = await send(
+            _idlest(),
+            request.copyWith(seedOnly: true),
           );
-          if (stopped) return;
-          responses[index] = response;
-          publish(merge());
-          progress?.call(++done, count);
+          publish(seeding);
+          seeds = [for (final r in seeding.results) ...r.hits];
+        } else if (!request.noFloor && stage < 0) {
+          final quick = await send(
+            _idlest(),
+            request.copyWith(
+              deadline: math.min(deadline, executionClock() + _quickMs),
+            ),
+            (value) => publish(value.response),
+          );
+          publish(quick);
+          if (completeResponse(quick)) return quick;
+          seeds = [for (final r in quick.results) ...r.hits];
         }
+        final goal = request.goal;
+        final sampledRewards = goal is EventGoal && goal.gekiso != null;
+        final workers = request.rewardPhase != null
+            ? _pool.take(4).toList()
+            : _pool;
+        final count = gekiso || sampledRewards
+            ? (request.constraints.leader == null ? workers.length : 1)
+            : workers.length * _shardsPerWorker;
+        double valueOf(EngineHit hit) => switch (request.rewardPhase?['kind']) {
+          'other' => hit.event?.otherMean ?? 0,
+          'score' => hit.score?.mean ?? 0,
+          _ => hit.key,
+        };
+        final responses = [
+          for (var i = 0; i < count; i++) emptyResponse(request),
+        ];
+        for (final response in responses) {
+          for (final result in response.results) {
+            result.hits = seeds
+                .where((hit) => hit.song == result.song)
+                .take(request.k)
+                .toList();
+          }
+        }
+        var next = 0, done = 0;
+        EngineResponse merge() => mergeShardResponses(
+          responses,
+          request.k,
+          executionClock() - started,
+        );
+        final active = <_Worker, _ShardRun>{};
+        Future<void> runShard(_Worker worker) async {
+          while (!stopped && remaining(deadline) > 0 && next < count) {
+            final index = next++;
+            while (!stopped && remaining(deadline) > 0) {
+              final current = merge();
+              final floors = {
+                for (final result in current.results)
+                  if (result.song != null && result.hits.length >= request.k)
+                    result.song!.key: valueOf(result.hits[request.k - 1]),
+              };
+              final job = _ShardRun(
+                floors.values.fold<double>(-double.infinity, math.max),
+              );
+              active[worker] = job;
+              final phase = request.rewardPhase;
+              final phaseFloor = phase != null && phase['kind'] != 'primary'
+                  ? {...phase, 'floor': math.max(0.0, job.floor)}
+                  : phase;
+              late EngineResponse response;
+              try {
+                response = await send(
+                  worker,
+                  request.copyWith(
+                    seeds: sampledRewards ? current.overall : seeds,
+                    seeded:
+                        gekiso || (phase != null && current.overall.isNotEmpty),
+                    rewardPhase: phaseFloor,
+                    shard: (index: index, count: count),
+                    floors: phase != null && phase['kind'] != 'primary'
+                        ? const {}
+                        : floors,
+                  ),
+                  (value) {
+                    if (stopped ||
+                        job.retry ||
+                        !identical(active[worker], job) ||
+                        value.contextKey != request.contextKey ||
+                        value.requestId != request.requestId) {
+                      return;
+                    }
+                    if (phase != null &&
+                        value.response.overall.length >= request.k) {
+                      job.floor = math.max(
+                        job.floor,
+                        valueOf(value.response.overall[request.k - 1]),
+                      );
+                    }
+                    responses[index] = value.response;
+                    publish(merge());
+                  },
+                  false,
+                );
+              } catch (_) {
+                if (job.retry && !stopped) continue;
+                rethrow;
+              } finally {
+                active.remove(worker);
+              }
+              if (stopped) return;
+              responses[index] = response;
+              publish(merge());
+              done++;
+              progress?.call(
+                stage < 0 ? done : stage * count + done,
+                stage < 0 ? count : 3 * count,
+              );
+              if (sampledRewards &&
+                  !request.noFloor &&
+                  completeResponse(response) &&
+                  response.overall.length >= request.k) {
+                final floor = valueOf(response.overall[request.k - 1]);
+                for (final entry in active.entries) {
+                  if (!entry.value.retry && floor > entry.value.floor) {
+                    entry.value.retry = true;
+                    entry.key.cancel();
+                  }
+                }
+              }
+              break;
+            }
+          }
+        }
+
+        await Future.wait([for (final worker in workers) runShard(worker)]);
+        final merged = merge();
+        if (!aspirationHeld(merged, request.k) &&
+            !request.noFloor &&
+            remaining(deadline) > 0) {
+          return send(
+            _idlest(),
+            request.copyWith(seeds: merged.overall, noFloor: true),
+          );
+        }
+        return merged;
       }
 
-      await Future.wait([for (final worker in _pool) runShard(worker)]);
-      final merged = merge();
-      if (!aspirationHeld(merged, request.k) &&
-          !request.noFloor &&
-          remaining(deadline) > 0) {
-        return send(
-          _idlest(),
-          request.copyWith(seeds: merged.overall, noFloor: true),
+      if (!phasedReward) return runShards(request, publish);
+      var seeds = request.seeds;
+      var response = emptyResponse(request);
+      for (final (stage, kind) in ['primary', 'other', 'score'].indexed) {
+        if (stopped || remaining(deadline) == 0) return latest;
+        final best = seeds.firstOrNull;
+        final phase = <String, Object?>{
+          'kind': kind,
+          if (kind != 'primary') 'reward': best!.key,
+          if (kind == 'score') 'other': best!.event?.otherMean ?? 0,
+        };
+        EngineResponse publicResponse(EngineResponse value) => EngineResponse(
+          results: [
+            for (final part in value.results)
+              SongResult(
+                song: part.song,
+                hits: [...part.hits],
+                proven: kind == 'score' && part.proven,
+                bound: null,
+                stats: part.stats,
+                excludedBelow: part.excludedBelow,
+                exclusion: part.exclusion,
+              ),
+          ],
+          overall: [...value.overall],
+          unknownCards: value.unknownCards,
+          elapsedMs: value.elapsedMs,
+          stopReason: value.stopReason,
+          error: value.error,
         );
+        response = await runShards(
+          request.copyWith(
+            seeds: seeds,
+            rewardPhase: phase,
+            completed: const [],
+          ),
+          (value) => publish(publicResponse(value)),
+          stage,
+        );
+        if (stopped) return latest;
+        if (!completeResponse(response) || response.overall.isEmpty) {
+          return publicResponse(response);
+        }
+        if (response.results.any((part) => part.rewardPhase != kind)) {
+          throw StateError('engine-reward-phase-mismatch');
+        }
+        seeds = response.overall;
+        response = publicResponse(response);
       }
-      return merged;
+      return response;
     }
 
     try {

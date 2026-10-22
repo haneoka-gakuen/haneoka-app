@@ -80,6 +80,10 @@ EngineResponse mergeShardResponses(
           proven: proven,
           bound: proven || bounds.isEmpty ? null : bounds.reduce(math.max),
           stats: stats,
+          rewardPhase:
+              parts.every((part) => part.rewardPhase == parts.first.rewardPhase)
+              ? parts.first.rewardPhase
+              : null,
           excludedBelow: excludedBelow,
           exclusion: exclusion,
           floor: floors.isEmpty ? null : floors.reduce(math.max),
