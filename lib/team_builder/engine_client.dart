@@ -343,6 +343,7 @@ class EngineClient {
   ]) => _call(
     'run',
     request.copyWith(
+      keepTimeLimit: false,
       deadline: deadlineOf(request),
       requestId: request.requestId ?? '$_key-${_nextId + 1}',
     ),
@@ -988,11 +989,33 @@ class _Worker {
   }
 }
 
-/// How many isolates share a search: the device's cores minus one for the
-/// interface; each holds its own compiled release, so phones get fewer.
+/// Worker count follows physical cores on Linux and mobile memory limits.
 int _poolSize() {
   final cores = Platform.numberOfProcessors;
-  final limit = Platform.isAndroid || Platform.isIOS ? 2 : 8;
+  var limit = Platform.isAndroid || Platform.isIOS ? 2 : 8;
+  if (Platform.isLinux) {
+    try {
+      final physical = <String>{};
+      final cpuName = RegExp(r'/cpu[0-9]+$');
+      for (final cpu in Directory('/sys/devices/system/cpu').listSync()) {
+        if (!cpuName.hasMatch(cpu.path)) continue;
+        final topology = '${cpu.path}/topology';
+        final package = File('$topology/physical_package_id')
+            .readAsStringSync()
+            .trim();
+        final core = File('$topology/core_id').readAsStringSync().trim();
+        if (package == '-1' || core == '-1') {
+          physical.clear();
+          break;
+        }
+        physical.add('$package:$core');
+        if (physical.length >= limit) break;
+      }
+      if (physical.isNotEmpty) limit = math.min(limit, physical.length);
+    } on FileSystemException {
+      // Sandboxed Linux installations may hide CPU topology.
+    }
+  }
   return math.max(1, math.min(limit, cores - 1));
 }
 
@@ -1122,6 +1145,7 @@ class _EngineCoordinator {
   ]) {
     final started = executionClock(), generation = _generation;
     final task = request.copyWith(
+      keepTimeLimit: false,
       deadline: deadlineOf(request),
       requestId:
           request.requestId ??
@@ -1345,12 +1369,14 @@ class _EngineCoordinator {
         return latest;
       }
       if (completeResponse(latest)) return latest;
+      final gekiso = request.goal is GekisoGoal;
+      final songs = requestSongs(request);
       final parallel =
           _pool.length > 1 &&
           request.members.length >= _parallelMinMembers &&
-          request.goal is! PlanGoal;
+          request.goal is! PlanGoal &&
+          !(gekiso && request.constraints.leader != null && songs.length == 1);
       if (!parallel) return send(_idlest(), request);
-      final songs = requestSongs(request);
       if (songs.length > 1 && songs.every((song) => song != null)) {
         final parts = [...latest.results];
         EngineResponse merged() => EngineResponse(
@@ -1394,7 +1420,6 @@ class _EngineCoordinator {
         return merged();
       }
       var seeds = request.seeds;
-      final gekiso = request.goal is GekisoGoal;
       if (gekiso) {
         final seeding = await send(_idlest(), request.copyWith(seedOnly: true));
         publish(seeding);
@@ -1410,7 +1435,11 @@ class _EngineCoordinator {
         if (completeResponse(quick)) return quick;
         seeds = [for (final r in quick.results) ...r.hits];
       }
-      final count = _pool.length * _shardsPerWorker;
+      final goal = request.goal;
+      final sampledRewards = goal is EventGoal && goal.gekiso != null;
+      final count = gekiso || sampledRewards
+          ? (request.constraints.leader == null ? _pool.length : 1)
+          : _pool.length * _shardsPerWorker;
       final responses = [
         for (var i = 0; i < count; i++) emptyResponse(request),
       ];
