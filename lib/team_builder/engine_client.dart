@@ -1474,8 +1474,11 @@ class _EngineCoordinator {
         }
         final goal = request.goal;
         final sampledRewards = goal is EventGoal && goal.gekiso != null;
+        final nominalGekiso = goal is GekisoGoal && goal.seeds == 0;
         final workers = request.rewardPhase != null
             ? _pool.take(4).toList()
+            : nominalGekiso
+            ? _pool.take(5).toList()
             : _pool;
         final count = gekiso || sampledRewards
             ? (request.constraints.leader == null ? workers.length : 1)
