@@ -616,6 +616,7 @@ class HitScore {
     required this.bestOrder,
     required this.orders,
     required this.ranks,
+    this.rangeScores,
   });
   factory HitScore.fromJson(Map<String, Object?> json) => HitScore(
     mean: numOf(json['mean']),
@@ -629,6 +630,7 @@ class HitScore {
       for (final key in json['bestOrder'] as List? ?? const []) '$key',
     ],
     orders: intListOf(json['orders']),
+    rangeScores: (json['rangeScores'] as List?)?.map(numOf).toList(),
     ranks: {
       for (final entry in objectRow(json['ranks']).entries)
         int.parse(entry.key): intOf(entry.value),
@@ -646,6 +648,7 @@ class HitScore {
   /// Score of every skill order, indexed like [orders].
   final List<int> orders;
   final Map<int, int> ranks;
+  final List<double>? rangeScores;
   Map<String, Object?> toJson() => {
     'mean': mean,
     'min': min,
@@ -654,6 +657,7 @@ class HitScore {
     'worstOrder': worstOrder,
     'bestOrder': bestOrder,
     'orders': orders,
+    'rangeScores': ?rangeScores,
     'ranks': {for (final e in ranks.entries) '${e.key}': e.value},
   };
 }
