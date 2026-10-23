@@ -737,6 +737,7 @@ class EngineHit {
             ? HitScore.fromJson(objectRow(json['score']))
             : null
         ..skipScore = (json['skipScore'] as num?)?.toInt()
+        ..comboBonus = (json['comboBonus'] as num?)?.toInt()
         ..event = json['event'] is Map
             ? HitEvent.fromJson(objectRow(json['event']))
             : null
@@ -757,6 +758,7 @@ class EngineHit {
   final double key;
   HitScore? score;
   int? skipScore;
+  int? comboBonus;
   HitEvent? event;
   PotentialDetail? potential;
   Map<String, Object?>? gekiso;
@@ -768,6 +770,7 @@ class EngineHit {
     'power': power,
     'slotPowers': slotPowers,
     'key': key,
+    'comboBonus': ?comboBonus,
     'score': score?.toJson(),
     'skipScore': skipScore,
     'event': event?.toJson(),
