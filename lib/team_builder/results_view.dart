@@ -2,6 +2,8 @@
 /// skill orders and comparison (`lit/team-builder/results.ts`).
 library;
 
+import 'reward_plan_view.dart';
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -24,6 +26,7 @@ import '../ui/theme.dart';
 import 'box.dart';
 import 'controller.dart';
 import 'engine/api.dart';
+import 'engine/num.dart';
 import 'engine/execution.dart';
 import 'engine/live.dart' show orders;
 import 'engine_client.dart';
@@ -182,6 +185,18 @@ List<(String, String)> resultConditions(
           '',
         ),
       ),
+    if (hit.event?.rewardPlan case final plan?)
+      (c.tb('rewardPlan.order', 'Ranking'), rewardRankingLabel(c, plan)),
+    if (hit.event?.rewardValues case final values?)
+      for (final entry in values.entries)
+        (
+          rewardLabel(c, entry.key),
+          formatNumber(
+            c.state.text.locale,
+            numOf(objectRow(entry.value)['value']),
+            4,
+          ),
+        ),
     if (goal is EventGoal && goal.weights != null)
       for (final (key, label) in [
         ('points', 'weightPoints'),
@@ -939,13 +954,23 @@ class _HitCardState extends State<_HitCard> {
           label: c.tb('comboBonus', 'Base COMBO BONUS'),
           value: '×${hit.comboBonus}',
         ),
-      if (hit.event?.otherMean case final other?)
+      if (hit.event?.rewardValues case final values?)
+        for (final entry in values.entries)
+          ValueChip(
+            label: rewardLabel(c, entry.key),
+            value: formatNumber(
+              locale,
+              numOf(objectRow(entry.value)['value']),
+              4,
+            ),
+          ),
+      if (hit.event?.rewardPlan == null && hit.event?.otherMean != null)
         ValueChip(
           label: c.tb(
             s.measure == 'items' ? 'pointsPerPlay' : 'itemsPerPlay',
             '',
           ),
-          value: formatNumber(locale, other, 1),
+          value: formatNumber(locale, hit.event!.otherMean!, 1),
         ),
       if (s.goal != GoalKind.power)
         ValueChip(
@@ -975,17 +1000,19 @@ class _HitCardState extends State<_HitCard> {
                 '${formatNumber(locale, top.value / 120 * 100, top.value == 120 ? 0 : 1)}%',
           ),
       ],
-      if (hit.event case final event?) ...[
-        ValueChip(
-          icon: Symbols.trending_up_rounded,
-          label: c.tb('eventBonus', 'Event bonus'),
-          value: '+${formatNumber(locale, event.bonusPercent.floor())}%',
-        ),
-        if (event.challengePoints != 0 && s.measure != 'challenge-points')
+      if (hit.event?.rewardPlan == null && hit.event != null) ...[
+        if (hit.event case final event?) ...[
           ValueChip(
-            label: c.tb('cpPerPlay', 'Challenge points per play'),
-            value: formatNumber(locale, event.challengePoints, 1),
+            icon: Symbols.trending_up_rounded,
+            label: c.tb('eventBonus', 'Event bonus'),
+            value: '+${formatNumber(locale, event.bonusPercent.floor())}%',
           ),
+          if (event.challengePoints != 0 && s.measure != 'challenge-points')
+            ValueChip(
+              label: c.tb('cpPerPlay', 'Challenge points per play'),
+              value: formatNumber(locale, event.challengePoints, 1),
+            ),
+        ],
       ],
       if (hit.skipScore case final skip?)
         ValueChip(
@@ -1925,7 +1952,13 @@ Future<List<int>> renderHitImage(
         (c.tb('power', 'Power'), formatNumber(locale, hit.power)),
         if (hit.comboBonus != null)
           (c.tb('comboBonus', 'Base COMBO BONUS'), '×${hit.comboBonus}'),
-        if (hit.event?.otherMean case final other?)
+        if (hit.event?.rewardValues case final values?)
+          for (final entry in values.entries)
+            (
+              rewardLabel(c, entry.key),
+              formatNumber(locale, numOf(objectRow(entry.value)['value']), 4),
+            ),
+        if (hit.event?.rewardPlan == null && hit.event?.otherMean != null)
           (
             c.tb(
               c.settingsForHit(hit).measure == 'items'
@@ -1933,7 +1966,7 @@ Future<List<int>> renderHitImage(
                   : 'itemsPerPlay',
               '',
             ),
-            formatNumber(locale, other, 1),
+            formatNumber(locale, hit.event!.otherMean!, 1),
           ),
         if (hit.score case final score?)
           (

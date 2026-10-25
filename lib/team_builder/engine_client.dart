@@ -1217,6 +1217,7 @@ class _EngineCoordinator {
         request.seedOnly ||
         request.seeded ||
         request.rewardPhase != null ||
+        request.resolveRewardPlan ||
         request.floors != null ||
         request.cutoff != null ||
         request.rewardCutoff != null ||
@@ -1494,7 +1495,7 @@ class _EngineCoordinator {
     ]) async {
       if (stopped || remaining(task.deadline!) == 0) return emptyResponse(task);
       final loaded = await _charts(
-        requestSongs(task).whereType<SongRef>().toList(),
+        requestChartSongs(task).whereType<SongRef>().toList(),
       );
       if (stopped || remaining(task.deadline!) == 0) return emptyResponse(task);
       return worker.call(
@@ -1512,6 +1513,25 @@ class _EngineCoordinator {
         return latest;
       }
       if (completeResponse(latest)) return latest;
+      if (request.goal case EventGoal(:final rewardPlan?)
+          when rewardPlan['autoCp'] != null) {
+        final resolved = await send(
+          _idlest(),
+          request.copyWith(resolveRewardPlan: true),
+          (_) {},
+          false,
+        );
+        if (stopped) return latest;
+        if (resolved.resolvedRewardPlan == null) {
+          latest.stopReason = resolved.stopReason ?? 'budget';
+          return latest;
+        }
+        request = request.copyWith(
+          goal: (request.goal as EventGoal).copyWith(
+            rewardPlan: resolved.resolvedRewardPlan,
+          ),
+        );
+      }
       final gekiso = request.goal is GekisoGoal;
       final opponents =
           request.goal is GekisoGoal &&
@@ -1565,6 +1585,7 @@ class _EngineCoordinator {
           request.k == 1 &&
           eventGoal.songs.length == 1;
       final phasedReward =
+          !(eventGoal is EventGoal && eventGoal.rewardPlan != null) &&
           nativeLuckAvailable &&
           (weightedLive ||
               missions.isNotEmpty && missions.every((kind) => kind == 1));
@@ -1871,7 +1892,7 @@ class _EngineCoordinator {
     () async => _pool.first.call(
       'growth',
       request,
-      await _charts(requestSongs(request).whereType<SongRef>().toList()),
+      await _charts(requestChartSongs(request).whereType<SongRef>().toList()),
       progress,
     ),
   );
@@ -2057,7 +2078,7 @@ void _main((SendPort, String, Map<String, String>, int?) args) {
           final r = request as EngineRequest;
           if (native != null) {
             final sources = await nativeSources(
-              requestSongs(r).whereType<SongRef>().toList(),
+              requestChartSongs(r).whereType<SongRef>().toList(),
             );
             result = EngineResponse.fromJson(
               native.run(r.toJson(), sources, (value) {
@@ -2115,7 +2136,9 @@ void _main((SendPort, String, Map<String, String>, int?) args) {
           if (native == null) throw UnsupportedError('native-engine-required');
           result = native.run(
             r.toJson(),
-            await nativeSources(requestSongs(r).whereType<SongRef>().toList()),
+            await nativeSources(
+              requestChartSongs(r).whereType<SongRef>().toList(),
+            ),
             (value) {
               final progress = objectRow(value['growth']);
               if (progress.isNotEmpty) {

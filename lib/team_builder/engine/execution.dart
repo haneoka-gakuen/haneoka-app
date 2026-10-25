@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'api.dart';
+import 'num.dart';
 import 'objectives.dart';
 import 'search.dart';
 
@@ -61,6 +62,14 @@ SongResult pendingSong(SongRef? song) => SongResult(
   bound: double.infinity,
   stats: SearchStats(),
 );
+List<SongRef?> requestChartSongs(EngineRequest request) => [
+  ...requestSongs(request),
+  if (request.goal case EventGoal(:final rewardPlan?))
+    for (final song
+        in objectRow(rewardPlan['autoCp'])['songs'] as List? ?? const [])
+      SongRef.fromJson(objectRow(song)),
+];
+
 EngineResponse emptyResponse(EngineRequest request) => EngineResponse(
   results: [
     for (final song in requestSongs(request))

@@ -227,7 +227,8 @@ class _BuildTabState extends State<BuildTab> {
         (s.goal == GoalKind.event && s.route != 'skip') ||
         (s.goal == GoalKind.power && s.powerSong);
     return [
-      if (!c.activity || s.goal != GoalKind.plan)
+      if ((!c.activity || s.goal != GoalKind.plan) &&
+          !(c.activity && s.goal == GoalKind.event && s.rewardPlan != null))
         ToolSection(
           icon: Symbols.flag_rounded,
           title: c.activity ? goalText(c, s.goal) : c.tb('goal', 'Goal'),
@@ -241,7 +242,7 @@ class _BuildTabState extends State<BuildTab> {
                 selected: s.goal,
                 onSelected: (goal) => set({'goal': goal.name}),
               ),
-            if (s.goal == GoalKind.event)
+            if (s.goal == GoalKind.event && s.rewardPlan == null)
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: s.fullRanking,
@@ -416,62 +417,64 @@ class _BuildTabState extends State<BuildTab> {
                   'measure': 'points',
               }),
             ),
-            Segmented<String>(
-              value: s.measure,
-              options: [
-                Choice('points', c.tb('measurePoints', 'Event points')),
-                Choice('items', c.tb('measureItems', 'Shop items')),
-                if (s.route == 'live')
-                  Choice(
-                    'challenge-points',
-                    c.tb('measureCp', 'Challenge points'),
-                  ),
-              ],
-              onSelected: (value) => set({'measure': value}),
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(c.tb('measureWeighted', 'Weighted rewards')),
-              value: s.weighted,
-              onChanged: (value) => set({'weighted': value}),
-            ),
-            if (s.weighted)
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  for (final (key, label) in [
-                    (
-                      'weightPoints',
-                      c.tb('weightPoints', 'Weight per event point'),
-                    ),
-                    (
-                      'weightItems',
-                      c.tb('weightItems', 'Weight per shop item'),
-                    ),
-                    if (s.route == 'live')
-                      (
-                        'weightCp',
-                        c.tb('weightCp', 'Weight per challenge point'),
-                      ),
-                  ])
-                    TextFormField(
-                      key: ValueKey('reward-$key'),
-                      initialValue:
-                          '${s.weights![key == 'weightPoints'
-                              ? 'points'
-                              : key == 'weightItems'
-                              ? 'items'
-                              : 'challengePoints']}',
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: InputDecoration(labelText: label),
-                      onChanged: (value) =>
-                          set({key: double.tryParse(value) ?? 0}),
+            if (!c.activity) ...[
+              Segmented<String>(
+                value: s.measure,
+                options: [
+                  Choice('points', c.tb('measurePoints', 'Event points')),
+                  Choice('items', c.tb('measureItems', 'Shop items')),
+                  if (s.route == 'live')
+                    Choice(
+                      'challenge-points',
+                      c.tb('measureCp', 'Challenge points'),
                     ),
                 ],
+                onSelected: (value) => set({'measure': value}),
               ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(c.tb('measureWeighted', 'Weighted rewards')),
+                value: s.weighted,
+                onChanged: (value) => set({'weighted': value}),
+              ),
+              if (s.weighted)
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    for (final (key, label) in [
+                      (
+                        'weightPoints',
+                        c.tb('weightPoints', 'Weight per event point'),
+                      ),
+                      (
+                        'weightItems',
+                        c.tb('weightItems', 'Weight per shop item'),
+                      ),
+                      if (s.route == 'live')
+                        (
+                          'weightCp',
+                          c.tb('weightCp', 'Weight per challenge point'),
+                        ),
+                    ])
+                      TextFormField(
+                        key: ValueKey('reward-$key'),
+                        initialValue:
+                            '${s.weights![key == 'weightPoints'
+                                ? 'points'
+                                : key == 'weightItems'
+                                ? 'items'
+                                : 'challengePoints']}',
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(labelText: label),
+                        onChanged: (value) =>
+                            set({key: double.tryParse(value) ?? 0}),
+                      ),
+                  ],
+                ),
+            ],
             if (s.route == 'challenge')
               ToolField(
                 label: c.tb('cpPerLive', 'Challenge points per live'),
@@ -579,7 +582,9 @@ class _BuildTabState extends State<BuildTab> {
         ToolSection(
           icon: Symbols.piano_rounded,
           title: c.tb('play', 'Play'),
-          children: _playSection(context),
+          children: c.activity && s.ptGekiso && s.rewardPlan != null
+              ? [Text(c.tb('playAp', 'All Perfect'))]
+              : _playSection(context),
         ),
       ],
       const SizedBox(height: 16),

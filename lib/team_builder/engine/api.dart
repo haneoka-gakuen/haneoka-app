@@ -158,6 +158,9 @@ sealed class Goal {
       ),
       'event' => EventGoal(
         measure: '${json['measure']}',
+        rewardPlan: json['rewardPlan'] is Map
+            ? objectRow(json['rewardPlan'])
+            : null,
         route: RouteKind.values.byName('${json['route']}'),
         eventId: (json['eventId'] as num).toInt(),
         songs: songs(json['songs']),
@@ -249,6 +252,7 @@ class EventGoal extends Goal {
     this.ptOnly = false,
     this.ranking,
     this.weights,
+    this.rewardPlan,
     this.minComboBonus = 1,
     this.cpExchange,
     this.gekiso,
@@ -259,6 +263,7 @@ class EventGoal extends Goal {
   final bool ptOnly;
   final String? ranking;
   final Doc? weights;
+  final Doc? rewardPlan;
   final int minComboBonus;
   bool get primaryOnly => ptOnly || ranking != null;
 
@@ -275,6 +280,7 @@ class EventGoal extends Goal {
     int? consumption,
     CpExchange? cpExchange,
     bool dropGekiso = false,
+    Doc? rewardPlan,
   }) => EventGoal(
     measure: measure ?? this.measure,
     route: route ?? this.route,
@@ -285,6 +291,7 @@ class EventGoal extends Goal {
     ptOnly: ptOnly,
     ranking: ranking,
     weights: weights,
+    rewardPlan: rewardPlan ?? this.rewardPlan,
     minComboBonus: minComboBonus,
     cpExchange: cpExchange ?? this.cpExchange,
     gekiso: dropGekiso ? null : gekiso,
@@ -299,6 +306,7 @@ class EventGoal extends Goal {
     'consumption': consumption,
     'play': play.toJson(),
     if (weights != null) 'weights': weights,
+    if (rewardPlan != null) 'rewardPlan': rewardPlan,
     if (primaryOnly) 'ranking': ptOnly ? 'pt-only' : ranking,
     if (cpExchange case final cp?)
       'cpExchange': {'numerator': cp.numerator, 'denominator': cp.denominator},
@@ -473,6 +481,7 @@ class EngineRequest {
     this.seedOnly = false,
     this.seeded = false,
     this.rewardPhase,
+    this.resolveRewardPlan = false,
   });
   factory EngineRequest.fromJson(Map<String, Object?> json) => EngineRequest(
     members: [
@@ -521,6 +530,7 @@ class EngineRequest {
     cutoff: json['cutoff'] is Map
         ? RewardCutoff.fromJson(objectRow(json['cutoff']))
         : null,
+    resolveRewardPlan: json['resolveRewardPlan'] == true,
     seedOnly: json['seedOnly'] == true,
     seeded: json['seeded'] == true,
     rewardPhase: json['rewardPhase'] is Map
@@ -559,6 +569,7 @@ class EngineRequest {
   final bool seedOnly;
   final bool seeded;
   final Doc? rewardPhase;
+  final bool resolveRewardPlan;
 
   /// The same request for one shard, a time limit, other floors or songs.
   EngineRequest copyWith({
@@ -577,6 +588,7 @@ class EngineRequest {
     bool? seedOnly,
     bool? seeded,
     Doc? rewardPhase,
+    bool? resolveRewardPlan,
   }) => EngineRequest(
     members: members,
     snaps: snaps,
@@ -599,6 +611,7 @@ class EngineRequest {
     seedOnly: seedOnly ?? this.seedOnly,
     seeded: seeded ?? this.seeded,
     rewardPhase: rewardPhase ?? this.rewardPhase,
+    resolveRewardPlan: resolveRewardPlan ?? this.resolveRewardPlan,
   );
 
   EngineRequest withGoal(
@@ -636,6 +649,7 @@ class EngineRequest {
     'seedOnly': seedOnly,
     'seeded': seeded,
     if (rewardPhase != null) 'rewardPhase': rewardPhase,
+    if (resolveRewardPlan) 'resolveRewardPlan': true,
     'noFloor': noFloor,
     if (rewardCutoff != null) 'rewardCutoff': rewardCutoff,
     'shard': shard == null
@@ -714,6 +728,8 @@ class HitEvent {
     this.directMean,
     this.convertedMean,
     this.otherMean,
+    this.rewardPlan,
+    this.rewardValues,
   });
   factory HitEvent.fromJson(Map<String, Object?> json) => HitEvent(
     mean: numOf(json['mean']),
@@ -727,6 +743,12 @@ class HitEvent {
     directMean: (json['directMean'] as num?)?.toDouble(),
     convertedMean: (json['convertedMean'] as num?)?.toDouble(),
     otherMean: (json['otherMean'] as num?)?.toDouble(),
+    rewardPlan: json['rewardPlan'] is Map
+        ? objectRow(json['rewardPlan'])
+        : null,
+    rewardValues: json['rewardValues'] is Map
+        ? objectRow(json['rewardValues'])
+        : null,
   );
 
   /// Exact order sums of the strict trial; mean includes CP conversion.
@@ -736,6 +758,8 @@ class HitEvent {
   final double? directMean;
   final double? convertedMean;
   final double? otherMean;
+  final Doc? rewardPlan;
+  final Doc? rewardValues;
   final double mean;
   final double bonusPercent;
   final double challengePoints;
@@ -753,6 +777,8 @@ class HitEvent {
     'directMean': ?directMean,
     'convertedMean': ?convertedMean,
     'otherMean': ?otherMean,
+    if (rewardPlan != null) 'rewardPlan': rewardPlan,
+    if (rewardValues != null) 'rewardValues': rewardValues,
   };
 }
 
@@ -790,6 +816,12 @@ class EngineHit {
                 numOf(objectRow(json['potential'])['area']),
               )
             : null
+        ..rewardRanking = json['rewardRanking'] is List
+            ? [
+                for (final value in json['rewardRanking'] as List)
+                  objectRow(value),
+              ]
+            : null
         ..gekiso = json['gekiso'] is Map ? objectRow(json['gekiso']) : null;
   final SongRef? song;
 
@@ -799,6 +831,7 @@ class EngineHit {
   final int power;
   final List<int> slotPowers;
   final double key;
+  List<Doc>? rewardRanking;
   HitScore? score;
   int? skipScore;
   int? comboBonus;
@@ -818,6 +851,7 @@ class EngineHit {
     'skipScore': skipScore,
     'event': event?.toJson(),
     if (gekiso != null) 'gekiso': gekiso,
+    if (rewardRanking != null) 'rewardRanking': rewardRanking,
     'potential': potential == null
         ? null
         : {'value': potential!.potential, 'area': potential!.area},
@@ -944,6 +978,7 @@ class EngineResponse {
     this.stopReason,
     this.error,
     this.timing,
+    this.resolvedRewardPlan,
   });
   factory EngineResponse.fromJson(Map<String, Object?> json) => EngineResponse(
     results: [
@@ -961,6 +996,9 @@ class EngineResponse {
     plan: json['plan'] is Map
         ? PlanSummary.fromJson(objectRow(json['plan']))
         : null,
+    resolvedRewardPlan: json['resolvedRewardPlan'] is Map
+        ? objectRow(json['resolvedRewardPlan'])
+        : null,
     stopReason: json['stopReason'] as String?,
     error: json['error'] as String?,
     timing: json['timing'] is Map
@@ -968,6 +1006,7 @@ class EngineResponse {
         : null,
   );
   final PlanSummary? plan;
+  final Doc? resolvedRewardPlan;
   String? stopReason;
   String? error;
   EngineTiming? timing;
@@ -983,6 +1022,7 @@ class EngineResponse {
     'unknownCards': unknownCards,
     'elapsedMs': elapsedMs,
     if (plan != null) 'plan': plan!.toJson(),
+    if (resolvedRewardPlan != null) 'resolvedRewardPlan': resolvedRewardPlan,
     'stopReason': stopReason,
     'error': error,
     'timing': timing?.toJson(),
@@ -1295,12 +1335,27 @@ double _rewardMean(Object? detail) => switch (detail) {
 
 /// Higher key first, then the other reward, then mean score.
 int compareHits(EngineHit a, EngineHit b) {
-  var d = b.key.compareTo(a.key);
-  if (d != 0) return d;
-  d = (b.event?.otherMean ?? 0).compareTo(a.event?.otherMean ?? 0);
-  if (d != 0) return d;
-  d = (b.score?.mean ?? 0).compareTo(a.score?.mean ?? 0);
-  if (d != 0) return d;
+  var d = 0;
+  if (a.rewardRanking != null && b.rewardRanking != null) {
+    for (var i = 0; i < a.rewardRanking!.length; i++) {
+      final x = a.rewardRanking![i], y = b.rewardRanking![i];
+      d =
+          (BigInt.parse('${y['numerator']}') *
+                  BigInt.parse('${x['denominator']}'))
+              .compareTo(
+                BigInt.parse('${x['numerator']}') *
+                    BigInt.parse('${y['denominator']}'),
+              );
+      if (d != 0) return d;
+    }
+  } else {
+    d = b.key.compareTo(a.key);
+    if (d != 0) return d;
+    d = (b.event?.otherMean ?? 0).compareTo(a.event?.otherMean ?? 0);
+    if (d != 0) return d;
+    d = (b.score?.mean ?? 0).compareTo(a.score?.mean ?? 0);
+    if (d != 0) return d;
+  }
   d = (a.song?.songId ?? 0).compareTo(b.song?.songId ?? 0);
   if (d != 0) return d;
   d = (a.song?.difficulty ?? 0).compareTo(b.song?.difficulty ?? 0);
@@ -1329,6 +1384,10 @@ Future<EngineResponse> runEngine(
   bool Function()? cancelled,
   String? fingerprint,
 }) async {
+  if (request.goal case EventGoal(:final rewardPlan?)
+      when rewardPlan.isNotEmpty) {
+    throw UnsupportedError('reward-plan-native-required');
+  }
   final clock = Stopwatch()..start();
   double now() => clock.elapsedMicroseconds / 1000;
   final deadline = deadlineOf(request);

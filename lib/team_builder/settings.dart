@@ -4,6 +4,7 @@
 library;
 
 import 'engine/api.dart';
+import 'reward_plan.dart';
 import 'engine/num.dart';
 
 enum GoalKind { score, gekiso, event, plan, power, potential }
@@ -35,6 +36,13 @@ class BuildSettings {
         'includeMemory': custom,
       };
     }
+    final draft = farming;
+    if (draft['weighted'] == true && draft['rewardPlan'] == null) {
+      _json['farming'] = {
+        ...draft,
+        'rewardPlan': RewardPlan.legacy(draft).toJson(),
+      };
+    }
     if (_json['rewardMode'] != 'plan') _json['rewardMode'] = farmingMode;
   }
   final Doc _json;
@@ -55,6 +63,7 @@ class BuildSettings {
     'missEvery': 0,
     'measure': 'points',
     'weighted': false,
+    'rewardPlan': null,
     'weightPoints': 1,
     'weightItems': 0,
     'weightCp': 0,
@@ -87,6 +96,7 @@ class BuildSettings {
       'includeMemory': false,
       'measure': draft['measure'] == 'items' ? 'items' : 'points',
       'weighted': false,
+      'rewardPlan': null,
       'fullRanking': false,
       'k': 1,
       'timeLimit': null,
@@ -95,7 +105,8 @@ class BuildSettings {
 
   String get farmingMode {
     final s = farmingConditions;
-    return const ['solo', 'gekiso'].contains(s['play']) &&
+    return s['rewardPlan'] == null &&
+            const ['solo', 'gekiso'].contains(s['play']) &&
             s['playMode'] == 'ap' &&
             s['requireGrowth'] == true &&
             s['includeMemory'] == false &&
@@ -136,6 +147,7 @@ class BuildSettings {
     'scoreTarget': 'none',
     'targetScore': null,
     'weighted': false,
+    'rewardPlan': null,
     'weightPoints': 1,
     'weightItems': 0,
     'weightCp': 0,
@@ -197,6 +209,11 @@ class BuildSettings {
   List<SongRef> get songs => _songs('songs');
   String get scoreTarget => '${_json['scoreTarget']}';
   int? get targetScore => _nullableInt('targetScore');
+  RewardPlan? get rewardPlan => _json['rewardPlan'] is Map
+      ? RewardPlan.fromJson(objectRow(_json['rewardPlan']))
+      : null;
+  RewardPlan get effectiveRewardPlan =>
+      (rewardPlan ?? RewardPlan.legacy(_json)).effective(route != 'live');
   bool get weighted => _json['weighted'] == true;
   Doc? get weights => weighted
       ? {

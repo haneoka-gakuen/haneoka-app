@@ -17,6 +17,7 @@ import 'pt_controller.dart';
 import 'pt_recommendation.dart';
 import 'results_view.dart' show Formation, openResultSongAnalysis;
 import 'settings.dart';
+import 'reward_plan_view.dart';
 import 'widgets.dart';
 
 class PtTab extends StatefulWidget {
@@ -138,6 +139,8 @@ class _PtTabState extends State<PtTab> {
                 ),
             ],
           ),
+          const SizedBox(height: 16),
+          RewardPlanControls(controller: c),
         ],
       ],
     );
@@ -221,25 +224,6 @@ class _PtTabState extends State<PtTab> {
         icon: Symbols.emoji_events_rounded,
         title: c.tb('eventSetup', 'Event'),
         children: [
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            value: s.ptCycle,
-            title: Text(c.tb('cpCycle', 'Long-term CP conversion')),
-            onChanged: (value) => c.updateSettings({'ptCycle': value == true}),
-          ),
-          Segmented<String>(
-            value: pt.measure,
-            options: [
-              Choice('points', c.tb('measurePoints', 'Event points')),
-              Choice('items', c.tb('measureItems', 'Shop items')),
-            ],
-            onSelected: (value) {
-              pt.measure = value;
-              c.updateSettings({'measure': value});
-              pt.sync();
-              c.changed();
-            },
-          ),
           if (s.ptGekiso && c.hasMission(1, s.songs))
             TextFormField(
               key: const ValueKey('pt-combo'),

@@ -724,7 +724,10 @@ class TeamBuilderController extends ChangeNotifier {
         }
       }
     }
-    if (activity && s.goal == GoalKind.event && s.ptCycle) {
+    if (activity &&
+        s.goal == GoalKind.event &&
+        s.rewardPlan == null &&
+        s.ptCycle) {
       return tb(
         'farm.conversionConflict',
         'CP conversion requires {condition}',
@@ -732,6 +735,7 @@ class TeamBuilderController extends ChangeNotifier {
       );
     }
     if (s.goal == GoalKind.event &&
+        s.rewardPlan == null &&
         s.weighted &&
         (s.weights!.values.any(
               (value) => !numOf(value).isFinite || numOf(value) < 0,
@@ -740,6 +744,18 @@ class TeamBuilderController extends ChangeNotifier {
       return tb(
         'needRewardWeight',
         'Enter at least one positive reward weight',
+      );
+    }
+    if (s.goal == GoalKind.event &&
+        s.rewardPlan != null &&
+        s.effectiveRewardPlan.compile(
+              s.planChallengeSongs,
+              s.challengePoints,
+            ) ==
+            null) {
+      return tb(
+        'rewardPlan.invalidRate',
+        'Enter conversion rates and challenge charts',
       );
     }
     return null;
@@ -788,6 +804,29 @@ class TeamBuilderController extends ChangeNotifier {
       case GoalKind.event:
         if (s.eventId == null) return null;
         if (s.route != 'skip' && s.songs.isEmpty) return null;
+        if (s.rewardPlan != null || s.weighted) {
+          final plan = s.effectiveRewardPlan;
+          final compiled = plan.compile(
+            s.planChallengeSongs,
+            s.challengePoints,
+          );
+          if (compiled == null) return null;
+          return EventGoal(
+            measure: plan.primary,
+            route: RouteKind.values.byName(s.route),
+            eventId: s.eventId!,
+            songs: s.route == 'skip' ? const [] : s.songs,
+            consumption: s.route == 'challenge' ? s.challengePoints : s.boosts,
+            play: play,
+            rewardPlan: compiled,
+            ptOnly: s.ptGekiso && s.route == 'live',
+            ranking: 'primary',
+            minComboBonus: s.minComboBonus,
+            gekiso: s.ptGekiso && s.route == 'live'
+                ? (just: s.ptJust / 100, luckSamples: s.ptLuckSamples)
+                : null,
+          );
+        }
         return EventGoal(
           ranking: s.fullRanking ? null : 'primary',
           weights: s.weights,

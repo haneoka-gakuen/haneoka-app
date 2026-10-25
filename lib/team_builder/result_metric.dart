@@ -34,6 +34,28 @@ ResultMetric resultMetric(
   if ((s.goal == GoalKind.event || s.goal == GoalKind.plan) &&
       hit.event != null) {
     final event = hit.event!;
+    if (event.rewardPlan case final plan?) {
+      final levels = plan['levels'] as List;
+      final primary = '${objectRow((levels.first as List).first)['metric']}';
+      final label = (levels.first as List).length > 1
+          ? text('rewardPlan.converted', 'Converted rewards')
+          : primary == 'points'
+          ? text('pointsPerPlay', 'Event points per play')
+          : primary == 'items'
+          ? text('rewardPlan.itemsPerPlay', 'Badges per play')
+          : text('cpPerPlay', 'Challenge points per play');
+      return ResultMetric(
+        'reward-plan:$plan',
+        label,
+        event.mean,
+        digits: 4,
+        unit: primary == 'points'
+            ? 'PT'
+            : primary == 'challenge-points'
+            ? 'CP'
+            : '',
+      );
+    }
     if (s.weighted) {
       final weights = s.weights!,
           direct = event.directMean ?? event.mean,
