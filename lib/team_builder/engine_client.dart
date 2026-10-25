@@ -1532,12 +1532,18 @@ class _EngineCoordinator {
           ),
         );
       }
+      // Plan shards keep their tuple bounds and lottery state throughout the proof.
+      final eventGoal = request.goal;
+      if (eventGoal is EventGoal &&
+          eventGoal.rewardPlan != null &&
+          eventGoal.gekiso != null) {
+        request = request.copyWith(noFloor: true);
+      }
       final gekiso = request.goal is GekisoGoal;
       final opponents =
           request.goal is GekisoGoal &&
           (request.goal as GekisoGoal).opponents != null;
       final songs = requestSongs(request);
-      final eventGoal = request.goal;
       final songMissions = songs.length == 1 && songs.first != null
           ? intListOf(
               objectRow(

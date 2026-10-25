@@ -935,6 +935,8 @@ class _HitCardState extends State<_HitCard> {
   }
 
   List<Widget> _chips() {
+    final rankTotal =
+        hit.score?.ranks.values.fold<int>(0, (sum, count) => sum + count) ?? 0;
     final s = widget.settings;
     final locale = c.state.text.locale;
     final placements =
@@ -997,7 +999,7 @@ class _HitCardState extends State<_HitCard> {
             icon: Symbols.workspace_premium_rounded,
             label: rankNames[top.key] ?? '${top.key}',
             value:
-                '${formatNumber(locale, top.value / 120 * 100, top.value == 120 ? 0 : 1)}%',
+                '${formatNumber(locale, top.value / rankTotal * 100, top.value == rankTotal ? 0 : 1)}%',
           ),
       ],
       if (hit.event?.rewardPlan == null && hit.event != null) ...[
@@ -1375,6 +1377,10 @@ class _Distribution extends StatelessWidget {
     final span = math.max(1.0, high - low);
     double at(num value) => (value - low) / span;
     final ranks = score.ranks.entries.toList()..sort((a, b) => b.key - a.key);
+    final rankTotal = score.ranks.values.fold<int>(
+      0,
+      (sum, count) => sum + count,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1470,7 +1476,7 @@ class _Distribution extends StatelessWidget {
               ValueChip(
                 label: rankNames[rank.key] ?? '${rank.key}',
                 value:
-                    '${formatNumber(locale, rank.value / 120 * 100, rank.value == 120 ? 0 : 1)}%',
+                    '${formatNumber(locale, rank.value / rankTotal * 100, rank.value == rankTotal ? 0 : 1)}%',
               ),
           ],
         ),
