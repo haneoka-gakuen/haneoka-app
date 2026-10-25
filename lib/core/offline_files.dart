@@ -18,6 +18,27 @@ const _origin = String.fromEnvironment(
   'HANEOKA_API_ORIGIN',
   defaultValue: 'https://haneoka.org',
 );
+final _originUri = Uri.parse(_origin);
+final _storyIndex = RegExp(r'^/api/v1/servers/(jp|intl)/stories$');
+
+bool _canRead(Uri uri) {
+  if (!const {'http', 'https'}.contains(uri.scheme) ||
+      uri.host.isEmpty ||
+      uri.origin != _originUri.origin ||
+      !uri.queryParameters.containsKey('release')) {
+    return false;
+  }
+  if (uri.path.startsWith('/api/v1/servers/')) {
+    return uri.queryParameters.keys.every(
+      (key) =>
+          key == 'release' ||
+          (key == 'projection' &&
+              uri.queryParameters[key] == '4' &&
+              _storyIndex.hasMatch(uri.path)),
+    );
+  }
+  return true;
+}
 
 final class OfflineFileLease {
   OfflineFileLease(this.file, this.release);
@@ -118,7 +139,7 @@ final class OfflineFiles extends ChangeNotifier {
 
   File _object(String digest) =>
       File(p.join(_root.path, 'objects', digest.substring(0, 2), digest));
-  Uri _url(String path) => Uri.parse(_origin).resolve(path);
+  Uri _url(String path) => _originUri.resolve(path);
   Uri _base(Map snapshot) => _url(
     '/downloads/stories/${snapshot['server']}/${snapshot['releaseId']}/',
   );
@@ -602,7 +623,7 @@ final class OfflineFiles extends ChangeNotifier {
   }
 
   (String, String?)? _reference(Uri uri) {
-    if (uri.origin != Uri.parse(_origin).origin) return null;
+    if (!_canRead(uri)) return null;
     if (_aliases[uri.toString()] case final digest?) return (digest, null);
     final release = uri.queryParameters['release'];
     if (release == null) return null;
@@ -632,6 +653,7 @@ final class OfflineFiles extends ChangeNotifier {
   }
 
   Future<OfflineFileLease?> acquire(Uri uri) async {
+    if (!_canRead(uri)) return null;
     await initialize();
     final ref = _reference(uri);
     if (ref == null || ref.$2 != null) return null;
@@ -653,6 +675,7 @@ final class OfflineFiles extends ChangeNotifier {
   }
 
   Future<Uint8List?> readBytes(Uri uri) async {
+    if (!_canRead(uri)) return null;
     await initialize();
     final ref = _reference(uri);
     if (ref == null) return null;
