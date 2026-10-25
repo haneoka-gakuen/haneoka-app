@@ -174,6 +174,12 @@ class _OfflineStoriesScreenState extends State<OfflineStoriesScreen> {
               label: t('app.offline.check'),
               onPressed: busy || _checking ? null : () => _check(force: true),
             ),
+            if (saved != null && library.updateAvailable(server))
+              BarAction(
+                icon: Symbols.system_update_alt_rounded,
+                label: t('app.offline.update'),
+                onPressed: busy ? null : _download,
+              ),
             if (busy)
               BarAction(
                 icon: Symbols.pause_rounded,
@@ -230,18 +236,8 @@ class _OfflineStoriesScreenState extends State<OfflineStoriesScreen> {
                         onPressed: busy || root == null
                             ? null
                             : () => _download(all: true),
-                        icon: Icon(
-                          library.updateAvailable(server)
-                              ? Symbols.system_update_alt_rounded
-                              : Symbols.download_rounded,
-                        ),
-                        label: Text(
-                          t(
-                            library.updateAvailable(server)
-                                ? 'app.offline.update'
-                                : 'app.offline.downloadAll',
-                          ),
-                        ),
+                        icon: const Icon(Symbols.download_rounded),
+                        label: Text(t('app.offline.downloadAll')),
                       ),
                     ),
                   ],
