@@ -1025,16 +1025,41 @@ class _Worker {
   }
 }
 
-/// Worker count follows physical cores on Linux and mobile memory limits.
+/// Worker count follows accessible physical cores on Linux and mobile memory limits.
 int _poolSize() {
   final cores = Platform.numberOfProcessors;
   var limit = Platform.isAndroid || Platform.isIOS ? 2 : 8;
   if (Platform.isLinux) {
+    Set<int>? allowed;
+    try {
+      final row = RegExp(
+        r'^Cpus_allowed_list:\s*(.+)$',
+        multiLine: true,
+      ).firstMatch(File('/proc/self/status').readAsStringSync());
+      if (row != null) {
+        allowed = <int>{};
+        for (final part in row.group(1)!.split(',')) {
+          final bounds = part.trim().split('-');
+          final first = int.parse(bounds.first), last = int.parse(bounds.last);
+          for (var cpu = first; cpu <= last; cpu++) {
+            allowed.add(cpu);
+          }
+        }
+        limit = math.min(limit, allowed.length);
+      }
+    } on FileSystemException {
+      // Linux sandboxes may hide the process CPU mask.
+    }
     try {
       final physical = <String>{};
-      final cpuName = RegExp(r'/cpu[0-9]+$');
+      final cpuName = RegExp(r'/cpu([0-9]+)$');
       for (final cpu in Directory('/sys/devices/system/cpu').listSync()) {
-        if (!cpuName.hasMatch(cpu.path)) continue;
+        final match = cpuName.firstMatch(cpu.path);
+        if (match == null ||
+            (allowed != null &&
+                !allowed.contains(int.parse(match.group(1)!)))) {
+          continue;
+        }
         final topology = '${cpu.path}/topology';
         final package = File('$topology/physical_package_id')
             .readAsStringSync()
@@ -1180,6 +1205,35 @@ class _EngineCoordinator {
   int _generation = 0, _requestId = 0;
   void Function(String)? _activeStop;
   String? _activeRequestId;
+  ({String key, String response})? _completed;
+
+  String? _responseKey(EngineRequest request) {
+    if (request.k > 5 ||
+        request.members.length > 256 ||
+        request.snaps.length > 256 ||
+        requestSongs(request).length > 4 ||
+        request.shard != null ||
+        request.noFloor ||
+        request.seedOnly ||
+        request.seeded ||
+        request.rewardPhase != null ||
+        request.floors != null ||
+        request.cutoff != null ||
+        request.rewardCutoff != null ||
+        request.completed.isNotEmpty) {
+      return null;
+    }
+    final input = request.toJson();
+    for (final field in [
+      'timeLimitMs',
+      'deadline',
+      'requestId',
+      'contextKey',
+    ]) {
+      input.remove(field);
+    }
+    return jsonEncode(input);
+  }
 
   Future<EngineResponse> run(
     EngineRequest request, [
@@ -1230,7 +1284,29 @@ class _EngineCoordinator {
         return emptyResponse(task)
           ..stopReason = expired ? 'budget' : 'cancelled';
       }
-      return _execute(task, started, progress, snapshot);
+      final key = _responseKey(task), completed = _completed;
+      if (key != null &&
+          key == completed?.key &&
+          remaining(task.deadline!) > 0) {
+        final value = objectRow(jsonDecode(completed!.response));
+        value['elapsedMs'] = executionClock() - started;
+        value['timing'] = EngineTiming(wallMs: executionClock() - started)
+            .toJson();
+        final response = EngineResponse.fromJson(value);
+        progress?.call(response.results.length, response.results.length);
+        snapshot?.call(
+          EngineSnapshot(
+            requestId: task.requestId!,
+            contextKey: task.contextKey!,
+            response: response,
+            completed: response.results.length,
+            total: response.results.length,
+            stopReason: 'complete',
+          ),
+        );
+        return response;
+      }
+      return _execute(task, started, progress, snapshot, key);
     });
     _queue = queued.then<void>((_) {}, onError: (Object _, StackTrace _) {});
     return Future.any([queued, waiting.future])
@@ -1285,6 +1361,7 @@ class _EngineCoordinator {
     double started,
     void Function(int, int)? progress,
     void Function(EngineSnapshot)? snapshot,
+    String? responseKey,
   ) async {
     final downloadStart = _downloadMs;
     final before = [
@@ -1357,6 +1434,14 @@ class _EngineCoordinator {
         return;
       }
       lastShown = executionClock();
+      if (force &&
+          responseKey != null &&
+          latest.results.length <= 4 &&
+          latest.stopReason == 'complete' &&
+          latest.error == null &&
+          completeResponse(latest)) {
+        _completed = (key: responseKey, response: jsonEncode(latest.toJson()));
+      }
       snapshot?.call(
         EngineSnapshot(
           requestId: request.requestId!,
