@@ -102,8 +102,12 @@ Doc _read(Pointer<Uint8> pointer) {
 }
 
 Doc _invoke(Doc input, Pointer<Uint8> Function(Pointer<Uint8>) run) {
+  return _invokeJson(jsonEncode(input), run);
+}
+
+Doc _invokeJson(String input, Pointer<Uint8> Function(Pointer<Uint8>) run) {
   final kernel = _kernel!;
-  final bytes = utf8.encode(jsonEncode(input));
+  final bytes = utf8.encode(input);
   final pointer = kernel.allocate(bytes.length + 1);
   if (pointer == nullptr) throw StateError('native-luck-allocation');
   Pointer<Uint8> result = nullptr;
@@ -122,12 +126,23 @@ Doc _invoke(Doc input, Pointer<Uint8> Function(Pointer<Uint8>) run) {
 /// One worker owns a release context. Its coordinator disposes the handle
 /// before terminating the isolate, including cancellation and fatal errors.
 class NativeTeamEngine {
-  NativeTeamEngine(Doc data)
-    : handle = intOf(
-        _invoke({'op': 'create', 'data': data}, _kernel!.context)['handle'],
-      );
+  factory NativeTeamEngine(Doc data, {int workers = 4}) =>
+      NativeTeamEngine.fromSerialized(jsonEncode(data), workers: workers);
+
+  factory NativeTeamEngine.fromSerialized(String data, {int workers = 4}) {
+    final result = _invokeJson(
+      '{"op":"create","data":$data,"trustedScores":true,"workers":$workers}',
+      _kernel!.context,
+    );
+    return NativeTeamEngine._(
+      intOf(result['handle']),
+      result['cooperativeFloor'] == true,
+    );
+  }
+  NativeTeamEngine._(this.handle, this.cooperativeFloor);
   final int handle;
-  NativeTeamEngine.fromHandle(this.handle);
+  final bool cooperativeFloor;
+  NativeTeamEngine.fromHandle(this.handle) : cooperativeFloor = false;
   final _charts = <String>[];
   Set<String> chartsToLoad(List<String> keys) {
     final staged = [..._charts];

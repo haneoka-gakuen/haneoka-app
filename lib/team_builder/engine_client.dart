@@ -26,7 +26,7 @@ import 'engine/master.dart';
 import 'engine/merge.dart';
 import 'engine/num.dart';
 import 'engine/native_luck.dart';
-import 'engine/objectives.dart' show RouteKind;
+import 'engine/objectives.dart' show Criterion, RouteKind;
 import 'engine/power.dart';
 import 'engine/search.dart' show SearchStats;
 
@@ -125,8 +125,11 @@ typedef _Call = (
 );
 
 Future<String> _encodeData(Doc data) => Isolate.run(() => jsonEncode(data));
-Future<int> _createNativeContext(String payload) =>
-    Isolate.run(() => NativeTeamEngine(jsonDecode(payload) as Doc).handle);
+Future<(int, bool)> _createNativeContext(String payload, int workers) =>
+    Isolate.run(() {
+      final engine = NativeTeamEngine.fromSerialized(payload, workers: workers);
+      return (engine.handle, engine.cooperativeFloor);
+    });
 
 const _engineChannel = MethodChannel('org.haneoka/team_engine');
 
@@ -834,9 +837,10 @@ void _engineHostWorker((SendPort, SendPort) ports) {
 
 /// One engine isolate: compiles the release once, then serves calls.
 class _Worker {
-  _Worker(this.serializedData, this.chartUrls);
+  _Worker(this.serializedData, this.chartUrls, this.workers);
   final Future<String> serializedData;
   final Map<String, String> chartUrls;
+  final int workers;
   Isolate? _isolate;
   SendPort? _port;
   ReceivePort? _replies;
@@ -844,6 +848,8 @@ class _Worker {
   Completer<SendPort>? _spawnReady;
   int _generation = 0;
   int? _nativeHandle;
+  bool _cooperativeFloor = false;
+  bool get cooperativeFloor => _cooperativeFloor;
   Future<void>? _ready;
   var _nextId = 1;
   final _pending =
@@ -885,12 +891,16 @@ class _Worker {
     final payload = await serializedData;
     if (generation != _generation) throw const EngineCancelled();
     if (nativeLuckAvailable) {
-      final handle = await _createNativeContext(payload);
+      final (handle, cooperative) = await _createNativeContext(
+        payload,
+        workers,
+      );
       if (generation != _generation) {
         NativeTeamEngine.dispose(handle);
         throw const EngineCancelled();
       }
       _nativeHandle = handle;
+      _cooperativeFloor = cooperative;
     }
     final replies = _replies = ReceivePort();
     final ready = _spawnReady = Completer<SendPort>();
@@ -1008,6 +1018,7 @@ class _Worker {
   }
 
   void _disposeNative() {
+    _cooperativeFloor = false;
     final handle = _nativeHandle;
     _nativeHandle = null;
     if (handle != null) NativeTeamEngine.dispose(handle);
@@ -1077,7 +1088,8 @@ class _EngineCoordinator {
               ) ??
               '',
     };
-    _pool = [for (var i = 0; i < _poolSize(); i++) _Worker(encoded, urls)];
+    final workers = _poolSize();
+    _pool = [for (var i = 0; i < workers; i++) _Worker(encoded, urls, workers)];
   }
 
   /// The merged release document.
@@ -1421,19 +1433,41 @@ class _EngineCoordinator {
           (request.goal as GekisoGoal).opponents != null;
       final songs = requestSongs(request);
       final eventGoal = request.goal;
+      final songMissions = songs.length == 1 && songs.first != null
+          ? intListOf(
+              objectRow(
+                objectRow(
+                  objectRow(data['songs'])['${songs.first!.songId}'],
+                )['gekisou'],
+              )['missionTypes'],
+            )
+          : <int>[];
       final missions =
           eventGoal is EventGoal &&
               eventGoal.gekiso != null &&
               request.k == 1 &&
               eventGoal.songs.length == 1
-          ? intListOf(
-              objectRow(
-                objectRow(
-                  objectRow(data['songs'])['${eventGoal.songs.first.songId}'],
-                )['gekisou'],
-              )['missionTypes'],
-            )
+          ? songMissions
           : <int>[];
+      final parallelSampled =
+          nativeLuckAvailable &&
+          eventGoal is EventGoal &&
+          (eventGoal.gekiso?.luckSamples ?? 0) >= 16 &&
+          request.k == 1 &&
+          eventGoal.songs.length == 1 &&
+          request.constraints.leader == null &&
+          request.members.length >= 5;
+      if (nativeLuckAvailable &&
+          eventGoal is GekisoGoal &&
+          eventGoal.criterion == Criterion.max &&
+          eventGoal.seeds >= 16 &&
+          request.k == 1 &&
+          songs.length == 1 &&
+          songMissions.contains(2) &&
+          request.constraints.leader == null &&
+          !opponents) {
+        return send(_idlest(), request);
+      }
       final wholeReward =
           missions.isNotEmpty &&
           missions.every((kind) => kind == 2 || kind == 3);
@@ -1450,9 +1484,9 @@ class _EngineCoordinator {
           (weightedLive ||
               missions.isNotEmpty && missions.every((kind) => kind == 1));
       final parallel =
-          !wholeReward &&
+          (!wholeReward || parallelSampled) &&
           _pool.length > 1 &&
-          request.members.length >= _parallelMinMembers &&
+          (request.members.length >= _parallelMinMembers || parallelSampled) &&
           request.goal is! PlanGoal &&
           !(gekiso &&
               songs.length == 1 &&
@@ -1514,8 +1548,7 @@ class _EngineCoordinator {
           );
           publish(seeding);
           seeds = [for (final r in seeding.results) ...r.hits];
-        } else if (!request.noFloor &&
-            (stage < 0 || weightedLive && stage == 0)) {
+        } else if (!request.noFloor && stage <= 0) {
           final quick = await send(
             _idlest(),
             request.copyWith(
@@ -1530,11 +1563,7 @@ class _EngineCoordinator {
         final goal = request.goal;
         final sampledRewards = goal is EventGoal && goal.gekiso != null;
         final nominalGekiso = goal is GekisoGoal && goal.seeds == 0;
-        final workers = request.rewardPhase != null && !weightedLive
-            ? _pool.take(4).toList()
-            : nominalGekiso
-            ? _pool.take(5).toList()
-            : _pool;
+        final workers = nominalGekiso ? _pool.take(5).toList() : _pool;
         final count = gekiso || sampledRewards
             ? (request.constraints.leader == null ? workers.length : 1)
             : workers.length * _shardsPerWorker;
@@ -1586,7 +1615,9 @@ class _EngineCoordinator {
                   request.copyWith(
                     seeds: sampledRewards ? current.overall : seeds,
                     seeded:
-                        gekiso || (phase != null && current.overall.isNotEmpty),
+                        gekiso ||
+                        ((sampledRewards || phase != null) &&
+                            current.overall.isNotEmpty),
                     rewardPhase: phaseFloor,
                     shard: (index: index, count: count),
                     floors: phase != null && phase['kind'] != 'primary'
@@ -1601,8 +1632,7 @@ class _EngineCoordinator {
                         value.requestId != request.requestId) {
                       return;
                     }
-                    if (phase != null &&
-                        value.response.overall.length >= request.k) {
+                    if (value.response.overall.length >= request.k) {
                       job.floor = math.max(
                         job.floor,
                         valueOf(value.response.overall[request.k - 1]),
@@ -1634,8 +1664,14 @@ class _EngineCoordinator {
                 final floor = valueOf(response.overall[request.k - 1]);
                 for (final entry in active.entries) {
                   if (!entry.value.retry && floor > entry.value.floor) {
-                    entry.value.retry = true;
-                    entry.key.cancel();
+                    if (entry.key.cooperativeFloor &&
+                        phase != null &&
+                        request.k == 1) {
+                      entry.value.floor = floor;
+                    } else {
+                      entry.value.retry = true;
+                      entry.key.cancel();
+                    }
                   }
                 }
               }
