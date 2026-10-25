@@ -175,7 +175,19 @@ final class ResourceFileCache {
     required ResourceFileKind kind,
     Future<void>? cancelled,
   }) async {
+    var aborted = false;
+    unawaited(
+      cancelled?.then((_) {
+        aborted = true;
+      }),
+    );
+    if (cancelled != null) await Future<void>.value();
+    if (aborted) throw const ResourceCacheCancelled();
     final offline = await OfflineFiles.instance.acquire(uri);
+    if (aborted) {
+      await offline?.release();
+      throw const ResourceCacheCancelled();
+    }
     if (offline != null) {
       return ResourceFileLease._(uri, offline.file, null, offline.release);
     }
@@ -246,7 +258,16 @@ final class ResourceFileCache {
     required ResourceFileKind kind,
     Future<void>? cancelled,
   }) async {
+    var aborted = false;
+    unawaited(
+      cancelled?.then((_) {
+        aborted = true;
+      }),
+    );
+    if (cancelled != null) await Future<void>.value();
+    if (aborted) throw const ResourceCacheCancelled();
     final offline = await OfflineFiles.instance.readBytes(uri);
+    if (aborted) throw const ResourceCacheCancelled();
     if (offline != null) return offline;
     final lease = await acquire(uri, kind: kind, cancelled: cancelled);
     try {

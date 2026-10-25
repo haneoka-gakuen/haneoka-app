@@ -658,18 +658,24 @@ final class OfflineFiles extends ChangeNotifier {
     final ref = _reference(uri);
     if (ref == null || ref.$2 != null) return null;
     final file = _object(ref.$1);
-    if (!await file.exists()) return null;
-    _held.update(ref.$1, (count) => count + 1, ifAbsent: () => 1);
+    final lease = _hold(file, ref.$1);
+    if (await file.exists()) return lease;
+    await lease.release();
+    return null;
+  }
+
+  OfflineFileLease _hold(File file, String digest) {
+    _held.update(digest, (count) => count + 1, ifAbsent: () => 1);
     var released = false;
     return OfflineFileLease(file, () async {
       if (released) return;
       released = true;
-      final count = (_held[ref.$1] ?? 1) - 1;
+      final count = (_held[digest] ?? 1) - 1;
       if (count == 0) {
-        _held.remove(ref.$1);
-        if (_retireAfterUse.remove(ref.$1) && !running) await _collect();
+        _held.remove(digest);
+        if (!running && _retireAfterUse.remove(digest)) await _collect();
       } else {
-        _held[ref.$1] = count;
+        _held[digest] = count;
       }
     });
   }
@@ -680,13 +686,15 @@ final class OfflineFiles extends ChangeNotifier {
     final ref = _reference(uri);
     if (ref == null) return null;
     final file = _object(ref.$1);
-    if (!await file.exists()) return null;
-    if (ref.$2 case final selector?) return _selectedBytes(file.path, selector);
-    final lease = await acquire(uri);
+    final lease = _hold(file, ref.$1);
     try {
-      return await lease?.file.readAsBytes();
+      if (!await file.exists()) return null;
+      if (ref.$2 case final selector?) {
+        return await _selectedBytes(file.path, selector);
+      }
+      return await file.readAsBytes();
     } finally {
-      await lease?.release();
+      await lease.release();
     }
   }
 
@@ -734,6 +742,7 @@ final class OfflineFiles extends ChangeNotifier {
       _held.keys.where((digest) => !used.contains(digest)),
     );
     used.addAll(_held.keys);
+    _aliases.removeWhere((_, digest) => !used.contains(digest));
     final objects = Directory(p.join(_root.path, 'objects'));
     await for (final entity in objects.list(
       recursive: true,
