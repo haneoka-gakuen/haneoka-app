@@ -12,6 +12,7 @@ import '../core/net.dart';
 import '../core/account_resource.dart';
 import 'account_image.dart';
 import '../core/storage.dart';
+import '../core/offline_files.dart';
 
 const _localeImageTags = {
   'en': ['en'],
@@ -89,6 +90,21 @@ class _AppImageState extends State<AppImage> {
   StreamSubscription<void>? _accountChanges;
   int _vectorGeneration = 0;
   String? _chosenUrl;
+  String? _offlineUrl;
+  Future<OfflineFileLease?>? _offlineFile;
+  OfflineFileLease? _offlineLease;
+
+  Future<OfflineFileLease?> _loadOffline(String url) async {
+    final lease = await OfflineFiles.instance.acquire(Uri.parse(url));
+    if (!mounted || _offlineUrl != url) {
+      await lease?.release();
+      return null;
+    }
+    await _offlineLease?.release();
+    _offlineLease = lease;
+    return lease;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -136,6 +152,8 @@ class _AppImageState extends State<AppImage> {
 
   @override
   void dispose() {
+    _offlineUrl = null;
+    unawaited(_offlineLease?.release());
     _retry?.cancel();
     _vectorGeneration++;
     unawaited(_vectorLease?.release());
@@ -205,10 +223,50 @@ class _AppImageState extends State<AppImage> {
     if (_index >= candidates.length) {
       return widget.placeholder ?? _empty();
     }
-    final url = candidates[_index];
+    final local = candidates
+        .where((url) => OfflineFiles.instance.contains(Uri.parse(url)))
+        .firstOrNull;
+    final url = local ?? candidates[_index];
     _chosenUrl = url;
     final private = isAccountResource(Uri.parse(url)),
         epoch = private ? AccountResources.instance.epoch : 0;
+    if (local != null) {
+      if (_offlineUrl != url) {
+        _offlineUrl = url;
+        _offlineFile = _loadOffline(url);
+      }
+      return FutureBuilder<OfflineFileLease?>(
+        future: _offlineFile,
+        builder: (context, snapshot) {
+          final file = snapshot.data?.file;
+          if (file == null) return widget.placeholder ?? _empty();
+          if (Uri.parse(url).path.toLowerCase().endsWith('.svg')) {
+            return SvgPicture.file(
+              file,
+              fit: widget.fit,
+              alignment: widget.alignment,
+              width: double.infinity,
+              height: widget.naturalHeight ? null : double.infinity,
+            );
+          }
+          return LayoutBuilder(
+            builder: (context, constraints) => Image.file(
+              file,
+              cacheWidth: constraints.hasBoundedWidth
+                  ? (constraints.maxWidth *
+                            MediaQuery.devicePixelRatioOf(context))
+                        .round()
+                        .clamp(1, 8192)
+                  : null,
+              fit: widget.fit,
+              alignment: widget.alignment,
+              width: double.infinity,
+              height: widget.naturalHeight ? null : double.infinity,
+            ),
+          );
+        },
+      );
+    }
     if (Uri.tryParse(url)?.path.toLowerCase().endsWith('.svg') == true) {
       if (_vectorUrl != url) {
         _vectorUrl = url;

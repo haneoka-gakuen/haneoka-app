@@ -5170,6 +5170,20 @@
       "guide": "설치 안내",
       "copySource": "AltStore / SideStore 소스 URL 복사",
       "sourceCopied": "소스 URL을 복사했습니다. 0.1.0 출시 후 AltStore Classic 또는 SideStore에 추가하세요。"
+    },
+    "offline": {
+      "title": "오프라인 스토리",
+      "check": "업데이트 확인",
+      "download": "다운로드",
+      "downloadAll": "모두 다운로드",
+      "update": "다운로드 업데이트",
+      "downloadFailed": "다운로드 실패",
+      "loadFailed": "다운로드를 불러올 수 없습니다",
+      "resume": "계속",
+      "pause": "일시 정지",
+      "remove": "다운로드 삭제",
+      "removeConfirm": "다운로드한 스토리를 삭제할까요?",
+      "text": "텍스트 읽기"
     }
   },
   "download": {

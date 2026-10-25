@@ -5170,6 +5170,20 @@
       "guide": "Installation guide",
       "copySource": "Copy AltStore / SideStore source URL",
       "sourceCopied": "Source URL copied. Add it in AltStore Classic or SideStore after release 0.1.0 is published."
+    },
+    "offline": {
+      "title": "Offline stories",
+      "check": "Check for updates",
+      "download": "Download",
+      "downloadAll": "Download all",
+      "update": "Update downloads",
+      "downloadFailed": "Download failed",
+      "loadFailed": "Could not load downloads",
+      "resume": "Resume",
+      "pause": "Pause",
+      "remove": "Remove download",
+      "removeConfirm": "Remove downloaded stories?",
+      "text": "Read text"
     }
   },
   "download": {

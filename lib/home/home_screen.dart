@@ -297,7 +297,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     if (_communityKey != communityKey) {
       _communityKey = communityKey;
-      _community = _loadCommunity();
+      _community = _loadCommunity()..ignore();
     }
   }
 
@@ -793,7 +793,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   setState(() {
                     _data = _load();
                     _announcements = _loadNews();
-                    _community = _loadCommunity();
+                    _community = _loadCommunity()..ignore();
                     _fanInfo = _loadFanInfo();
                   });
                   await _data;

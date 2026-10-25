@@ -39,6 +39,8 @@ class HaneokaApi extends ChangeNotifier {
     ),
     required this.server,
     bool eagerRelease = true,
+    this.offlineRelease,
+    this.offlineSource,
   }) {
     _instances.add(WeakReference(this));
     final reference = WeakReference(this);
@@ -49,6 +51,7 @@ class HaneokaApi extends ChangeNotifier {
   }
 
   final String origin, server;
+  final String? offlineRelease, offlineSource;
   _ReleasePin? _pin, _pendingPin;
   Future<String>? _opening;
   Future<void>? _promotion;
@@ -129,7 +132,9 @@ class HaneokaApi extends ChangeNotifier {
         uri.queryParameters.containsKey('release')) {
       return uri;
     }
-    final pin = _releasePins['${uri.origin}:${parts[1]}'];
+    final pin = parts[1] == server && offlineRelease != null
+        ? offlineRelease
+        : _releasePins['${uri.origin}:${parts[1]}'];
     if (pin == null) return uri;
     return uri.replace(
       queryParameters: {...uri.queryParameters, 'release': pin},
@@ -138,6 +143,10 @@ class HaneokaApi extends ChangeNotifier {
 
   /// Cached active identity is available without waiting for network freshness.
   Future<String> release() {
+    if (offlineRelease case final release?) {
+      _pin = _ReleasePin(release, offlineSource);
+      return Future.value(release);
+    }
     _syncGeneration();
     if (_pin case final pin?) {
       _checkIdentityLater();

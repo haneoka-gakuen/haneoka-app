@@ -46,6 +46,7 @@ import '../home/home_screen.dart';
 import '../records/player.dart';
 import '../stories/stories.dart';
 import '../stories/story_sequence_player.dart';
+import '../stories/offline_stories.dart';
 import '../rendering/native_chart_player_screen.dart';
 import '../rendering/provider_chart_screen.dart';
 import '../team_builder/team_builder_screen.dart';
@@ -124,6 +125,9 @@ const _communityFeeds = {
 
 /// The native screen for a website route, or null while it is being built.
 Widget? screenFor(String route, {required ValueChanged<String> navigate}) {
+  if (Uri.parse(route).path == '/offline/stories') {
+    return const OfflineStoriesScreen();
+  }
   final uri = Uri.parse(route);
   route = uri.path;
   if (uri.path == '/admin' || uri.path.startsWith('/admin/')) {

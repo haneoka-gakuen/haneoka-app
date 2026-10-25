@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'net.dart';
+import 'offline_files.dart';
 import 'public_document_cache.dart';
 import 'storage.dart';
 
@@ -130,6 +131,14 @@ final class _AppDocumentStorage implements PublicDocumentStorage {
 
   @override
   Future<StoredPublicDocument?> read(PublicDocumentKey key) async {
+    final offline = await OfflineFiles.instance.readBytes(key.uri);
+    if (offline != null) {
+      return StoredPublicDocument(
+        bytes: offline,
+        digest: sha256.convert(offline).toString(),
+        validatedAt: DateTime.now(),
+      );
+    }
     final storage = CacheStorage.instance;
     final file = await _file(key);
     if (storage.canRead(file.path) && await file.exists()) {

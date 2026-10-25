@@ -158,6 +158,15 @@ class CacheStorage extends ChangeNotifier {
   }
 
   bool canRead(String path) => !_deleteWhenIdle.contains(path);
+
+  Future<void> retire(File file) async {
+    if ((_active[file.path] ?? 0) > 0) {
+      _deleteWhenIdle.add(file.path);
+    } else {
+      await _delete(file);
+    }
+  }
+
   bool permitWrite(int requestGeneration, String path) {
     if (requestGeneration != generation) return false;
     _deleteWhenIdle.remove(path);

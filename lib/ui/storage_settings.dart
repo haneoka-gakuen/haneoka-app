@@ -6,6 +6,7 @@ import '../core/api.dart';
 import '../core/app_state.dart';
 import '../core/storage.dart';
 import '../shell/links.dart';
+import '../stories/offline_stories.dart';
 
 class StorageSettings extends StatefulWidget {
   const StorageSettings({super.key});
@@ -193,6 +194,18 @@ class _StorageSettingsState extends State<StorageSettings> {
                 t('app.storage.other', 'Settings and other local data'),
                 usage?.other,
                 Symbols.folder_rounded,
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Symbols.download_done_rounded),
+                title: Text(t('app.offline.title')),
+                trailing: const Icon(Symbols.chevron_right_rounded),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    settings: const RouteSettings(name: '/offline/stories'),
+                    builder: (_) => const OfflineStoriesScreen(),
+                  ),
+                ),
               ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,

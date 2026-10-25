@@ -39,7 +39,7 @@ def main():
     hashes = {name: digest_file(path) for name, path in files.items()}
     for name in generated:
         (folder / name).unlink(missing_ok=True)
-    base = f'https://github.com/{args.repository}/releases/download/v{args.version}/'
+    base = f'https://haneoka.org/downloads/app/v{args.version}/'
     ipa = files.get('haneoka-ios-unsigned.ipa')
     if ipa:
         info, permissions = read_ipa(ipa)
@@ -52,7 +52,7 @@ def main():
                             'developerName': 'Haneoka contributors', 'category': 'utilities',
                             'appPermissions': permissions,
                             'localizedDescription': 'Our Notes catalogue, community and local save reader. Standard iOS installs import saves or backups exported on a computer. Private game containers require the separate privileged build.',
-                            'iconURL': f'https://raw.githubusercontent.com/{args.repository}/v{args.version}/assets/brand/android-chrome-512x512.png',
+                            'iconURL': 'https://haneoka.org/android-chrome-512x512.png',
                             'versions': [{'version': args.version, 'buildVersion': args.build_number,
                                           'date': datetime.now(timezone.utc).isoformat(),
                                           'downloadURL': base + ipa.name, 'size': ipa.stat().st_size,
@@ -104,7 +104,7 @@ def main():
             raise SystemExit('MSIX identity does not match the release version/architecture')
         namespace = 'http://schemas.microsoft.com/appx/appinstaller/2018'
         ET.register_namespace('', namespace)
-        stable = f'https://github.com/{args.repository}/releases/latest/download/'
+        stable = 'https://haneoka.org/downloads/app/latest/'
         installer = ET.Element(f'{{{namespace}}}AppInstaller', Uri=stable + f'haneoka-windows-{arch}.appinstaller', Version=identity.get('Version'))
         ET.SubElement(installer, f'{{{namespace}}}MainPackage', Name=identity.get('Name'), Publisher=identity.get('Publisher'), Version=identity.get('Version'), ProcessorArchitecture=arch, Uri=base + files[name].name)
         settings = ET.SubElement(installer, f'{{{namespace}}}UpdateSettings')

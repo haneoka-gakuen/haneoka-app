@@ -5170,6 +5170,20 @@
       "guide": "安装指南",
       "copySource": "复制 AltStore / SideStore 源地址",
       "sourceCopied": "源地址已复制。0.1.0 发布后，在 AltStore Classic 或 SideStore 中添加此源。"
+    },
+    "offline": {
+      "title": "离线剧情",
+      "check": "检查更新",
+      "download": "下载",
+      "downloadAll": "下载全部",
+      "update": "更新下载",
+      "downloadFailed": "下载失败",
+      "loadFailed": "无法读取下载清单",
+      "resume": "继续下载",
+      "pause": "暂停",
+      "remove": "删除下载",
+      "removeConfirm": "删除已下载的剧情？",
+      "text": "阅读文本"
     }
   },
   "download": {
