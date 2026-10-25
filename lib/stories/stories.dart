@@ -1414,8 +1414,11 @@ class _EpisodeTile extends StatelessWidget {
   }
 
   void open(BuildContext context) {
-    final api = CatalogSourceScope.resolve(context, api: this.api,
-      server: episode[serverKey] == null ? null : '${episode[serverKey]}');
+    final api = CatalogSourceScope.resolve(
+      context,
+      api: this.api,
+      server: episode[serverKey] == null ? null : '${episode[serverKey]}',
+    );
     if (episode['cardId'] != null) {
       openStoryCard(context, api, '${episode['cardId']}');
       return;
@@ -1426,7 +1429,10 @@ class _EpisodeTile extends StatelessWidget {
           name:
               '/stories/${Uri.encodeComponent('${episode['storyKey'] ?? episode['storyId'] ?? episode['_key']}')}?mode=$mode',
         ),
-        builder: (_) => CatalogSourceScope(api: api, child: StoryReaderScreen(episode: episode, api: api)),
+        builder: (_) => CatalogSourceScope(
+          api: api,
+          child: StoryReaderScreen(episode: episode, api: api),
+        ),
       ),
     );
   }
@@ -1458,14 +1464,17 @@ Future<void> openStoryCard(
               Navigator.pop(sheet);
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => CatalogSourceScope(api: api, child: StoryReaderScreen(
+                  builder: (_) => CatalogSourceScope(
                     api: api,
-                    episode: {
-                      'storyKey':
-                          'card.${e['resourceSetName'] ?? card['resourceSetName']}.${e['scenarioId']}',
-                      'title': e['title'],
-                    },
-                  )),
+                    child: StoryReaderScreen(
+                      api: api,
+                      episode: {
+                        'storyKey':
+                            'card.${e['resourceSetName'] ?? card['resourceSetName']}.${e['scenarioId']}',
+                        'title': e['title'],
+                      },
+                    ),
+                  ),
                 ),
               );
             },
@@ -1514,7 +1523,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
     final (record, visuals, page) = await (
       api.catalog('stories', id),
       CatalogVisuals.of(api),
-      api is ProviderApi
+      api is ProviderApi || api.offlineRelease != null
           ? Future<Map<String, Object?>?>.value(null)
           : pageData(
               '/${api.server}/$locale/stories/${Uri.encodeComponent(id)}/',
@@ -1629,18 +1638,21 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
                               },
                             ).toString(),
                           ),
-                          builder: (_) => CatalogSourceScope(api: api, child: StorySequencePlayer(
-                            storyId: id,
-                            server: api.server,
+                          builder: (_) => CatalogSourceScope(
                             api: api,
-                            title: detail['title'],
-                            catalog: detail['_storyPayload'] as Map?,
-                            textModeBuilder: (context, currentId) =>
-                                StoryReaderScreen(
-                                  episode: {'storyKey': currentId},
-                                  api: api,
-                                ),
-                          )),
+                            child: StorySequencePlayer(
+                              storyId: id,
+                              server: api.server,
+                              api: api,
+                              title: detail['title'],
+                              catalog: detail['_storyPayload'] as Map?,
+                              textModeBuilder: (context, currentId) =>
+                                  StoryReaderScreen(
+                                    episode: {'storyKey': currentId},
+                                    api: api,
+                                  ),
+                            ),
+                          ),
                         ),
                       );
                     },

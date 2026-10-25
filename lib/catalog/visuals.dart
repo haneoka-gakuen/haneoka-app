@@ -59,13 +59,17 @@ class CatalogVisuals {
     // A provider has no game emblems; what it has still loads.
     final results = await Future.wait([
       for (final resource in const ['ui-marks', 'bands', 'characters'])
-        api
-            .catalog(resource)
-            .then<Object?>(
-              (v) => v,
-              onError: (Object error) =>
-                  resource == 'ui-marks' ? null : Future<Object?>.error(error),
-            ),
+        if (resource == 'ui-marks' && api.offlineRelease != null)
+          Future<Object?>.value(null)
+        else
+          api
+              .catalog(resource)
+              .then<Object?>(
+                (v) => v,
+                onError: (Object error) => resource == 'ui-marks'
+                    ? null
+                    : Future<Object?>.error(error),
+              ),
     ]);
     Map<int, Entry> byId(Object? value) => {
       if (_entries(value) case final Map<String, Object?> rows)

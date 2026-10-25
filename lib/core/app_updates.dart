@@ -74,9 +74,7 @@ class AppUpdates extends ChangeNotifier {
       currentVersion = package.version;
       final response = await netClient
           .get(
-            Uri.parse(
-              'https://api.github.com/repos/haneoka-gakuen/haneoka-app/releases/latest',
-            ),
+            Uri.parse('https://haneoka.org/downloads/app/latest.json'),
             headers: {
               'Accept': 'application/vnd.github+json',
               'X-GitHub-Api-Version': '2026-03-10',
@@ -95,7 +93,7 @@ class AppUpdates extends ChangeNotifier {
           '',
         );
         final url = _releaseLink(data['html_url']);
-        int? buildNumber;
+        int? buildNumber = int.tryParse('${data['buildNumber']}');
         var newer = _newer(version, package.version);
         if (!newer &&
             version == package.version &&
@@ -111,7 +109,7 @@ class AppUpdates extends ChangeNotifier {
               )
               .firstOrNull;
           final metadataUrl = _releaseLink(metadata?['browser_download_url']);
-          if (metadataUrl != null) {
+          if (buildNumber == null && metadataUrl != null) {
             final response = await netClient
                 .get(metadataUrl)
                 .timeout(const Duration(seconds: 15));
@@ -119,20 +117,18 @@ class AppUpdates extends ChangeNotifier {
               final metadata = jsonDecode(response.body);
               if (metadata is Map && metadata['version'] == version) {
                 buildNumber = int.tryParse('${metadata['buildNumber']}');
-                var installedBuild = int.tryParse(package.buildNumber) ?? 0;
-                if (Platform.isAndroid) {
-                  // New releases share a versionCode across all APK variants.
-                  // Older split APKs used Flutter's 1000 * ABI_VERSION offset.
-                  if (installedBuild >= 10000) {
-                    installedBuild -= 10000;
-                  } else if (installedBuild >= 1000) {
-                    installedBuild %= 1000;
-                  }
-                }
-                newer = (buildNumber ?? 0) > installedBuild;
               }
             }
           }
+          var installedBuild = int.tryParse(package.buildNumber) ?? 0;
+          if (Platform.isAndroid) {
+            if (installedBuild >= 10000) {
+              installedBuild -= 10000;
+            } else if (installedBuild >= 1000) {
+              installedBuild %= 1000;
+            }
+          }
+          newer = (buildNumber ?? 0) > installedBuild;
         }
         if (data['draft'] != false ||
             data['prerelease'] != false ||
@@ -253,8 +249,12 @@ class AppUpdates extends ChangeNotifier {
     final uri = value is String ? Uri.tryParse(value) : null;
     return uri != null &&
             uri.scheme == 'https' &&
-            uri.host == 'github.com' &&
-            uri.path.startsWith('/haneoka-gakuen/haneoka-app/releases/')
+            ((uri.host == 'haneoka.org' &&
+                    uri.path.startsWith('/downloads/app/')) ||
+                (uri.host == 'github.com' &&
+                    uri.path.startsWith(
+                      '/haneoka-gakuen/haneoka-app/releases/',
+                    )))
         ? uri
         : null;
   }

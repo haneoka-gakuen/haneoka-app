@@ -5170,6 +5170,20 @@
       "guide": "導入手順",
       "copySource": "AltStore / SideStore のソースURLをコピー",
       "sourceCopied": "ソースURLをコピーしました。0.1.0 公開後、AltStore Classic または SideStore に追加してください。"
+    },
+    "offline": {
+      "title": "オフラインストーリー",
+      "check": "更新を確認",
+      "download": "ダウンロード",
+      "downloadAll": "すべてダウンロード",
+      "update": "ダウンロードを更新",
+      "downloadFailed": "ダウンロードに失敗しました",
+      "loadFailed": "ダウンロードを読み込めません",
+      "resume": "再開",
+      "pause": "一時停止",
+      "remove": "ダウンロードを削除",
+      "removeConfirm": "ダウンロード済みのストーリーを削除しますか？",
+      "text": "テキストを読む"
     }
   },
   "download": {

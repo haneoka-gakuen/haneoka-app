@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
 import 'net.dart';
+import 'offline_files.dart';
 import 'account_resource.dart';
 import 'storage.dart';
 
@@ -174,6 +175,22 @@ final class ResourceFileCache {
     required ResourceFileKind kind,
     Future<void>? cancelled,
   }) async {
+    var aborted = false;
+    unawaited(
+      cancelled?.then((_) {
+        aborted = true;
+      }),
+    );
+    if (cancelled != null) await Future<void>.value();
+    if (aborted) throw const ResourceCacheCancelled();
+    final offline = await OfflineFiles.instance.acquire(uri);
+    if (aborted) {
+      await offline?.release();
+      throw const ResourceCacheCancelled();
+    }
+    if (offline != null) {
+      return ResourceFileLease._(uri, offline.file, null, offline.release);
+    }
     if (isAccountResource(uri)) {
       try {
         final lease = await AccountResources.instance.acquire(
@@ -241,6 +258,17 @@ final class ResourceFileCache {
     required ResourceFileKind kind,
     Future<void>? cancelled,
   }) async {
+    var aborted = false;
+    unawaited(
+      cancelled?.then((_) {
+        aborted = true;
+      }),
+    );
+    if (cancelled != null) await Future<void>.value();
+    if (aborted) throw const ResourceCacheCancelled();
+    final offline = await OfflineFiles.instance.readBytes(uri);
+    if (aborted) throw const ResourceCacheCancelled();
+    if (offline != null) return offline;
     final lease = await acquire(uri, kind: kind, cancelled: cancelled);
     try {
       return await lease.readBytes();

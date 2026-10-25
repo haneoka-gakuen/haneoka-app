@@ -5170,6 +5170,20 @@
       "guide": "安裝指南",
       "copySource": "複製 AltStore / SideStore 來源網址",
       "sourceCopied": "來源網址已複製。0.1.0 發布後，在 AltStore Classic 或 SideStore 中新增此來源。"
+    },
+    "offline": {
+      "title": "離線劇情",
+      "check": "檢查更新",
+      "download": "下載",
+      "downloadAll": "下載全部",
+      "update": "更新下載",
+      "downloadFailed": "下載失敗",
+      "loadFailed": "無法讀取下載清單",
+      "resume": "繼續下載",
+      "pause": "暫停",
+      "remove": "刪除下載",
+      "removeConfirm": "刪除已下載的劇情？",
+      "text": "閱讀文字"
     }
   },
   "download": {

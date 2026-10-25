@@ -37,9 +37,10 @@ class _DownloadScreenState extends State<DownloadScreen> {
     _release ??= _load();
   }
 
-  Future<Map> _load() async => await AppScope.of(context).api.live(
-    'https://api.github.com/repos/haneoka-gakuen/haneoka-app/releases/latest',
-  ) as Map;
+  Future<Map> _load() async =>
+      await AppScope.of(context).api
+              .live('https://haneoka.org/downloads/app/latest.json')
+          as Map;
   Future<void> _download(Map asset) async {
     if (_downloading != null) return;
     final name = asset['name'] as String,
