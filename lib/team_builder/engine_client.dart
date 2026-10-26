@@ -1590,11 +1590,16 @@ class _EngineCoordinator {
           eventGoal.weights != null &&
           request.k == 1 &&
           eventGoal.songs.length == 1;
+      final comboReward =
+          nativeLuckAvailable &&
+          request.rewardPhase == null &&
+          !(eventGoal is EventGoal && eventGoal.rewardPlan != null) &&
+          missions.isNotEmpty &&
+          missions.every((kind) => kind == 1);
       final phasedReward =
           !(eventGoal is EventGoal && eventGoal.rewardPlan != null) &&
           nativeLuckAvailable &&
-          (weightedLive ||
-              missions.isNotEmpty && missions.every((kind) => kind == 1));
+          weightedLive;
       final parallel =
           (!wholeReward || parallelSampled) &&
           _pool.length > 1 &&
@@ -1661,15 +1666,49 @@ class _EngineCoordinator {
           publish(seeding);
           seeds = [for (final r in seeding.results) ...r.hits];
         } else if (!request.noFloor && stage <= 0) {
+          if (comboReward) {
+            await _charts(
+              requestChartSongs(request).whereType<SongRef>().toList(),
+            );
+            await _idlest().warm();
+          }
+          EngineResponse quickResponse(EngineResponse value) => !comboReward
+              ? value
+              : EngineResponse(
+                  results: [
+                    for (final part in value.results)
+                      SongResult(
+                        song: part.song,
+                        hits: [...part.hits],
+                        proven: false,
+                        bound: null,
+                        stats: part.stats,
+                        floor: part.floor,
+                        excludedBelow: part.excludedBelow,
+                        exclusion: part.exclusion,
+                        placements: part.placements,
+                      ),
+                  ],
+                  overall: [...value.overall],
+                  unknownCards: value.unknownCards,
+                  elapsedMs: value.elapsedMs,
+                  plan: value.plan,
+                  resolvedRewardPlan: value.resolvedRewardPlan,
+                  error: value.error,
+                  timing: value.timing,
+                );
           final quick = await send(
             _idlest(),
             request.copyWith(
               deadline: math.min(deadline, executionClock() + _quickMs),
+              rewardPhase: comboReward
+                  ? <String, Object?>{'kind': 'primary'}
+                  : request.rewardPhase,
             ),
-            (value) => publish(value.response),
+            (value) => publish(quickResponse(value.response)),
           );
-          publish(quick);
-          if (completeResponse(quick)) return quick;
+          publish(quickResponse(quick));
+          if (!comboReward && completeResponse(quick)) return quick;
           seeds = [for (final r in quick.results) ...r.hits];
         }
         final goal = request.goal;
@@ -1777,7 +1816,7 @@ class _EngineCoordinator {
                 for (final entry in active.entries) {
                   if (!entry.value.retry && floor > entry.value.floor) {
                     if (entry.key.cooperativeFloor &&
-                        phase != null &&
+                        (phase != null || comboReward) &&
                         request.k == 1) {
                       entry.value.floor = floor;
                     } else {
