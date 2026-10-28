@@ -385,7 +385,7 @@
       "character": "캐릭터",
       "attribute": "속성",
       "type": "유형",
-      "release": "공개",
+      "release": "출시",
       "rewards": "보상",
       "stats": "능력치",
       "collection": "컬렉션",
@@ -394,7 +394,9 @@
       "info": "정보",
       "conditions": "조건",
       "effects": "효과",
-      "scoreRanks": "스코어 랭크"
+      "scoreRanks": "스코어 랭크",
+      "skill": "스킬",
+      "skillHint": "스킬 이름"
     },
     "songs": {
       "fields": {
@@ -646,7 +648,10 @@
         "artworkCard": "일러스트 카드",
         "unlockConditions": "해금 조건",
         "gekisouSupportSkill": "격주 서포트 스킬",
-        "cardMovieGacha": "가챠 연출"
+        "cardMovieGacha": "가챠 연출",
+        "total": "총 능력치",
+        "image": "카드 이미지",
+        "hasImage": "이미지 있음"
       },
       "costs": {
         "mode": "재료 계산",
@@ -2878,7 +2883,31 @@
       "adjustCardRange": "카드 범위 조정",
       "allNoSnaps": "5명 모두 스냅 미설정",
       "comparisonValue": "지표 값",
-      "playJudgements": "연주 판정"
+      "playJudgements": "연주 판정",
+      "quickAdd": "빠른 추가",
+      "quickAddDone": "추가 완료",
+      "quickAddHint": "눌러서 추가·해제",
+      "quickAddOwned": "{name} 추가됨",
+      "quickAddDropped": "{name} 해제됨",
+      "arena": {
+        "tab": "아레나",
+        "title": "아레나 규칙",
+        "season": "시즌 {id} · {from} – {to}",
+        "current": "진행 중",
+        "range": "{count}번째",
+        "original": "오리지널 곡",
+        "any": "전체 속성",
+        "empty": "이 서버에는 아레나 일정이 없습니다.",
+        "noSeason": "진행 중인 시즌이 없습니다",
+        "apply": "적용"
+      },
+      "songRules": "곡 규칙",
+      "songRule": {
+        "attribute": "곡 속성",
+        "master": "데이터 기준",
+        "none": "—",
+        "clear": "데이터 값으로"
+      }
     },
     "calendar": {
       "title": "달력",

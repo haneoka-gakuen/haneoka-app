@@ -394,7 +394,9 @@
       "info": "Info",
       "conditions": "Conditions",
       "effects": "Effects",
-      "scoreRanks": "Score Ranks"
+      "scoreRanks": "Score Ranks",
+      "skill": "Skill",
+      "skillHint": "Skill name"
     },
     "songs": {
       "fields": {
@@ -646,7 +648,10 @@
         "artworkCard": "Artwork card",
         "unlockConditions": "Unlock conditions",
         "gekisouSupportSkill": "Gekiso support skill",
-        "cardMovieGacha": "Gacha movie"
+        "cardMovieGacha": "Gacha movie",
+        "total": "Total stat",
+        "image": "Card image",
+        "hasImage": "Has artwork"
       },
       "costs": {
         "mode": "Material calculation",
@@ -2878,7 +2883,31 @@
       "adjustCardRange": "Adjust card range",
       "allNoSnaps": "No Snapshots in any of the five slots",
       "comparisonValue": "Value",
-      "playJudgements": "Play judgements"
+      "playJudgements": "Play judgements",
+      "quickAdd": "Quick add",
+      "quickAddDone": "Finish quick add",
+      "quickAddHint": "Tap to add or remove",
+      "quickAddOwned": "Quick added {name}",
+      "quickAddDropped": "Removed {name}",
+      "arena": {
+        "tab": "Arena",
+        "title": "Arena rules",
+        "season": "Season {id} · {from} – {to}",
+        "current": "Now",
+        "range": "Range {count}",
+        "original": "Original song",
+        "any": "Any attribute",
+        "empty": "No Arena schedule for this server.",
+        "noSeason": "No active season",
+        "apply": "Apply"
+      },
+      "songRules": "Song rules",
+      "songRule": {
+        "attribute": "Song attribute",
+        "master": "From data",
+        "none": "—",
+        "clear": "Use data values"
+      }
     },
     "calendar": {
       "title": "Calendar",

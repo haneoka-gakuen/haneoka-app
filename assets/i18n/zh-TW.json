@@ -385,7 +385,7 @@
       "character": "角色",
       "attribute": "屬性",
       "type": "類型",
-      "release": "發布",
+      "release": "發售",
       "rewards": "報酬",
       "stats": "數值",
       "collection": "收藏",
@@ -394,7 +394,9 @@
       "info": "資訊",
       "conditions": "條件",
       "effects": "效果",
-      "scoreRanks": "分數等級"
+      "scoreRanks": "分數等級",
+      "skill": "技能",
+      "skillHint": "技能名"
     },
     "songs": {
       "fields": {
@@ -646,7 +648,10 @@
         "artworkCard": "圖片來源卡牌",
         "unlockConditions": "解鎖條件",
         "gekisouSupportSkill": "激奏支援技能",
-        "cardMovieGacha": "抽卡演出"
+        "cardMovieGacha": "抽卡演出",
+        "total": "總屬性",
+        "image": "卡面",
+        "hasImage": "有卡面"
       },
       "costs": {
         "mode": "材料計算",
@@ -2878,7 +2883,31 @@
       "adjustCardRange": "調整卡牌範圍",
       "allNoSnaps": "五人均未配置留影",
       "comparisonValue": "指標值",
-      "playJudgements": "演奏判定"
+      "playJudgements": "演奏判定",
+      "quickAdd": "快速錄入",
+      "quickAddDone": "完成錄入",
+      "quickAddHint": "點按新增或移除",
+      "quickAddOwned": "已快速新增 {name}",
+      "quickAddDropped": "已移除 {name}",
+      "arena": {
+        "tab": "競技場",
+        "title": "競技場規則",
+        "season": "第 {id} 賽季 · {from} – {to}",
+        "current": "目前",
+        "range": "第 {count} 檔",
+        "original": "原曲",
+        "any": "全屬性",
+        "empty": "此伺服器沒有競技場賽程。",
+        "noSeason": "沒有進行中的賽季",
+        "apply": "套用"
+      },
+      "songRules": "曲目規則",
+      "songRule": {
+        "attribute": "曲目屬性",
+        "master": "跟隨資料",
+        "none": "—",
+        "clear": "還原資料值"
+      }
     },
     "calendar": {
       "title": "日曆",

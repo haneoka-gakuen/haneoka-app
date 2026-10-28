@@ -385,6 +385,20 @@ class _BuildTabState extends State<BuildTab> {
             ],
           ],
         ),
+      if (s.goal == GoalKind.gekiso) ...[
+        const SizedBox(height: 16),
+        ToolSection(
+          icon: Symbols.tune_rounded,
+          title: c.tb('songRules', 'Song rules'),
+          children: [
+            _SongRulesEditor(
+              controller: c,
+              rules: s.songRulesOverride,
+              onChanged: (value) => set({'songRules': value}),
+            ),
+          ],
+        ),
+      ],
       if (s.goal == GoalKind.event) ...[
         const SizedBox(height: 16),
         ToolSection(
@@ -1219,6 +1233,114 @@ class _WrappingSegments<T> extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Per-song rules of an Arena period: the attribute a song is treated as and
+/// the three range types (`lit/team-builder/song-rules.ts`).
+class _SongRulesEditor extends StatelessWidget {
+  const _SongRulesEditor({
+    required this.controller,
+    required this.rules,
+    required this.onChanged,
+  });
+  final TeamBuilderController controller;
+  final ({int musicType, List<int> missions})? rules;
+  final ValueChanged<Map<String, Object?>?> onChanged;
+
+  void _write({int? musicType, int? mission, int? index}) {
+    final current = rules;
+    final nextMusic = musicType ?? current?.musicType ?? 0;
+    final nextMissions = [
+      for (var i = 0; i < 3; i++)
+        index == i ? mission ?? 0 : (current?.missions[i] ?? 0),
+    ];
+    onChanged({'musicType': nextMusic, 'missions': nextMissions});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller;
+    final catalog = c.catalog!;
+    const missionNames = ['—', 'COMBO', 'LUCK', 'JUST'];
+    Widget field(String label, Widget child) => Padding(
+      padding: const EdgeInsets.only(right: 8, bottom: 8),
+      child: InputDecorator(
+        decoration: InputDecoration(isDense: true, labelText: label),
+        child: child,
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        field(
+          c.tb('songRule.attribute', 'Song attribute'),
+          DropdownButton<int>(
+            value: rules?.musicType ?? -1,
+            isExpanded: true,
+            underline: const SizedBox.shrink(),
+            items: [
+              DropdownMenuItem(
+                value: -1,
+                child: Text(c.tb('songRule.master', 'From data')),
+              ),
+              DropdownMenuItem(
+                value: 0,
+                child: Text(c.tb('arena.original', 'Original song')),
+              ),
+              for (final id in [1, 2, 3, 4, 5])
+                DropdownMenuItem(
+                  value: id,
+                  child: Text(catalog.attributeName(id)),
+                ),
+              DropdownMenuItem(
+                value: 99,
+                child: Text(c.tb('arena.any', 'Any attribute')),
+              ),
+            ],
+            onChanged: (value) => value == null || value < 0
+                ? onChanged(null)
+                : _write(musicType: value),
+          ),
+        ),
+        Row(
+          children: [
+            for (var index = 0; index < 3; index++)
+              Expanded(
+                child: field(
+                  c.tb('arena.range', 'Range {count}', {'count': index + 1}),
+                  DropdownButton<int>(
+                    value: rules?.missions[index] ?? 0,
+                    isExpanded: true,
+                    underline: const SizedBox.shrink(),
+                    items: [
+                      for (var value = 0; value < 4; value++)
+                        DropdownMenuItem(
+                          value: value,
+                          child: Text(
+                            value == 0
+                                ? c.tb('songRule.none', '—')
+                                : missionNames[value],
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) =>
+                        _write(index: index, mission: value ?? 0),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: rules == null ? null : () => onChanged(null),
+            icon: const Icon(Symbols.restart_alt_rounded, size: 18),
+            label: Text(c.tb('songRule.clear', 'Use data values')),
+          ),
+        ),
+      ],
     );
   }
 }

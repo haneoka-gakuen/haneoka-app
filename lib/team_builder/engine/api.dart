@@ -339,6 +339,8 @@ class GekisoGoal extends Goal {
     this.seeds = 0,
     this.minComboBonus = 1,
     this.opponents,
+    this.musicType,
+    this.missions,
   });
   final List<SongRef> songs;
   final Criterion criterion;
@@ -354,6 +356,11 @@ class GekisoGoal extends Goal {
   final int seeds;
   final int minComboBonus;
   final List<List<double>>? opponents;
+
+  /// Song rules override (`arena.ts` SongRules): the attribute a song is
+  /// treated as and the three range types. Null keeps the master values.
+  final int? musicType;
+  final List<int>? missions;
 }
 
 class PotentialGoal extends Goal {
@@ -1050,9 +1057,16 @@ class ChartCache {
   }
 
   /// The Gekisou chart of a song at a stated accuracy and assumed range rank.
-  Future<GekisoChart> gekiso(SongRef ref, Accuracy accuracy, int rank) {
+  /// [missions] overlays the three range types of an Arena period.
+  Future<GekisoChart> gekiso(
+    SongRef ref,
+    Accuracy accuracy,
+    int rank, {
+    List<int>? missions,
+  }) {
     final key =
-        '${ref.key}:${accuracy.great}:${accuracy.just}:${accuracy.missEvery}:$rank';
+        '${ref.key}:${accuracy.great}:${accuracy.just}:${accuracy.missEvery}:$rank'
+        '${missions == null ? '' : ':${missions.join('-')}'}';
     var value = _gekiso.remove(key);
     if (value == null) {
       final song = master.songs[ref.songId];
@@ -1067,7 +1081,7 @@ class ChartCache {
           master,
           source,
           difficulty.playLevel,
-          song.gekisoMissions,
+          missions ?? song.gekisoMissions,
           accuracy,
           rank,
         ),
@@ -1141,7 +1155,13 @@ PlayerState playerState(EngineMaster master, PlayerInput input) {
 }
 
 /// Song view of a chart; a challenge song uses its own nonzero music type.
-MusicView musicView(EngineMaster master, int songId, int? challengeEventId) {
+/// [musicTypeOverride] applies the song rules of an Arena period on top.
+MusicView musicView(
+  EngineMaster master,
+  int songId,
+  int? challengeEventId, {
+  int? musicTypeOverride,
+}) {
   final song = master.songs[songId]!;
   var musicType = song.musicType;
   if (challengeEventId != null) {
@@ -1152,6 +1172,7 @@ MusicView musicView(EngineMaster master, int songId, int? challengeEventId) {
         .firstOrNull;
     if ((challenge?.musicType ?? 0) != 0) musicType = challenge!.musicType;
   }
+  if (musicTypeOverride != null) musicType = musicTypeOverride;
   return MusicView(musicType, song.bestTags, songId);
 }
 
@@ -1688,7 +1709,12 @@ Future<EngineResponse> runEngine(
       _ => null,
     };
     final music = song != null
-        ? musicView(master, song.songId, challengeId)
+        ? musicView(
+            master,
+            song.songId,
+            challengeId,
+            musicTypeOverride: goal is GekisoGoal ? goal.musicType : null,
+          )
         : null;
     final powerEffects = challengeId != null
         ? master.events[challengeId]?.effects ?? const <EventEffectRow>[]
@@ -2184,7 +2210,12 @@ Future<EngineResponse> runEngine(
           ),
         );
       case GekisoGoal():
-        final gekiso = await charts.gekiso(song!, goal.accuracy, goal.rank);
+        final gekiso = await charts.gekiso(
+          song!,
+          goal.accuracy,
+          goal.rank,
+          missions: goal.missions,
+        );
         final exactRanking =
             !gekiso.luck && goal.seeds <= 1 && !request.seedOnly;
         double margin(double key) => math.max(1, key.abs()) * 3e-5;

@@ -385,7 +385,7 @@
       "character": "角色",
       "attribute": "属性",
       "type": "类型",
-      "release": "发布",
+      "release": "发售",
       "rewards": "奖励",
       "stats": "数值",
       "collection": "收藏",
@@ -394,7 +394,9 @@
       "info": "信息",
       "conditions": "条件",
       "effects": "效果",
-      "scoreRanks": "得分评级"
+      "scoreRanks": "得分评级",
+      "skill": "技能",
+      "skillHint": "技能名"
     },
     "songs": {
       "fields": {
@@ -646,7 +648,10 @@
         "artworkCard": "图片来源卡牌",
         "unlockConditions": "解锁条件",
         "gekisouSupportSkill": "激奏支援技能",
-        "cardMovieGacha": "抽卡演出"
+        "cardMovieGacha": "抽卡演出",
+        "total": "总属性",
+        "image": "卡面",
+        "hasImage": "有卡面"
       },
       "costs": {
         "mode": "材料计算",
@@ -2878,7 +2883,31 @@
       "adjustCardRange": "调整卡牌范围",
       "allNoSnaps": "五人均未配置留影",
       "comparisonValue": "指标值",
-      "playJudgements": "演奏判定"
+      "playJudgements": "演奏判定",
+      "quickAdd": "快速录入",
+      "quickAddDone": "完成录入",
+      "quickAddHint": "点按添加或移除",
+      "quickAddOwned": "已快速添加 {name}",
+      "quickAddDropped": "已移除 {name}",
+      "arena": {
+        "tab": "竞技场",
+        "title": "竞技场规则",
+        "season": "第 {id} 赛季 · {from} – {to}",
+        "current": "当前",
+        "range": "第 {count} 档",
+        "original": "原曲",
+        "any": "全属性",
+        "empty": "该服务器没有竞技场赛程。",
+        "noSeason": "没有进行中的赛季",
+        "apply": "应用"
+      },
+      "songRules": "曲目规则",
+      "songRule": {
+        "attribute": "曲目属性",
+        "master": "跟随数据",
+        "none": "—",
+        "clear": "恢复数据值"
+      }
     },
     "calendar": {
       "title": "日历",

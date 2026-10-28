@@ -76,6 +76,22 @@ class BuildSettings {
     'ptCycle': false,
   };
   Doc get farming => {...farmingDefaults, ...objectRow(_json['farming'])};
+
+  /// Song rules overlay for Gekiso searches (`arena.ts` SongRules), or null to
+  /// use the values recorded in the master data.
+  ({int musicType, List<int> missions})? get songRulesOverride {
+    final row = objectRow(_json['songRules']);
+    if (row.isEmpty) return null;
+    final missions = [
+      for (final value in (row['missions'] as List? ?? const []))
+        if (value is num) value.toInt(),
+    ];
+    return (
+      musicType: intOf(row['musicType']),
+      missions: [for (var i = 0; i < 3; i++) i < missions.length ? missions[i] : 0],
+    );
+  }
+
   Doc get farmingConditions {
     final draft = farming;
     if (draft['play'] != 'gekiso') {
@@ -156,6 +172,7 @@ class BuildSettings {
     'gekisoPlacementMode': 'rank',
     'gekisoOpponents': <Object?>['', '', ''],
     'minComboBonus': 1,
+    'songRules': null,
     'playMode': 'ap',
     'great': 3,
     'good': 0,

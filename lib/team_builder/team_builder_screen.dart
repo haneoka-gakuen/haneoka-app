@@ -14,6 +14,7 @@ import '../shell/links.dart';
 import '../shell/page.dart';
 import '../ui/labels.dart';
 import 'account_tab.dart';
+import 'arena.dart';
 import 'box.dart';
 import 'box_import_screen.dart';
 import 'box_tab.dart';
@@ -25,7 +26,7 @@ import 'song_comparison_view.dart';
 import 'results_view.dart' show showResultComparison;
 import 'widgets.dart';
 
-enum _Tab { build, pt, comparison, box, account, teams }
+enum _Tab { build, pt, comparison, arena, box, account, teams }
 
 class TeamBuilderScreen extends StatefulWidget {
   const TeamBuilderScreen({
@@ -48,7 +49,9 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
   bool _manualBuild = false;
   void _selectTab(_Tab tab) {
     if (const [_Tab.box, _Tab.account, _Tab.teams].contains(tab) &&
-        const [_Tab.build, _Tab.pt, _Tab.comparison].contains(_tab)) {
+        const [_Tab.build, _Tab.pt, _Tab.comparison, _Tab.arena].contains(
+          _tab,
+        )) {
       _returnTab = _tab;
     }
     setState(() {
@@ -168,6 +171,12 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
         c.tb('sc.tab', 'Gekiso songs'),
         null,
       ),
+      (
+        _Tab.arena,
+        Symbols.military_tech_rounded,
+        c.tb('arena.tab', 'Arena'),
+        null,
+      ),
     ];
     final Widget body;
     if (!ready) {
@@ -197,7 +206,8 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
       body = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (const [_Tab.build, _Tab.pt, _Tab.comparison].contains(_tab))
+          if (const [_Tab.build, _Tab.pt, _Tab.comparison, _Tab.arena]
+              .contains(_tab))
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: PillTabs<_Tab>(
@@ -237,6 +247,7 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
                 ],
               ),
               _Tab.comparison => SongComparisonTab(controller: c),
+              _Tab.arena => ArenaTab(controller: c),
               _Tab.pt => PtTab(
                 controller: c,
                 openTab: (name) =>

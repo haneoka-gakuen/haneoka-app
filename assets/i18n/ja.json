@@ -385,7 +385,7 @@
       "character": "キャラクター",
       "attribute": "属性",
       "type": "タイプ",
-      "release": "公開",
+      "release": "実装日",
       "rewards": "報酬",
       "stats": "ステータス",
       "collection": "コレクション",
@@ -394,7 +394,9 @@
       "info": "情報",
       "conditions": "条件",
       "effects": "効果",
-      "scoreRanks": "スコアランク"
+      "scoreRanks": "スコアランク",
+      "skill": "スキル",
+      "skillHint": "スキル名"
     },
     "songs": {
       "fields": {
@@ -646,7 +648,10 @@
         "artworkCard": "イラストのカード",
         "unlockConditions": "解放条件",
         "gekisouSupportSkill": "撃奏サポートスキル",
-        "cardMovieGacha": "ガチャ演出"
+        "cardMovieGacha": "ガチャ演出",
+        "total": "総合力",
+        "image": "カード画像",
+        "hasImage": "画像あり"
       },
       "costs": {
         "mode": "素材計算",
@@ -2878,7 +2883,31 @@
       "adjustCardRange": "カード範囲を変更",
       "allNoSnaps": "5人ともスナップ未設定",
       "comparisonValue": "指標値",
-      "playJudgements": "演奏判定"
+      "playJudgements": "演奏判定",
+      "quickAdd": "クイック追加",
+      "quickAddDone": "追加を終了",
+      "quickAddHint": "タップで追加・解除",
+      "quickAddOwned": "{name} を追加しました",
+      "quickAddDropped": "{name} を外しました",
+      "arena": {
+        "tab": "アリーナ",
+        "title": "アリーナルール",
+        "season": "シーズン {id} · {from} – {to}",
+        "current": "開催中",
+        "range": "{count} 枠目",
+        "original": "オリジナル曲",
+        "any": "全属性",
+        "empty": "このサーバーのアリーナ日程はありません。",
+        "noSeason": "開催中のシーズンはありません",
+        "apply": "適用"
+      },
+      "songRules": "曲目ルール",
+      "songRule": {
+        "attribute": "曲の属性",
+        "master": "データに従う",
+        "none": "—",
+        "clear": "データ値に戻す"
+      }
     },
     "calendar": {
       "title": "カレンダー",

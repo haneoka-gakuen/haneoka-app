@@ -41,6 +41,10 @@ class _BoxTabState extends State<BoxTab> {
   CardFilters _filters = const CardFilters();
   bool _filtersOpen = false;
 
+  /// Quick add: tapping a card marks it owned (or drops it) instead of
+  /// opening the growth editor (`box-tab.ts` Quick add).
+  bool _quickAdd = false;
+
   TeamBuilderController get c => widget.controller;
 
   String _prefix(bool members) => members ? 'm' : 's';
@@ -252,6 +256,23 @@ class _BoxTabState extends State<BoxTab> {
                 child: const Icon(Symbols.filter_list_rounded),
               ),
             ),
+            IconButton.filledTonal(
+              tooltip: _quickAdd
+                  ? c.tb('quickAddDone', 'Finish quick add')
+                  : c.tb('quickAdd', 'Quick add'),
+              isSelected: _quickAdd,
+              onPressed: () => setState(() => _quickAdd = !_quickAdd),
+              icon: Icon(
+                _quickAdd
+                    ? Symbols.check_circle_rounded
+                    : Symbols.add_circle_outline_rounded,
+              ),
+            ),
+            if (_quickAdd)
+              Chip(
+                avatar: const Icon(Symbols.touch_app_rounded, size: 18),
+                label: Text(c.tb('quickAddHint', 'Tap to add or remove')),
+              ),
           ],
         ),
         if (_filtersOpen)
@@ -467,7 +488,21 @@ class _BoxTabState extends State<BoxTab> {
         if (owned == null)
           TileMark.text(MarkAt.bottomStart, c.tb('notOwned', 'Not owned')),
       ],
-      onTap: () => showCardEditor(context, c, members: _members, id: id),
+      onTap: () {
+        if (!_quickAdd) {
+          showCardEditor(context, c, members: _members, id: id);
+          return;
+        }
+        final name = catalog.cardName(_members, id);
+        _bulk(
+          owned == null
+              ? c.tb('quickAddOwned', 'Quick added {name}', {'name': name})
+              : c.tb('quickAddDropped', 'Quick dropped {name}', {'name': name}),
+          owned == null
+              ? [('$p.$id.own', true), ('$p.$id.use', true)]
+              : [('$p.$id.own', false)],
+        );
+      },
       action: Material(
         color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
         shape: const CircleBorder(),

@@ -14,7 +14,8 @@ import 'engine/api.dart';
 import 'engine/num.dart';
 import 'widgets.dart';
 
-/// Card filters: bands, characters, attributes and rarities.
+/// Card filters: bands, characters, attributes, rarities, artwork presence
+/// and a total-stat range (`card-filters.ts`).
 class CardFilters {
   const CardFilters({
     this.query = '',
@@ -22,6 +23,12 @@ class CardFilters {
     this.characters = const {},
     this.attributes = const {},
     this.rarities = const {},
+    this.totalMin,
+    this.totalMax,
+    this.artOnly = false,
+    this.releaseFrom,
+    this.releaseTo,
+    this.skill = '',
   });
   final String query;
   final Set<int> bands;
@@ -29,8 +36,29 @@ class CardFilters {
   final Set<int> attributes;
   final Set<int> rarities;
 
+  /// Bounds on performance + technique + visual at maximum growth.
+  final int? totalMin;
+  final int? totalMax;
+
+  /// Only cards that actually ship a card image.
+  final bool artOnly;
+
+  /// Release window, in epoch milliseconds (`catalogMetadata.releasedAt`).
+  final int? releaseFrom;
+  final int? releaseTo;
+
+  /// Substring matched against the resolved live / gekiso / leader skill names.
+  final String skill;
+
   int get active =>
-      bands.length + characters.length + attributes.length + rarities.length;
+      bands.length +
+      characters.length +
+      attributes.length +
+      rarities.length +
+      (totalMin != null || totalMax != null ? 1 : 0) +
+      (artOnly ? 1 : 0) +
+      (releaseFrom != null || releaseTo != null ? 1 : 0) +
+      (skill.trim().isEmpty ? 0 : 1);
 
   CardFilters copyWith({
     String? query,
@@ -38,12 +66,26 @@ class CardFilters {
     Set<int>? characters,
     Set<int>? attributes,
     Set<int>? rarities,
+    int? totalMin,
+    int? totalMax,
+    bool resetTotal = false,
+    bool? artOnly,
+    int? releaseFrom,
+    int? releaseTo,
+    bool resetRelease = false,
+    String? skill,
   }) => CardFilters(
     query: query ?? this.query,
     bands: bands ?? this.bands,
     characters: characters ?? this.characters,
     attributes: attributes ?? this.attributes,
     rarities: rarities ?? this.rarities,
+    totalMin: resetTotal ? null : (totalMin ?? this.totalMin),
+    totalMax: resetTotal ? null : (totalMax ?? this.totalMax),
+    artOnly: artOnly ?? this.artOnly,
+    releaseFrom: resetRelease ? null : (releaseFrom ?? this.releaseFrom),
+    releaseTo: resetRelease ? null : (releaseTo ?? this.releaseTo),
+    skill: skill ?? this.skill,
   );
 
   bool matches(TeamCatalog catalog, bool members, int id) {
@@ -63,6 +105,49 @@ class CardFilters {
     if (rarities.isNotEmpty &&
         !rarities.contains(catalog.rarity(members, id))) {
       return false;
+    }
+    if (artOnly && catalog.cardImage(members, id).isEmpty) return false;
+    if (totalMin != null || totalMax != null) {
+      final stat = objectRow(catalog.card(members, id)['statMax']);
+      final total =
+          intOf(stat['performance']) +
+          intOf(stat['technique']) +
+          intOf(stat['visual']);
+      if (totalMin != null && total < totalMin!) return false;
+      if (totalMax != null && total > totalMax!) return false;
+    }
+    final meta = objectRow(catalog.card(members, id)['catalogMetadata']);
+    if (releaseFrom != null || releaseTo != null) {
+      final raw = meta['releasedAt'];
+      num? stamp;
+      if (raw is List) {
+        for (final value in raw) {
+          if (value is num) {
+            stamp = value;
+            break;
+          }
+        }
+      } else if (raw is num) {
+        stamp = raw;
+      }
+      if (stamp == null) return false;
+      final millis = stamp.toInt();
+      if (releaseFrom != null && millis < releaseFrom!) return false;
+      if (releaseTo != null && millis > releaseTo!) return false;
+    }
+    final skillQuery = skill.trim().toLowerCase();
+    if (skillQuery.isNotEmpty) {
+      final resolved = objectRow(meta['resolvedSkills']);
+      final names = <String>[];
+      for (final role in resolved.values) {
+        final names_ = objectRow(role)['skillName'];
+        if (names_ is List) {
+          names.addAll(names_.whereType<String>());
+        }
+      }
+      if (!names.any((name) => name.toLowerCase().contains(skillQuery))) {
+        return false;
+      }
     }
     final plan = catalog.cardQueryEngine.parse(query);
     if (!catalog.cardQueryEngine.matches({
@@ -170,10 +255,101 @@ class CardFilterPanel extends StatelessWidget {
               ),
           ]),
         ),
+        const SizedBox(height: 12),
+        ToolField(
+          label: t('catalog.cards.fields.total', 'Total stat'),
+          child: RangeSlider(
+            values: RangeValues(
+              (filters.totalMin ?? 0).toDouble(),
+              (filters.totalMax ?? 60000).toDouble(),
+            ),
+            max: 60000,
+            divisions: 60,
+            labels: RangeLabels(
+              '${filters.totalMin ?? 0}',
+              filters.totalMax == null ? 'max' : '${filters.totalMax}',
+            ),
+            onChanged: (value) {
+              final low = value.start <= 0 ? null : value.start.round();
+              final high = value.end >= 60000 ? null : value.end.round();
+              onChanged(
+                filters.copyWith(
+                  totalMin: low,
+                  totalMax: high,
+                  resetTotal: low == null && high == null,
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+        ToolField(
+          label: t('catalog.cards.fields.image', 'Card image'),
+          child: chips([
+            FilterChip(
+              label: Text(t('catalog.cards.fields.hasImage', 'Has artwork')),
+              selected: filters.artOnly,
+              onSelected: (value) => onChanged(filters.copyWith(artOnly: value)),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 12),
+        ToolField(
+          label: t('catalog.fields.release', 'Release'),
+          child: Builder(
+            builder: (context) {
+              final nowYear = DateTime.now().year;
+              final start = _yearOf(filters.releaseFrom) ?? 2019;
+              final end = _yearOf(filters.releaseTo) ?? nowYear;
+              return RangeSlider(
+                values: RangeValues(
+                  start.toDouble().clamp(2019, nowYear.toDouble()),
+                  end.toDouble().clamp(2019, nowYear.toDouble()),
+                ),
+                min: 2019,
+                max: nowYear.toDouble(),
+                divisions: nowYear - 2019,
+                labels: RangeLabels('$start', '$end'),
+                onChanged: (value) {
+                  final from = value.start <= 2019
+                      ? null
+                      : DateTime(value.start.round()).millisecondsSinceEpoch;
+                  final to = value.end >= nowYear
+                      ? null
+                      : DateTime(value.end.round() + 1, 1, 1)
+                            .millisecondsSinceEpoch -
+                            1;
+                  onChanged(
+                    filters.copyWith(
+                      releaseFrom: from,
+                      releaseTo: to,
+                      resetRelease: from == null && to == null,
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+        ToolField(
+          label: t('catalog.fields.skill', 'Skill'),
+          child: TextField(
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: t('catalog.fields.skillHint', 'Skill name'),
+            ),
+            onChanged: (value) => onChanged(filters.copyWith(skill: value)),
+          ),
+        ),
       ],
     );
   }
 }
+
+int? _yearOf(int? millis) => millis == null
+    ? null
+    : DateTime.fromMillisecondsSinceEpoch(millis).year;
 
 Widget? _emblem(String url, {bool round = false}) {
   if (url.isEmpty) return null;

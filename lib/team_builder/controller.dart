@@ -295,6 +295,14 @@ class TeamBuilderController extends ChangeNotifier {
             true,
       );
 
+  /// A range type is active when the song rules override says so, otherwise
+  /// when any selected song carries that mission in the master data.
+  bool _missionEnabled(BuildSettings s, int mission) {
+    final rules = s.songRulesOverride;
+    if (rules != null) return rules.missions[mission] != 0;
+    return hasMission(mission, s.songs);
+  }
+
   BuildSettings get searchSettings {
     final s = _contextSettings, catalog = this.catalog;
     if (catalog == null || s.eventId == null) return s;
@@ -422,24 +430,33 @@ class TeamBuilderController extends ChangeNotifier {
     );
   }
 
-  Goal? manualGoal() => settings.manualScoreMode == 'gekiso'
-      ? GekisoGoal(
-          songs: manualSongs,
-          criterion: Criterion.mean,
-          accuracy: Accuracy(
-            great: settings.allPerfect ? 0 : settings.great / 100,
-            just: hasMission(3, manualSongs) ? settings.just / 100 : 1,
-            missEvery: settings.allPerfect ? 0 : settings.missEvery,
-          ),
-          rank: settings.gekisoRank,
-          seeds: hasMission(2, manualSongs) ? settings.gekisoSeeds : 0,
-        )
-      : ScoreGoal(
-          manualSongs,
-          Criterion.mean,
-          play,
-          settings.challengeRules ? settings.eventId : null,
-        );
+  Goal? manualGoal() {
+    final rules = settings.songRulesOverride;
+    bool mission(int index) => rules != null
+        ? rules.missions[index] != 0
+        : hasMission(index, manualSongs);
+    if (settings.manualScoreMode != 'gekiso') {
+      return ScoreGoal(
+        manualSongs,
+        Criterion.mean,
+        play,
+        settings.challengeRules ? settings.eventId : null,
+      );
+    }
+    return GekisoGoal(
+      songs: manualSongs,
+      criterion: Criterion.mean,
+      accuracy: Accuracy(
+        great: settings.allPerfect ? 0 : settings.great / 100,
+        just: mission(3) ? settings.just / 100 : 1,
+        missEvery: settings.allPerfect ? 0 : settings.missEvery,
+      ),
+      rank: settings.gekisoRank,
+      seeds: mission(2) ? settings.gekisoSeeds : 0,
+      musicType: rules?.musicType,
+      missions: rules?.missions,
+    );
+  }
 
   String tb(
     String key,
@@ -793,13 +810,15 @@ class TeamBuilderController extends ChangeNotifier {
                 criterion: criterion,
                 accuracy: Accuracy(
                   great: s.allPerfect ? 0 : s.great / 100,
-                  just: hasMission(3, s.songs) ? s.just / 100 : 1,
+                  just: _missionEnabled(s, 3) ? s.just / 100 : 1,
                   missEvery: s.allPerfect ? 0 : s.missEvery,
                 ),
                 rank: s.gekisoRank,
-                seeds: hasMission(2, s.songs) ? s.gekisoSeeds : 0,
-                minComboBonus: hasMission(1, s.songs) ? s.minComboBonus : 1,
+                seeds: _missionEnabled(s, 2) ? s.gekisoSeeds : 0,
+                minComboBonus: _missionEnabled(s, 1) ? s.minComboBonus : 1,
                 opponents: s.opponents,
+                musicType: s.songRulesOverride?.musicType,
+                missions: s.songRulesOverride?.missions,
               );
       case GoalKind.event:
         if (s.eventId == null) return null;
