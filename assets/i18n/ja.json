@@ -838,7 +838,12 @@
       "costsHint": "関連カードを開くと、そのカードの強化素材を確認できます。",
       "includeUnlinked": "関連カードのないスキルも表示",
       "cardCount": "カード {count} 枚",
-      "upgradeCosts": "強化素材"
+      "upgradeCosts": "強化素材",
+      "leader": "リーダースキル",
+      "live": "ライブスキル",
+      "gekiso": "激奏スキル",
+      "support": "サポートスキル",
+      "gekisouSupport": "激奏サポートスキル"
     },
     "rankings": {
       "songs": {
@@ -2899,7 +2904,9 @@
         "any": "全属性",
         "empty": "このサーバーのアリーナ日程はありません。",
         "noSeason": "開催中のシーズンはありません",
-        "apply": "適用"
+        "apply": "適用",
+        "search": "このルールで検索",
+        "pool": "このリーグの {count} 曲"
       },
       "songRules": "曲目ルール",
       "songRule": {
@@ -2907,6 +2914,11 @@
         "master": "データに従う",
         "none": "—",
         "clear": "データ値に戻す"
+      },
+      "manualEvent": {
+        "enable": "ボーナスを手動設定",
+        "hint": "イベント本来のボーナスを無視します",
+        "attribute": "ボーナス属性"
       }
     },
     "calendar": {

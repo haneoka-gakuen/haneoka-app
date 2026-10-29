@@ -303,6 +303,31 @@ class TeamBuilderController extends ChangeNotifier {
     return hasMission(mission, s.songs);
   }
 
+  /// Bonus rows for a manually stated event: the same percentage for every
+  /// bonus type, scoped to one attribute (`event.rs` `ManualEffect`).
+  List<Doc>? _manualEventEffects(BuildSettings s) {
+    final manual = s.manualEvent;
+    if (manual == null) return null;
+    final perRank = [
+      for (var rank = 0; rank < 5; rank++) (manual.percent * 100).round(),
+    ];
+    return [
+      for (final resourceType in [2, 3])
+        for (final bonusType in [0, 1, 2])
+          {
+            'resourceType': resourceType,
+            'characterId': 0,
+            'bandId': 0,
+            'cardType': manual.attribute,
+            'tagId': 0,
+            'memberCardId': 0,
+            'supportCardId': 0,
+            'bonusType': bonusType,
+            'perRank': perRank,
+          },
+    ];
+  }
+
   BuildSettings get searchSettings {
     final s = _contextSettings, catalog = this.catalog;
     if (catalog == null || s.eventId == null) return s;
@@ -844,6 +869,7 @@ class TeamBuilderController extends ChangeNotifier {
             gekiso: s.ptGekiso && s.route == 'live'
                 ? (just: s.ptJust / 100, luckSamples: s.ptLuckSamples)
                 : null,
+            eventEffects: _manualEventEffects(s),
           );
         }
         return EventGoal(
@@ -861,6 +887,7 @@ class TeamBuilderController extends ChangeNotifier {
           songs: s.route == 'skip' ? const [] : s.songs,
           consumption: s.route == 'challenge' ? s.challengePoints : s.boosts,
           play: play,
+          eventEffects: _manualEventEffects(s),
         );
       case GoalKind.potential:
         return PotentialGoal(s.window.toDouble());

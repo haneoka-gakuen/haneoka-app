@@ -838,7 +838,12 @@
       "costsHint": "Open a related card to view its upgrade costs.",
       "includeUnlinked": "Include skills without associated cards",
       "cardCount": "{count} cards",
-      "upgradeCosts": "Upgrade materials"
+      "upgradeCosts": "Upgrade materials",
+      "leader": "Leader skill",
+      "live": "Live skill",
+      "gekiso": "Gekiso skill",
+      "support": "Support skill",
+      "gekisouSupport": "Gekiso support skill"
     },
     "rankings": {
       "songs": {
@@ -2899,7 +2904,9 @@
         "any": "Any attribute",
         "empty": "No Arena schedule for this server.",
         "noSeason": "No active season",
-        "apply": "Apply"
+        "apply": "Apply",
+        "search": "Search with these rules",
+        "pool": "{count} songs in this league"
       },
       "songRules": "Song rules",
       "songRule": {
@@ -2907,6 +2914,11 @@
         "master": "From data",
         "none": "—",
         "clear": "Use data values"
+      },
+      "manualEvent": {
+        "enable": "Set the bonus by hand",
+        "hint": "Ignores the recorded event effects",
+        "attribute": "Bonus attribute"
       }
     },
     "calendar": {

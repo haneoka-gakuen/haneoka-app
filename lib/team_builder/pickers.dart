@@ -29,6 +29,7 @@ class CardFilters {
     this.releaseFrom,
     this.releaseTo,
     this.skill = '',
+    this.skills = const {},
   });
   final String query;
   final Set<int> bands;
@@ -50,6 +51,10 @@ class CardFilters {
   /// Substring matched against the resolved live / gekiso / leader skill names.
   final String skill;
 
+  /// Skill type names selected per role (`leader`, `live`, `gekiso`,
+  /// `support`, `gekisouSupport`), the website's `CARD_SKILL_FACETS`.
+  final Map<String, Set<String>> skills;
+
   int get active =>
       bands.length +
       characters.length +
@@ -58,7 +63,8 @@ class CardFilters {
       (totalMin != null || totalMax != null ? 1 : 0) +
       (artOnly ? 1 : 0) +
       (releaseFrom != null || releaseTo != null ? 1 : 0) +
-      (skill.trim().isEmpty ? 0 : 1);
+      (skill.trim().isEmpty ? 0 : 1) +
+      skills.values.fold<int>(0, (sum, set) => sum + set.length);
 
   CardFilters copyWith({
     String? query,
@@ -74,6 +80,7 @@ class CardFilters {
     int? releaseTo,
     bool resetRelease = false,
     String? skill,
+    Map<String, Set<String>>? skills,
   }) => CardFilters(
     query: query ?? this.query,
     bands: bands ?? this.bands,
@@ -86,6 +93,7 @@ class CardFilters {
     releaseFrom: resetRelease ? null : (releaseFrom ?? this.releaseFrom),
     releaseTo: resetRelease ? null : (releaseTo ?? this.releaseTo),
     skill: skill ?? this.skill,
+    skills: skills ?? this.skills,
   );
 
   bool matches(TeamCatalog catalog, bool members, int id) {
@@ -149,6 +157,11 @@ class CardFilters {
         return false;
       }
     }
+    for (final entry in skills.entries) {
+      if (entry.value.isEmpty) continue;
+      final carried = catalog.skillTypes(members, id, entry.key);
+      if (!carried.any(entry.value.contains)) return false;
+    }
     final plan = catalog.cardQueryEngine.parse(query);
     if (!catalog.cardQueryEngine.matches({
       ...catalog.card(members, id),
@@ -176,10 +189,14 @@ class CardFilterPanel extends StatelessWidget {
     required this.catalog,
     required this.filters,
     required this.onChanged,
+    this.members = true,
   });
   final TeamCatalog catalog;
   final CardFilters filters;
   final ValueChanged<CardFilters> onChanged;
+
+  /// Which card kind the skill facets apply to (member or snapshot).
+  final bool members;
 
   @override
   Widget build(BuildContext context) {
@@ -293,6 +310,37 @@ class CardFilterPanel extends StatelessWidget {
             ),
           ]),
         ),
+        for (final (role, label) in (members
+            ? const [
+                ('leader', 'Leader skill'),
+                ('live', 'Live skill'),
+                ('gekiso', 'Gekiso skill'),
+              ]
+            : const [
+                ('support', 'Support skill'),
+                ('gekisouSupport', 'Gekiso support skill'),
+              ])) ...[
+          const SizedBox(height: 12),
+          ToolField(
+            label: t('catalog.skills.$role', label),
+            child: chips([
+              for (final name in catalog.skillTypeOptions(members, role))
+                FilterChip(
+                  label: Text(name),
+                  selected: filters.skills[role]?.contains(name) ?? false,
+                  onSelected: (_) {
+                    final current = {...?filters.skills[role]};
+                    if (!current.remove(name)) current.add(name);
+                    onChanged(
+                      filters.copyWith(
+                        skills: {...filters.skills, role: current},
+                      ),
+                    );
+                  },
+                ),
+            ]),
+          ),
+        ],
         const SizedBox(height: 12),
         ToolField(
           label: t('catalog.fields.release', 'Release'),
@@ -857,6 +905,7 @@ class _CardPickerState extends State<_CardPicker> {
       filters: CardFilterPanel(
         catalog: catalog,
         filters: _filters,
+        members: widget.members,
         onChanged: (value) => setState(() => _filters = value),
       ),
       count: tb('cardCount', '{count} cards', {'count': ids.length}),

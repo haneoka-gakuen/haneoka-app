@@ -247,7 +247,10 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
                 ],
               ),
               _Tab.comparison => SongComparisonTab(controller: c),
-              _Tab.arena => ArenaTab(controller: c),
+              _Tab.arena => ArenaTab(
+                controller: c,
+                onSearch: () => _selectTab(_Tab.build),
+              ),
               _Tab.pt => PtTab(
                 controller: c,
                 openTab: (name) =>

@@ -223,8 +223,11 @@ class _BoxTabState extends State<BoxTab> {
                 ),
               ],
               selected: {_members},
-              onSelectionChanged: (value) =>
-                  setState(() => _members = value.single),
+              onSelectionChanged: (value) => setState(() {
+                _members = value.single;
+                // Skill facets differ between members and snapshots.
+                _filters = _filters.copyWith(skills: const {});
+              }),
             ),
             SegmentedButton<_Show>(
               showSelectedIcon: false,
@@ -279,6 +282,7 @@ class _BoxTabState extends State<BoxTab> {
           CardFilterPanel(
             catalog: catalog,
             filters: _filters,
+            members: _members,
             onChanged: (value) => setState(() => _filters = value),
           ),
         const Divider(height: 1),

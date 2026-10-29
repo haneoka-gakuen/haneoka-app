@@ -198,6 +198,35 @@ class TeamCatalog extends ChangeNotifier {
     return key.isEmpty ? '' : t('catalog.songs.liveTypes.$key', key);
   }
 
+  /// Skill type names a card carries in one role (`skillName` of
+  /// `catalogMetadata.resolvedSkills`), the website's `skillFacetValues`.
+  /// Only the canonical (first non-empty) name counts, so the localised
+  /// variants of one skill do not turn into separate filter options.
+  List<String> skillTypes(bool members, int id, String role) {
+    final meta = objectRow(card(members, id)['catalogMetadata']);
+    final entry = objectRow(objectRow(meta['resolvedSkills'])[role]);
+    final names = entry['skillName'];
+    if (names is! List) return const [];
+    for (final value in names) {
+      if (value is String && value.trim().isNotEmpty) return [value.trim()];
+    }
+    return const [];
+  }
+
+  /// Every distinct skill type of the given role across the loaded cards.
+  List<String> skillTypeOptions(bool members, String role) {
+    final ids = [
+      for (final key in objectRow(data[members ? 'members' : 'snapshots']).keys)
+        ?int.tryParse(key),
+    ];
+    final seen = <String>{};
+    for (final id in ids) {
+      seen.addAll(skillTypes(members, id, role));
+    }
+    final sorted = seen.toList()..sort();
+    return sorted;
+  }
+
   String? attributeIcon(int attribute) => visuals?.cardTypeMark(attribute);
   String? rarityIcon(int rarity) =>
       visuals?.mark('RarityIconCenter_${cardRarityName(rarity)}.png');

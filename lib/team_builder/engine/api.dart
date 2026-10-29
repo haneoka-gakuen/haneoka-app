@@ -256,6 +256,7 @@ class EventGoal extends Goal {
     this.minComboBonus = 1,
     this.cpExchange,
     this.gekiso,
+    this.eventEffects,
   });
 
   /// Strict reward recommendation: exact inputs, AP solo/challenge lives,
@@ -272,6 +273,10 @@ class EventGoal extends Goal {
 
   /// Non-challenge Gekisou rewards, using per-outcome settlement.
   final ({double just, int luckSamples})? gekiso;
+
+  /// Manual event effects (`event.rs` `ManualEffect`): replaces the bonus rows
+  /// the template event would contribute. Null keeps the recorded ones.
+  final List<Doc>? eventEffects;
 
   EventGoal copyWith({
     String? measure,
@@ -295,6 +300,7 @@ class EventGoal extends Goal {
     minComboBonus: minComboBonus,
     cpExchange: cpExchange ?? this.cpExchange,
     gekiso: dropGekiso ? null : gekiso,
+    eventEffects: eventEffects,
   );
 
   Map<String, Object?> toJson() => {
@@ -308,6 +314,7 @@ class EventGoal extends Goal {
     if (weights != null) 'weights': weights,
     if (rewardPlan != null) 'rewardPlan': rewardPlan,
     if (primaryOnly) 'ranking': ptOnly ? 'pt-only' : ranking,
+    if (eventEffects != null) 'eventEffects': eventEffects,
     if (cpExchange case final cp?)
       'cpExchange': {'numerator': cp.numerator, 'denominator': cp.denominator},
     if (gekiso case final g?)

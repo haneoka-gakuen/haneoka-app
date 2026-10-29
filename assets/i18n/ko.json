@@ -838,7 +838,12 @@
       "costsHint": "관련 카드를 열어 해당 카드의 강화 재료를 확인하세요.",
       "includeUnlinked": "관련 카드가 없는 스킬 포함",
       "cardCount": "카드 {count}장",
-      "upgradeCosts": "강화 재료"
+      "upgradeCosts": "강화 재료",
+      "leader": "리더 스킬",
+      "live": "라이브 스킬",
+      "gekiso": "격주 스킬",
+      "support": "서포트 스킬",
+      "gekisouSupport": "격주 서포트 스킬"
     },
     "rankings": {
       "songs": {
@@ -2899,7 +2904,9 @@
         "any": "전체 속성",
         "empty": "이 서버에는 아레나 일정이 없습니다.",
         "noSeason": "진행 중인 시즌이 없습니다",
-        "apply": "적용"
+        "apply": "적용",
+        "search": "이 규칙으로 검색",
+        "pool": "이 리그 {count}곡"
       },
       "songRules": "곡 규칙",
       "songRule": {
@@ -2907,6 +2914,11 @@
         "master": "데이터 기준",
         "none": "—",
         "clear": "데이터 값으로"
+      },
+      "manualEvent": {
+        "enable": "보너스 직접 설정",
+        "hint": "이벤트의 원래 보너스를 무시합니다",
+        "attribute": "보너스 속성"
       }
     },
     "calendar": {

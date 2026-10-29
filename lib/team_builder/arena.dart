@@ -90,8 +90,12 @@ class ArenaRules {
 }
 
 class ArenaTab extends StatefulWidget {
-  const ArenaTab({super.key, required this.controller});
+  const ArenaTab({super.key, required this.controller, this.onSearch});
   final TeamBuilderController controller;
+
+  /// Called after the rules and the song pool are written, so the host can
+  /// switch to the Build tab.
+  final VoidCallback? onSearch;
 
   @override
   State<ArenaTab> createState() => _ArenaTabState();
@@ -101,6 +105,28 @@ class _ArenaTabState extends State<ArenaTab> {
   int? _leagueId;
 
   TeamBuilderController get c => widget.controller;
+
+  /// Songs of the league's band, which is what the website's Arena pool is
+  /// (`arena-tab.ts` allowedSongIds).
+  List<Map<String, Object?>> _pool(ArenaLeague league) => [
+    for (final key in objectRow(c.catalog!.data['songs']).keys)
+      if (int.tryParse(key) case final id?)
+        if (c.catalog!.songBands(id).contains(league.bandId))
+          {'songId': id, 'difficulty': 3},
+  ];
+
+  void _applyAndSearch(ArenaLeague league, ArenaRegulation? rule) {
+    final pool = _pool(league);
+    c.updateSettings({
+      'goal': 'gekiso',
+      'criterion': 'mean',
+      'bands': [league.bandId],
+      'songs': pool,
+      if (rule != null)
+        'songRules': {'musicType': rule.musicType, 'missions': rule.missions},
+    });
+    widget.onSearch?.call();
+  }
 
   String _time(int millis) {
     final at = DateTime.fromMillisecondsSinceEpoch(millis);
@@ -183,6 +209,39 @@ class _ArenaTabState extends State<ArenaTab> {
                 onSelected: (_) => setState(() => _leagueId = league.id),
               ),
           ],
+        ),
+        const SizedBox(height: 12),
+        Builder(
+          builder: (context) {
+            final league = rules.leagues
+                .where((item) => item.id == leagueId)
+                .firstOrNull;
+            final current = rows.where((row) => row.active).firstOrNull ?? (rows.isEmpty ? null : rows.first);
+            return Row(
+              children: [
+                FilledButton.icon(
+                  onPressed: league == null
+                      ? null
+                      : () => _applyAndSearch(league, current),
+                  icon: const Icon(Symbols.search_rounded),
+                  label: Text(
+                    c.tb('arena.search', 'Search with these rules'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Text(
+                    c.tb('arena.pool', '{count} songs in this league', {
+                      'count': league == null ? 0 : _pool(league).length,
+                    }),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
         const SizedBox(height: 12),
         for (final row in rows.take(40))

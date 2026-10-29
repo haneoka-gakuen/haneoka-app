@@ -406,6 +406,11 @@ class _BuildTabState extends State<BuildTab> {
           title: c.tb('eventSetup', 'Event'),
           children: [
             ..._eventSection(context),
+            ManualEventControls(
+              controller: c,
+              value: s.manualEvent,
+              onChanged: (value) => set({'manualEvent': value}),
+            ),
             Segmented<String>(
               value: s.route,
               options: [
@@ -1340,6 +1345,97 @@ class _SongRulesEditor extends StatelessWidget {
             label: Text(c.tb('songRule.clear', 'Use data values')),
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// Manual event bonus: one percentage for every bonus type of one attribute
+/// (`lit/team-builder/manual-event.ts`, simplified to the attribute knob).
+class ManualEventControls extends StatelessWidget {
+  const ManualEventControls({
+    super.key,
+    required this.controller,
+    required this.value,
+    required this.onChanged,
+  });
+  final TeamBuilderController controller;
+  final ({int attribute, double percent})? value;
+  final ValueChanged<Map<String, Object?>?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller;
+    final catalog = c.catalog!;
+    final enabled = value != null;
+    final attribute = value?.attribute ?? 1;
+    final percent = value?.percent ?? 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        CheckboxListTile(
+          contentPadding: EdgeInsets.zero,
+          value: enabled,
+          title: Text(c.tb('manualEvent.enable', 'Set the bonus by hand')),
+          subtitle: Text(
+            c.tb('manualEvent.hint', 'Ignores the recorded event effects'),
+          ),
+          onChanged: (on) => onChanged(
+            on == true
+                ? {'attribute': attribute, 'percent': percent}
+                : null,
+          ),
+        ),
+        if (enabled) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: InputDecorator(
+              decoration: InputDecoration(
+                isDense: true,
+                labelText: c.tb('manualEvent.attribute', 'Bonus attribute'),
+              ),
+              child: DropdownButton<int>(
+                value: attribute,
+                isExpanded: true,
+                underline: const SizedBox.shrink(),
+                items: [
+                  for (final id in [1, 2, 3, 4, 5])
+                    DropdownMenuItem(
+                      value: id,
+                      child: Text(catalog.attributeName(id)),
+                    ),
+                ],
+                onChanged: (v) => onChanged({
+                  'attribute': v ?? attribute,
+                  'percent': percent,
+                }),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: Slider(
+                  value: percent.clamp(0, 300).toDouble(),
+                  max: 300,
+                  divisions: 60,
+                  label: '${percent.round()}%',
+                  onChanged: (v) => onChanged({
+                    'attribute': attribute,
+                    'percent': v,
+                  }),
+                ),
+              ),
+              SizedBox(
+                width: 64,
+                child: Text(
+                  '${percent.round()}%',
+                  textAlign: TextAlign.end,
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

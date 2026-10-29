@@ -838,7 +838,12 @@
       "costsHint": "開啟關聯卡牌可查看該卡的升級材料。",
       "includeUnlinked": "包含未關聯卡牌的技能",
       "cardCount": "{count} 張卡牌",
-      "upgradeCosts": "升級材料"
+      "upgradeCosts": "升級材料",
+      "leader": "隊長技能",
+      "live": "Live 技能",
+      "gekiso": "激奏技能",
+      "support": "支援技能",
+      "gekisouSupport": "激奏支援技能"
     },
     "rankings": {
       "songs": {
@@ -2899,7 +2904,9 @@
         "any": "全屬性",
         "empty": "此伺服器沒有競技場賽程。",
         "noSeason": "沒有進行中的賽季",
-        "apply": "套用"
+        "apply": "套用",
+        "search": "依這期規則搜尋",
+        "pool": "本聯賽 {count} 首歌"
       },
       "songRules": "曲目規則",
       "songRule": {
@@ -2907,6 +2914,11 @@
         "master": "跟隨資料",
         "none": "—",
         "clear": "還原資料值"
+      },
+      "manualEvent": {
+        "enable": "手動設定加成",
+        "hint": "忽略活動原本的加成效果",
+        "attribute": "加成屬性"
       }
     },
     "calendar": {

@@ -92,6 +92,14 @@ class BuildSettings {
     );
   }
 
+  /// Manual event bonus: one percentage applied to every bonus type of one
+  /// attribute. Null keeps the recorded event effects.
+  ({int attribute, double percent})? get manualEvent {
+    final row = objectRow(_json['manualEvent']);
+    if (row.isEmpty) return null;
+    return (attribute: intOf(row['attribute']), percent: numOf(row['percent']));
+  }
+
   Doc get farmingConditions {
     final draft = farming;
     if (draft['play'] != 'gekiso') {
@@ -173,6 +181,7 @@ class BuildSettings {
     'gekisoOpponents': <Object?>['', '', ''],
     'minComboBonus': 1,
     'songRules': null,
+    'manualEvent': null,
     'playMode': 'ap',
     'great': 3,
     'good': 0,
