@@ -3009,7 +3009,51 @@
       },
       "selectAllCharts": "全选",
       "deselectAllCharts": "全不选",
-      "clearAllCharts": "清空全部选择"
+      "clearAllCharts": "清空全部选择",
+      "growthComparison": {
+        "action": "养成项目",
+        "target": "目标等级",
+        "next": "下一等级",
+        "cap": "当前上限",
+        "card": "卡牌",
+        "edit": "补录养成",
+        "status": {
+          "ready": "可对照",
+          "missing-state": "待补录",
+          "missing-data": "资料缺档",
+          "at-cap": "已到上限",
+          "invalid-state": "养成值异常"
+        },
+        "expUnknown": "所需经验：未录入当前经验",
+        "loadError": "卡库读取失败"
+      },
+      "tg": {
+        "title": "养成方案",
+        "full": "全部升满",
+        "fixedBefore": "原队伍",
+        "fixedAfter": "养成后的原队伍",
+        "searchAfter": "养成后重新配队",
+        "searchBefore": "养成前后重新配队",
+        "fixedGain": "原队伍提升",
+        "rebuildGain": "重配额外提升",
+        "totalGain": "相对原队伍提升",
+        "searchGrowthGain": "养成前后重配差值",
+        "scenario": "模拟养成",
+        "inTeam": "当前队伍",
+        "inPool": "候选卡库",
+        "snapshot": "原结果条件",
+        "original": "原结果",
+        "pending": "待计算",
+        "partial": "搜索未完成",
+        "complete": "已完成",
+        "failed": "计算失败",
+        "noTeam": "无符合条件的队伍",
+        "runFixed": "计算队伍提升",
+        "runSearch": "重新配队",
+        "continue": "继续配队",
+        "pool": "成员 / 留影",
+        "materials": "材料与技能资料"
+      }
     },
     "calendar": {
       "title": "日历",

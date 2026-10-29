@@ -3009,7 +3009,51 @@
       },
       "selectAllCharts": "전체 선택",
       "deselectAllCharts": "전체 해제",
-      "clearAllCharts": "모든 선택 지우기"
+      "clearAllCharts": "모든 선택 지우기",
+      "growthComparison": {
+        "action": "육성 항목",
+        "target": "목표 레벨",
+        "next": "다음 레벨",
+        "cap": "현재 상한",
+        "card": "카드",
+        "edit": "육성 상태 입력",
+        "status": {
+          "ready": "비교 가능",
+          "missing-state": "육성 상태 미입력",
+          "missing-data": "데이터 없음",
+          "at-cap": "상한 도달",
+          "invalid-state": "육성 값 확인"
+        },
+        "expUnknown": "필요 EXP: 현재 EXP 미입력",
+        "loadError": "카드 목록을 불러올 수 없습니다"
+      },
+      "tg": {
+        "title": "육성 계획",
+        "full": "모두 최대로",
+        "fixedBefore": "기존 편성",
+        "fixedAfter": "육성 후 기존 편성",
+        "searchAfter": "육성 후 재편성",
+        "searchBefore": "육성 전후 재편성",
+        "fixedGain": "기존 편성 상승량",
+        "rebuildGain": "재편성 추가 상승량",
+        "totalGain": "기존 편성 대비 상승량",
+        "searchGrowthGain": "육성 전후 재편성 차이",
+        "scenario": "육성 시뮬레이션",
+        "inTeam": "현재 편성",
+        "inPool": "후보 카드",
+        "snapshot": "기존 결과 조건",
+        "original": "기존 결과",
+        "pending": "계산 전",
+        "partial": "탐색 미완료",
+        "complete": "완료",
+        "failed": "계산 실패",
+        "noTeam": "조건에 맞는 편성 없음",
+        "runFixed": "편성 상승량 계산",
+        "runSearch": "재편성",
+        "continue": "탐색 계속",
+        "pool": "멤버 / 스냅",
+        "materials": "재료 및 스킬 정보"
+      }
     },
     "calendar": {
       "title": "달력",

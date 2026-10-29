@@ -94,6 +94,7 @@ dependencies:
   flutter_svg: ^2.3.0
   flutter_widget_from_html_core: ^0.17.4
   http: ^1.6.0
+  html: ^0.15.7
   intl: any
   material_new_shapes: ^1.0.0
   material_symbols_icons: ^4.2960.0

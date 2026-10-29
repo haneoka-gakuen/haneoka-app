@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'source_picker.dart';
+import 'sort_control.dart';
 
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:intl/intl.dart';
@@ -926,34 +927,12 @@ class BrowseFilterPanel extends StatelessWidget {
                           style: theme.textTheme.titleSmall,
                         ),
                       ),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownMenu<String>(
-                              expandedInsets: EdgeInsets.zero,
-                              initialSelection: sort,
-                              onSelected: (value) {
-                                if (value != null) onSort(value);
-                              },
-                              dropdownMenuEntries: [
-                                for (final s in sorts)
-                                  DropdownMenuEntry(
-                                    value: s.key,
-                                    label: s.label,
-                                  ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton.outlined(
-                            onPressed: onOrder,
-                            icon: Icon(
-                              descending
-                                  ? Symbols.arrow_downward_rounded
-                                  : Symbols.arrow_upward_rounded,
-                            ),
-                          ),
-                        ],
+                      CatalogSortControl(
+                        options: [for (final s in sorts) (s.key, s.label)],
+                        value: sort,
+                        descending: descending,
+                        onSort: onSort,
+                        onOrder: onOrder,
                       ),
                     ],
                   ],
@@ -1214,6 +1193,6 @@ class _PaneRail extends StatelessWidget {
       ),
       child: view,
     );
-    return vertical ? box : SizedBox(height: meta ? 120 : 102, child: box);
+    return vertical ? box : SizedBox(height: meta ? 128 : 110, child: box);
   }
 }

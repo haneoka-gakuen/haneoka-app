@@ -14,6 +14,7 @@ import '../ui/tile.dart';
 import '../ui/card_artwork.dart';
 import 'box.dart';
 import 'catalog.dart';
+import 'catalog_sort.dart';
 import 'controller.dart';
 import 'engine/box.dart';
 import 'engine/num.dart';
@@ -159,21 +160,16 @@ class _BoxTabState extends State<BoxTab> {
     final theme = Theme.of(context);
     final filters = _filters.copyWith(query: widget.query);
     final owned = _members ? view.members : view.snaps;
-    final ids =
-        [
-          for (final key in (objectRow(
-            catalog.data[_members ? 'members' : 'snapshots'],
-          )).keys)
-            if (int.tryParse(key) case final id?)
-              if ((_show == _Show.all ||
-                      (_show == _Show.owned) == owned.containsKey(id)) &&
-                  filters.matches(catalog, _members, id))
-                id,
-        ]..sort((a, b) {
-          final rarity =
-              catalog.rarity(_members, b) - catalog.rarity(_members, a);
-          return rarity != 0 ? rarity : b - a;
-        });
+    final ids = catalog.sortedCards(_members, [
+      for (final key in (objectRow(
+        catalog.data[_members ? 'members' : 'snapshots'],
+      )).keys)
+        if (int.tryParse(key) case final id?)
+          if ((_show == _Show.all ||
+                  (_show == _Show.owned) == owned.containsKey(id)) &&
+              filters.matches(catalog, _members, id))
+            id,
+    ]);
     final ownedShown = [
       for (final id in ids)
         if (owned.containsKey(id)) id,

@@ -353,6 +353,23 @@ class EngineClient {
     progress,
     snapshot,
   );
+  Future<List<EngineResponse>> runBatch(
+    List<EngineRequest> requests,
+    void Function(int, EngineResponse) onResult,
+  ) => _call(
+    'batch',
+    [
+      for (final (i, request) in requests.indexed)
+        request.copyWith(
+          keepTimeLimit: false,
+          deadline: deadlineOf(request),
+          requestId: '$_key-batch-$i',
+          contextKey: '$i',
+        ),
+    ],
+    null,
+    (snapshot) => onResult(int.parse(snapshot.contextKey), snapshot.response),
+  );
   Future<Doc> growth(
     EngineRequest request,
     void Function(int, int)? progress,
@@ -473,6 +490,10 @@ void _displayBridge(
     } else if (kind == 'result') {
       final result = switch (kinds.remove(id)) {
         'run' => EngineResponse.fromJson(objectRow(row['result'])),
+        'batch' => [
+          for (final value in row['result'] as List)
+            EngineResponse.fromJson(objectRow(value)),
+        ],
         'evaluate' => [
           for (final value in row['result'] as List)
             TeamEvaluation.fromJson(objectRow(value)),
@@ -549,6 +570,7 @@ void _displayBridge(
         EngineRequest() => request.toJson(),
         EvaluateRequest() => request.toJson(),
         TimelineRequest() => request.toJson(),
+        List<EngineRequest>() => [for (final input in request) input.toJson()],
         _ => throw StateError('engine-request'),
       };
       port.send(jsonEncode({'id': id, 'kind': kind, 'request': value}));
@@ -790,6 +812,28 @@ void _engineHostWorker((SendPort, SendPort) ports) {
           );
           requests.remove(id);
           send(id, 'result', result.toJson());
+        case 'batch':
+          final inputs = [
+            for (final value in row['request'] as List)
+              EngineRequest.fromJson(objectRow(value)),
+          ];
+          final outputs = await current.runBatch(
+            inputs,
+            (index, result) => reply.send(
+              jsonEncode({
+                'id': id,
+                'kind': 'snapshot',
+                'snapshot': EngineSnapshot(
+                  requestId: 'batch-$id',
+                  contextKey: '$index',
+                  response: result,
+                  completed: index + 1,
+                  total: inputs.length,
+                ).toJson(),
+              }),
+            ),
+          );
+          send(id, 'result', [for (final output in outputs) output.toJson()]);
         case 'growth':
           send(
             id,
@@ -1941,6 +1985,39 @@ class _EngineCoordinator {
     return queued;
   }
 
+  Future<List<EngineResponse>> runBatch(
+    List<EngineRequest> requests,
+    void Function(int, EngineResponse) result,
+  ) => _enqueue(() async {
+    final generation = _generation;
+    final outputs = List<EngineResponse?>.filled(requests.length, null);
+    var next = 0;
+    Future<void> work(_Worker worker) async {
+      while (next < requests.length) {
+        if (generation != _generation) throw const EngineCancelled();
+        final index = next++, request = requests[index];
+        final charts = await _charts(
+          requestChartSongs(request).whereType<SongRef>().toList(),
+        );
+        if (generation != _generation) throw const EngineCancelled();
+        final value = await worker.call<EngineResponse>(
+          'run',
+          request,
+          charts,
+          null,
+          null,
+        );
+        if (generation != _generation) throw const EngineCancelled();
+        outputs[index] = value;
+        result(index, value);
+      }
+    }
+
+    await Future.wait([
+      for (final worker in _pool.take(requests.length)) work(worker),
+    ]);
+    return [for (final value in outputs) value!];
+  });
   Future<Doc> growth(
     EngineRequest request,
     void Function(int, int)? progress,

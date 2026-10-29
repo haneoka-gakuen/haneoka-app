@@ -307,7 +307,7 @@ final navSections = <NavSection>[
   ),
   const NavSection('community', 'navigation.community', Symbols.forum_rounded, [
     NavItem(
-      '/community',
+      '/community/feeds',
       'community.page.feedRecommended',
       Symbols.dynamic_feed_rounded,
       [

@@ -10,6 +10,7 @@ import 'box_tab.dart' show showCardEditor;
 import 'manual_event_view.dart';
 import 'build_tab.dart' show BuildTab;
 import 'controller.dart';
+import 'team_growth_view.dart';
 import 'engine/api.dart';
 import 'engine/num.dart';
 import 'engine/pt_eligibility.dart';
@@ -739,6 +740,20 @@ class _PtTabState extends State<PtTab> {
                 child: Text(breakdown, style: theme.textTheme.bodySmall),
               ),
             const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: c.running
+                    ? null
+                    : () => showTeamGrowth(
+                        context,
+                        c,
+                        c.training.resultSource(hit),
+                      ),
+                icon: const Icon(Symbols.trending_up_rounded),
+                label: Text(c.tb('tg.title', 'Training comparison')),
+              ),
+            ),
             Formation(
               controller: c,
               hit: hit,

@@ -25,6 +25,7 @@ import '../tools/stamp_maker.dart';
 import '../chart_editor/editor_screen.dart';
 import '../gacha_history/history_page.dart';
 import '../catalog/browse.dart';
+import '../catalog/arena_detail.dart';
 import '../catalog/missions.dart';
 import '../catalog/tgw_card.dart';
 import '../catalog/catalog_screen.dart';
@@ -100,6 +101,15 @@ void openEntity(
             ? '/community/sekai/songs'
             : '/community/gbp/songs'
       : '/catalog/$kind';
+  if (profile.resource == 'arena') {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        settings: RouteSettings(name: '/catalog/arena/$id'),
+        builder: (_) => ArenaScreen(seasonId: id, server: selectedApi.server),
+      ),
+    );
+    return;
+  }
   Navigator.of(context).push(
     MaterialPageRoute<void>(
       settings: RouteSettings(name: '$path/${Uri.encodeComponent(id)}'),
@@ -119,7 +129,6 @@ void openEntity(
 
 /// The community's feeds by address and the scope each reads.
 const _communityFeeds = {
-  '/community': 'recommended',
   '/community/feeds': 'recommended',
   '/community/latest': 'latest',
   '/community/following': 'following',
@@ -193,7 +202,7 @@ Widget? screenFor(String route, {required ValueChanged<String> navigate}) {
   if (route == '/') return HomeScreen(onBrowse: navigate);
   if (route == '/settings') return const SettingsScreen();
   if (route == '/catalog') return CatalogHubScreen(navigate: navigate);
-  if (route == '/tools' || route == '/games') {
+  if (route == '/tools' || route == '/games' || route == '/community') {
     return CatalogHubScreen(navigate: navigate, section: route.substring(1));
   }
   final progression = route.split('/').last;
@@ -208,6 +217,14 @@ Widget? screenFor(String route, {required ValueChanged<String> navigate}) {
   if (route == '/announcements') return const AnnouncementsScreen();
   if (route == '/calendar') return const CalendarScreen();
   if (route == '/join') return const JoinScreen();
+  if (route == '/catalog/arena' || route.startsWith('/catalog/arena/')) {
+    return ArenaScreen(
+      key: ValueKey(uri.toString()),
+      server: uri.queryParameters['server'],
+      seasonId: route == '/catalog/arena' ? null : route.split('/').last,
+      anchor: uri.fragment,
+    );
+  }
   if (route == '/catalog/song-meta') {
     return SongMetaScreen(
       initialQuery: uri.queryParameters,
@@ -251,13 +268,15 @@ Widget? screenFor(String route, {required ValueChanged<String> navigate}) {
   if (route == '/gacha-history') return const HistoryPage();
   if (route == '/team-builder') {
     return TeamBuilderScreen(
+      key: ValueKey(uri.toString()),
+      server: uri.queryParameters['server'],
       initialTab: uri.queryParameters['tab'],
       returnTab: uri.queryParameters['return'],
       initialLeague: int.tryParse(uri.queryParameters['league'] ?? ''),
     );
   }
   if (route == '/catalog/stories') {
-    return const StoriesScreen(key: ValueKey('band'), mode: 'band');
+    return CatalogHubScreen(navigate: navigate, section: 'stories');
   }
   if (_communityFeeds[route] case final scope?) {
     return CommunityFeedScreen(key: ValueKey(scope), scope: scope);

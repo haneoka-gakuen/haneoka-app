@@ -1,37 +1,16 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:flutter/rendering.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../core/app_state.dart';
 import '../shell/navigation.dart';
 import '../shell/page.dart';
-import '../ui/shapes.dart';
-import '../ui/tile.dart';
+import '../ui/app_image.dart';
+import '../ui/tile.dart' show pagePadding;
+import 'hub_data.dart';
 
-/// Each hub route's API resource, whose size the hub shows (`CATALOG_HUB`).
-const _counted = {
-  '/catalog/songs': 'songs',
-  '/catalog/characters': 'characters',
-  '/catalog/member-cards': 'cards',
-  '/catalog/support-cards': 'support-cards',
-  '/catalog/comics': 'comics',
-  '/catalog/events': 'events',
-  '/catalog/gacha': 'gacha',
-  '/catalog/login-campaigns': 'login-campaigns',
-  '/catalog/missions': 'missions',
-  '/catalog/passes': 'passes',
-  '/catalog/tgw-card': 'tgw-card',
-  '/catalog/shop': 'shop',
-  '/catalog/exchange': 'exchange',
-  '/catalog/stamps': 'stamps',
-  '/catalog/stickers': 'stickers',
-  '/catalog/backgrounds': 'backgrounds',
-  '/catalog/items': 'items',
-  '/catalog/band-items': 'band-items',
-  '/catalog/real-lives': 'real-lives',
-};
-
-/// The catalogue destination's own page (`CatalogIndexPage`): the library
-/// section as a grid of hub links with each collection's size.
 class CatalogHubScreen extends StatefulWidget {
   const CatalogHubScreen({
     super.key,
@@ -45,84 +24,87 @@ class CatalogHubScreen extends StatefulWidget {
 }
 
 class _CatalogHubScreenState extends State<CatalogHubScreen> {
-  Future<Object?>? _summary;
-  Object? _dataKey;
+  Future<List<Map<String, Object?>>>? _data;
+  Object? _key;
+  void _load() {
+    final state = AppScope.of(context);
+    final kind = widget.section == 'library' ? 'catalog' : widget.section;
+    final path = ['catalog', 'stories'].contains(kind)
+        ? '/${state.server}/${state.text.locale}/$kind/'
+        : '/${state.text.locale}/$kind/';
+    _data = hubData(state.api.origin, path);
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final state = AppScope.of(context);
-    if (_dataKey != state.publicDataKey) {
-      _dataKey = state.publicDataKey;
-      _summary = state.api.json(
-        '/api/v1/servers/${state.server}/catalog/summary',
-      );
+    final key = (state.publicDataKey, state.text.locale, widget.section);
+    if (_key != key) {
+      _key = key;
+      _load();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final t = AppScope.of(context).text;
-    final theme = Theme.of(context);
-    final number = NumberFormat.decimalPattern(t.locale);
-    final library = navSections.firstWhere((s) => s.id == widget.section);
+    final text = AppScope.of(context).text;
     return ShellPage(
-      title: t(
-        widget.section == 'library'
-            ? 'navigation.catalog'
-            : 'navigation.${widget.section}',
-        'Catalog',
+      title: text(
+        'navigation.${widget.section == 'library' ? 'catalog' : widget.section}',
       ),
+      actions: [
+        BarAction(
+          icon: Symbols.refresh_rounded,
+          label: text('common.actions.refresh'),
+          onPressed: () => setState(_load),
+        ),
+      ],
       body: FutureBuilder(
-        future: _summary,
+        future: _data,
         builder: (context, snapshot) {
-          final resources =
-              (snapshot.data as Map?)?['resources'] as Map? ?? const {};
-          String? count(String route) {
-            final value = (resources[_counted[route]] as Map?)?['count'];
-            return value is num ? number.format(value) : null;
+          final tiles = snapshot.data;
+          if (tiles == null && !snapshot.hasError) {
+            return const Center(child: CircularProgressIndicator());
           }
-
+          final entries =
+              tiles ??
+              [
+                for (final section in navSections.where(
+                  (s) => widget.section == 'community'
+                      ? ['community', 'mirrors', 'sekai'].contains(s.id)
+                      : s.id == widget.section,
+                ))
+                  for (final item in section.items)
+                    {
+                      'columns': 3,
+                      'rows': 2,
+                      'visual': 'icon',
+                      'links': [
+                        {'route': item.route, 'label': item.label},
+                      ],
+                    },
+              ];
           return LayoutBuilder(
             builder: (context, constraints) {
               final padding = pagePadding(context);
               final width = constraints.maxWidth - padding.horizontal;
-              final columns = width < 600 - padding.horizontal
-                  ? 2
-                  : ((width + 8) / 228).floor().clamp(1, 8);
-              return ListView(
+              return GridView.builder(
                 padding: padding,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
-                    child: Text(
-                      t(library.label),
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: columns,
-                      mainAxisSpacing: 8,
-                      crossAxisSpacing: 8,
-                      mainAxisExtent: 64,
-                    ),
-                    itemCount: library.items.length,
-                    itemBuilder: (context, index) {
-                      final item = library.items[index];
-                      return HubLink(
-                        icon: item.icon,
-                        label: t(item.label),
-                        count: count(item.route),
-                        onTap: () => widget.navigate(item.route),
-                      );
-                    },
-                  ),
-                ],
+                gridDelegate: _MosaicDelegate(
+                  entries,
+                  width > 700 ? 12 : 6,
+                  width <= 420
+                      ? 80
+                      : width <= 700
+                      ? 90
+                      : 100,
+                ),
+                itemCount: entries.length,
+                itemBuilder: (context, index) => _MosaicTile(
+                  data: entries[index],
+                  navigate: widget.navigate,
+                ),
               );
             },
           );
@@ -130,4 +112,401 @@ class _CatalogHubScreenState extends State<CatalogHubScreen> {
       ),
     );
   }
+}
+
+class _MosaicTile extends StatelessWidget {
+  const _MosaicTile({required this.data, required this.navigate});
+  final Map<String, Object?> data;
+  final ValueChanged<String> navigate;
+  @override
+  Widget build(BuildContext context) {
+    final state = AppScope.of(context), colors = Theme.of(context).colorScheme;
+    final links = (data['links'] as List).cast<Map>();
+    NavItem? item(Map link) =>
+        allNavItems.where((v) => v.route == link['route']).firstOrNull;
+    final icon = item(links.first)?.icon ?? Symbols.arrow_forward_rounded;
+    String label(Map link) =>
+        state.text('${link['label'] ?? item(link)?.label}');
+    final compound = links.length > 1;
+    return Material(
+      color: colors.surfaceContainer,
+      borderRadius: BorderRadius.circular(28),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: compound ? null : () => navigate('${links.first['route']}'),
+        child: Column(
+          children: [
+            Expanded(
+              child: ExcludeSemantics(
+                child: _HubArt(data: data, icon: icon),
+              ),
+            ),
+            if (compound)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final link in links)
+                      FilledButton.tonalIcon(
+                        onPressed: () => navigate('${link['route']}'),
+                        icon: Icon(item(link)?.icon ?? icon, size: 20),
+                        label: Text(label(link)),
+                      ),
+                  ],
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        label(links.first),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(Symbols.arrow_forward_rounded, size: 22),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HubArt extends StatelessWidget {
+  const _HubArt({required this.data, required this.icon});
+  final Map<String, Object?> data;
+  final IconData icon;
+  @override
+  Widget build(BuildContext context) {
+    final state = AppScope.of(context), colors = Theme.of(context).colorScheme;
+    Widget image(Object? value, {BoxFit fit = BoxFit.contain}) => AppImage(
+      candidates: [state.api.asset('$value').toString()],
+      fit: fit,
+      localized: false,
+    );
+    final visual = data['visual'],
+        images = (data['images'] as List? ?? []).cast<String>();
+    final team = (data['team'] as List? ?? []).cast<Map>();
+    if (visual == 'team' && team.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            for (final slot in team)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      for (final kind in ['member', 'snap'])
+                        if ((slot[kind] as List).isNotEmpty)
+                          Flexible(
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: AspectRatio(
+                                aspectRatio: 1,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      image((slot[kind] as List).first),
+                                      if ((slot[kind] as List).length > 1)
+                                        Positioned(
+                                          left: 0,
+                                          top: 0,
+                                          width: 20,
+                                          height: 20,
+                                          child: image((slot[kind] as List)[1]),
+                                        ),
+                                      if ((slot[kind] as List).length > 2)
+                                        Positioned(
+                                          right: 0,
+                                          bottom: 0,
+                                          width: 26,
+                                          height: 26,
+                                          child: image((slot[kind] as List)[2]),
+                                        ),
+                                      if (slot['leader'] == true &&
+                                          kind == 'member')
+                                        Positioned(
+                                          left: 0,
+                                          right: 0,
+                                          bottom: 0,
+                                          child: ColoredBox(
+                                            color: colors.primaryContainer,
+                                            child: Text(
+                                              state.text(
+                                                'navigation.mosaic.leader',
+                                              ),
+                                              textAlign: TextAlign.center,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .labelSmall
+                                                  ?.copyWith(
+                                                    color: colors
+                                                        .onPrimaryContainer,
+                                                  ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+    final friendship = data['friendship'] as Map?;
+    if (visual == 'friendship' && friendship?['board'] != null) {
+      final portraits = friendship!['portraits'] as List;
+      final styles = friendship['slots'] as List;
+      double point(String style, String key) => double.parse(
+        RegExp('--$key:([\\d.−-]+)')
+            .firstMatch(style)![1]!
+            .replaceAll('−', '-'),
+      );
+      return Padding(
+        padding: const EdgeInsets.all(8),
+        child: FittedBox(
+          fit: BoxFit.contain,
+          child: SizedBox(
+            width: 1312,
+            height: 964,
+            child: Stack(
+              clipBehavior: Clip.hardEdge,
+              children: [
+                Positioned.fill(child: image(friendship['board'])),
+                Positioned(
+                  left: 144,
+                  bottom: -36.6,
+                  width: 1024,
+                  height: 1024,
+                  child: image(friendship['lead']),
+                ),
+                for (final (i, src) in portraits.indexed)
+                  Positioned(
+                    left: point(styles[i] as String, 'slot-x') * 13.12 - 175,
+                    top: point(styles[i] as String, 'slot-y') * 9.64 - 175,
+                    width: 350,
+                    height: 350,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        if (friendship['arrow'] != null)
+                          Positioned(
+                            left:
+                                point(styles[i] as String, 'arrow-x') * 3.5 -
+                                80,
+                            top:
+                                point(styles[i] as String, 'arrow-y') * 3.5 -
+                                40,
+                            width: 160,
+                            height: 80,
+                            child: Transform.rotate(
+                              angle:
+                                  point(styles[i] as String, 'arrow-rotation') *
+                                  math.pi /
+                                  180,
+                              child: image(friendship['arrow']),
+                            ),
+                          ),
+                        Positioned.fill(child: image(src)),
+                      ],
+                    ),
+                  ),
+                if (friendship['logo'] != null)
+                  Positioned(
+                    left: 175,
+                    top: 86,
+                    width: 250,
+                    height: 140,
+                    child: image(friendship['logo']),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    if (images.isEmpty) {
+      return Center(child: Icon(icon, size: 64, color: colors.primary));
+    }
+    if (['chart', 'sonolus', 'puzzle', 'guess'].contains(visual)) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: image(images.first, fit: BoxFit.cover),
+            ),
+          ),
+          Align(
+            alignment: Alignment.bottomRight,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colors.primaryContainer,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(icon, size: 40, color: colors.onPrimaryContainer),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    return LayoutBuilder(
+      builder: (context, box) {
+        final portrait = ['portraits', 'models'].contains(visual),
+            landscape = ['landscape', 'banners'].contains(visual);
+        final w = math.min(
+          box.maxWidth * (images.length == 1 ? .88 : .58),
+          landscape
+              ? 320.0
+              : portrait
+              ? 120.0
+              : 136.0,
+        );
+        final h = math.min(
+          box.maxHeight - 16,
+          portrait
+              ? w * 1.45
+              : landscape
+              ? w * .62
+              : w,
+        );
+        return Stack(
+          clipBehavior: Clip.hardEdge,
+          children: [
+            for (final i in images.indexed.toList().reversed)
+              Positioned(
+                left:
+                    (box.maxWidth - w) / 2 +
+                    (i.$1 - (images.length - 1) / 2) * w * .28,
+                top: (box.maxHeight - h) / 2 + ((i.$1 % 2) * 6),
+                width: w,
+                height: h,
+                child: Transform.rotate(
+                  angle: images.length == 1
+                      ? 0
+                      : (i.$1 - (images.length - 1) / 2) * .11,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: image(
+                      i.$2,
+                      fit: portrait ? BoxFit.contain : BoxFit.cover,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _MosaicDelegate extends SliverGridDelegate {
+  const _MosaicDelegate(this.tiles, this.columns, this.rowHeight);
+  final List<Map<String, Object?>> tiles;
+  final int columns;
+  final double rowHeight;
+  @override
+  SliverGridLayout getLayout(SliverConstraints constraints) {
+    const gap = 8.0;
+    final unit = (constraints.crossAxisExtent - (columns - 1) * gap) / columns;
+    final occupied = <int>{}, geometries = <SliverGridGeometry>[];
+    for (final tile in tiles) {
+      final span = (tile['columns'] as int) == 4 && columns == 6
+              ? 3
+              : (tile['columns'] as int).clamp(1, columns),
+          height = tile['rows'] as int;
+      var row = 0, col = 0;
+      bool fits() =>
+          col + span <= columns &&
+          [
+            for (var y = 0; y < height; y++)
+              for (var x = 0; x < span; x++) (row + y) * columns + col + x,
+          ].every((slot) => !occupied.contains(slot));
+      while (!fits()) {
+        col++;
+        if (col == columns) {
+          col = 0;
+          row++;
+        }
+      }
+      occupied.addAll([
+        for (var y = 0; y < height; y++)
+          for (var x = 0; x < span; x++) (row + y) * columns + col + x,
+      ]);
+      geometries.add(
+        SliverGridGeometry(
+          scrollOffset: row * (rowHeight + gap),
+          crossAxisOffset: col * (unit + gap),
+          mainAxisExtent: height * (rowHeight + gap) - gap,
+          crossAxisExtent: span * (unit + gap) - gap,
+        ),
+      );
+    }
+    return _MosaicGridLayout(geometries);
+  }
+
+  @override
+  bool shouldRelayout(_MosaicDelegate oldDelegate) =>
+      tiles != oldDelegate.tiles ||
+      columns != oldDelegate.columns ||
+      rowHeight != oldDelegate.rowHeight;
+}
+
+class _MosaicGridLayout extends SliverGridLayout {
+  const _MosaicGridLayout(this.geometries);
+  final List<SliverGridGeometry> geometries;
+  @override
+  int getMinChildIndexForScrollOffset(double scrollOffset) {
+    final index = geometries.indexWhere(
+      (g) => g.trailingScrollOffset > scrollOffset,
+    );
+    return index < 0 ? math.max(0, geometries.length - 1) : index;
+  }
+
+  @override
+  int getMaxChildIndexForScrollOffset(double scrollOffset) {
+    final index = geometries.lastIndexWhere(
+      (g) => g.scrollOffset <= scrollOffset,
+    );
+    return math.max(0, index);
+  }
+
+  @override
+  SliverGridGeometry getGeometryForChildIndex(int index) => geometries[index];
+  @override
+  double computeMaxScrollOffset(int childCount) => geometries
+      .take(childCount)
+      .fold(0.0, (value, g) => math.max(value, g.trailingScrollOffset));
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../shell/page.dart';
+import '../catalog/arena_detail.dart' show arenaTime;
 import 'build_tab.dart';
 import 'controller.dart';
 import 'engine/num.dart';
@@ -17,10 +19,7 @@ class ArenaTab extends StatelessWidget {
     final period = arena.regulation;
     final end = period == null
         ? null
-        : DateTime.fromMillisecondsSinceEpoch(
-            intOf(period['endAt']),
-            isUtc: true,
-          ).add(const Duration(hours: 9));
+        : DateTime.fromMillisecondsSinceEpoch(intOf(period['endAt']));
     final missions = intListOf(rule['missions']);
     return BuildTab(
       controller: c,
@@ -41,7 +40,22 @@ class ArenaTab extends StatelessWidget {
                 ),
             ],
             onChanged: (server) {
-              if (server != null) c.state.setServer(server);
+              if (server != null) {
+                if (c.serverOverride != null) {
+                  ShellScope.of(context)?.navigate(
+                    Uri(
+                      path: '/team-builder',
+                      queryParameters: {
+                        'tab': 'arena',
+                        'league': '${arena.leagueId}',
+                        'server': server,
+                      },
+                    ).toString(),
+                  );
+                } else {
+                  c.state.setServer(server);
+                }
+              }
             },
           ),
           DropdownButtonFormField<int>(
@@ -87,8 +101,10 @@ class ArenaTab extends StatelessWidget {
                 Chip(
                   label: Text(
                     c.tb('arena.until', 'Until {time}', {
-                      'time':
-                          '${end.month}/${end.day} ${end.hour.toString().padLeft(2, '0')}:${end.minute.toString().padLeft(2, '0')} JST',
+                      'time': arenaTime(
+                        end.millisecondsSinceEpoch,
+                        c.state.text.locale,
+                      ),
                     }),
                   ),
                 ),

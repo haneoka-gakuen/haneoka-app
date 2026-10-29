@@ -3009,7 +3009,51 @@
       },
       "selectAllCharts": "すべて選択",
       "deselectAllCharts": "すべて解除",
-      "clearAllCharts": "すべての選択をクリア"
+      "clearAllCharts": "すべての選択をクリア",
+      "growthComparison": {
+        "action": "育成項目",
+        "target": "目標レベル",
+        "next": "次のレベル",
+        "cap": "現在の上限",
+        "card": "カード",
+        "edit": "育成状況を入力",
+        "status": {
+          "ready": "比較可能",
+          "missing-state": "育成状況未入力",
+          "missing-data": "データなし",
+          "at-cap": "上限到達",
+          "invalid-state": "育成値を確認"
+        },
+        "expUnknown": "必要EXP：現在のEXP未入力",
+        "loadError": "カード一覧を読み込めません"
+      },
+      "tg": {
+        "title": "育成プラン",
+        "full": "すべて最大",
+        "fixedBefore": "元の編成",
+        "fixedAfter": "育成後の元の編成",
+        "searchAfter": "育成後の再編成",
+        "searchBefore": "育成前後の再編成",
+        "fixedGain": "同じ編成の上昇量",
+        "rebuildGain": "再編成による追加上昇量",
+        "totalGain": "元の編成との差",
+        "searchGrowthGain": "育成前後の再編成差",
+        "scenario": "育成シミュレーション",
+        "inTeam": "現在の編成",
+        "inPool": "候補カード",
+        "snapshot": "元の結果の条件",
+        "original": "元の結果",
+        "pending": "未計算",
+        "partial": "探索未完了",
+        "complete": "完了",
+        "failed": "計算失敗",
+        "noTeam": "条件に合う編成なし",
+        "runFixed": "編成の上昇量を計算",
+        "runSearch": "再編成",
+        "continue": "探索を続ける",
+        "pool": "メンバー / スナップ",
+        "materials": "素材・スキル資料"
+      }
     },
     "calendar": {
       "title": "カレンダー",

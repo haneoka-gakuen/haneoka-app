@@ -13,6 +13,7 @@ import '../core/app_state.dart';
 import '../core/i18n.dart';
 import '../ui/card_artwork.dart';
 import 'box.dart';
+import 'catalog_sort.dart';
 import 'engine/api.dart';
 import 'engine/box.dart';
 import 'engine/master.dart';
@@ -52,6 +53,57 @@ class TeamCatalog extends ChangeNotifier {
   final String? server;
   final Doc data;
   final EngineMaster master;
+  final resourceSort = <TeamResource, TeamResourceSort>{};
+  Map<String, Doc> _chartMetadata = {};
+  bool _disposed = false;
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  bool metricsLoaded = false;
+  Object? metricsError;
+  Future<void>? _metricsLoading;
+  void sortChanged() => notifyListeners();
+  Doc? chartMetadata(SongRef song) => _chartMetadata[song.key];
+  Future<void> loadChartMetadata() => _metricsLoading ??= () async {
+    try {
+      final cross = objectRow(data['crossServer']);
+      final identities = objectRow(cross['identities']);
+      final owners = objectRow(objectRow(cross['owners'])['songs']);
+      final documents = await Future.wait([
+        for (final entry in identities.entries)
+          () async {
+            final identity = objectRow(entry.value);
+            final value = await state
+                .apiFor(entry.key)
+                .json(
+                  '/api/v1/servers/${entry.key}/song-meta?release=${identity['releaseId']}',
+                );
+            return (entry.key, objectRow(value));
+          }(),
+      ]);
+      final byServer = {for (final (server, doc) in documents) server: doc};
+      _chartMetadata = {
+        for (final entry in objectRow(data['songs']).entries)
+          for (final chart in objectRow(
+            objectRow(
+              byServer['${owners[entry.key] ?? objectRow(data['identity'])['server']}'],
+            )[entry.key],
+          ).entries)
+            '${entry.key}:${chart.key}': objectRow(
+              objectRow(chart.value)['chart'],
+            ),
+      };
+      metricsLoaded = true;
+      metricsError = null;
+    } catch (error) {
+      metricsError = error;
+      _metricsLoading = null;
+    }
+    if (!_disposed) notifyListeners();
+  }();
   late final fullGrowthInputs = (
     members: [
       for (final card in master.members.values)

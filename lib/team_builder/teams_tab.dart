@@ -8,6 +8,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../ui/theme.dart';
 import 'box.dart';
 import 'controller.dart';
+import 'team_growth_view.dart';
 import 'build_tab.dart' show SongRulesEditor;
 import 'engine/api.dart';
 import 'engine/box.dart';
@@ -289,6 +290,7 @@ class _TeamsTabState extends State<TeamsTab> {
                 numeric: true,
               ),
               DataColumn(label: Text(c.tb('scoreRange', 'Range'))),
+              DataColumn(label: Text(c.tb('tg.title', 'Training comparison'))),
               if (s.manualScoreMode != 'gekiso')
                 DataColumn(
                   label: Text(c.tb('skipScore', 'Skip score')),
@@ -321,6 +323,19 @@ class _TeamsTabState extends State<TeamsTab> {
                     DataCell(
                       Text(
                         '${formatNumber(locale, row.score.min)} – ${formatNumber(locale, row.score.max)}',
+                      ),
+                    ),
+                    DataCell(
+                      IconButton(
+                        tooltip: c.tb('tg.title', 'Training comparison'),
+                        onPressed: c.running
+                            ? null
+                            : () => showTeamGrowth(
+                                context,
+                                c,
+                                c.training.manualSource(row),
+                              ),
+                        icon: const Icon(Symbols.trending_up_rounded),
                       ),
                     ),
                     if (s.manualScoreMode != 'gekiso')

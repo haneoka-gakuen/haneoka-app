@@ -197,7 +197,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       });
       return;
     }
-    if (route == '/catalog/stories') route = '/catalog/stories/band';
     _scaffold.currentState?.closeDrawer();
     if (route == _route) return;
     final navigator = _pages.currentState;

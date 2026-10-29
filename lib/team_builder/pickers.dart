@@ -11,6 +11,7 @@ import '../catalog/catalog_screen.dart' show cardRarityName;
 import '../catalog/catalog_query.dart';
 import '../ui/tile.dart';
 import 'catalog.dart';
+import 'catalog_sort.dart';
 import 'engine/api.dart';
 import 'engine/num.dart';
 import 'widgets.dart';
@@ -431,6 +432,11 @@ class CardFilterPanel extends StatelessWidget {
             ],
           ),
         ),
+        TeamResourceSortControl(
+          catalog: catalog,
+          resource: members ? TeamResource.members : TeamResource.snaps,
+          onChanged: () => onChanged(filters),
+        ),
         const SizedBox(height: 12),
         ToolField(
           label: t('catalog.fields.skill', 'Skill'),
@@ -663,7 +669,7 @@ class _SongPickerState extends State<_SongPicker> {
       'gekisouType': _missions.toList(),
       'gekisouMatch': plan.facets['gekisouMatch']!,
     });
-    final ids = [
+    final candidates = [
       for (final key in objectRow(catalog.data['songs']).keys)
         if (int.tryParse(key) case final id?)
           if ((widget.allowed == null || widget.allowed!.contains(id)) &&
@@ -683,7 +689,18 @@ class _SongPickerState extends State<_SongPicker> {
                       .toLowerCase()
                       .contains(query)))
             id,
-    ]..sort((a, b) => b - a);
+    ];
+    final sort =
+        catalog.resourceSort[TeamResource.songs] ?? const TeamResourceSort();
+    if (chartMetricSortFields.contains(sort.field) &&
+        !catalog.metricsLoaded &&
+        catalog.metricsError == null) {
+      catalog.loadChartMetadata();
+    }
+    final ids = catalog
+        .sortedCharts(candidates.map((id) => SongRef(id, _difficulty)))
+        .map((song) => song.songId)
+        .toList();
     final selected = {
       for (final song in _songs)
         if (song.difficulty == _difficulty) song.songId,
@@ -784,6 +801,10 @@ class _SongPickerState extends State<_SongPicker> {
               selected: {_containsMissions},
               onSelectionChanged: (value) =>
                   setState(() => _containsMissions = value.first),
+            ),
+            TeamResourceSortControl(
+              catalog: catalog,
+              resource: TeamResource.songs,
             ),
             const SizedBox(height: 12),
             facet(
@@ -958,7 +979,11 @@ class _CardPickerState extends State<_CardPicker> {
   CardFilters _filters = const CardFilters();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: widget.catalog,
+    builder: (context, _) => content(context),
+  );
+  Widget content(BuildContext context) {
     final catalog = widget.catalog;
     final t = catalog.t;
     String tb(
@@ -966,10 +991,10 @@ class _CardPickerState extends State<_CardPicker> {
       String fallback, [
       Map<String, Object?> v = const {},
     ]) => t('tools.teamBuilder.$key', fallback, v);
-    final ids = [
+    final ids = catalog.sortedCards(widget.members, [
       for (final id in widget.ids)
         if (_filters.matches(catalog, widget.members, id)) id,
-    ]..sort((a, b) => b - a);
+    ]);
     return SelectionPane(
       title: widget.members
           ? tb('pickMember', 'Choose a member')

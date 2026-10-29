@@ -100,6 +100,21 @@ Future<bool> openLink(
     navigate?.call('/');
     return navigate != null;
   }
+  if (parts.first == 'arena' ||
+      parts.take(2).join('/') == 'catalog/arena' ||
+      parts.first == 'team-builder') {
+    final path = parts.first == 'arena'
+        ? '/catalog/${parts.join('/')}'
+        : '/${parts.join('/')}';
+    navigate?.call(
+      Uri(
+        path: path,
+        queryParameters: {...uri.queryParameters, 'server': ?server},
+        fragment: uri.hasFragment ? uri.fragment : null,
+      ).toString(),
+    );
+    return navigate != null;
+  }
   if (parts.first == 'charts') {
     navigate?.call(
       Uri(

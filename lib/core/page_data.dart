@@ -14,6 +14,19 @@ Stream<PublicDocumentChange> get publicPageDataChanges => publicDocumentCache
     .changes
     .where((change) => _pageKeys.contains(change.key));
 
+PublicDocumentKey pageDocumentKey(Uri uri) {
+  final key = PublicDocumentKey(
+    uri: uri,
+    server: uri.pathSegments.firstOrNull ?? '',
+  );
+  _pageKeys.remove(key);
+  _pageKeys.add(key);
+  while (_pageKeys.length > 128) {
+    _pageKeys.remove(_pageKeys.first);
+  }
+  return key;
+}
+
 Future<Map<String, Object?>> _decodePage(
   Uint8List bytes,
   String scriptId,
@@ -38,17 +51,8 @@ Future<Map<String, Object?>> pageData(
   bool attribute = false,
 }) {
   final uri = Uri.parse(_pageOrigin).resolve(path);
-  final key = PublicDocumentKey(
-    uri: uri,
-    server: uri.pathSegments.firstOrNull ?? '',
-  );
-  _pageKeys.remove(key);
-  _pageKeys.add(key);
-  while (_pageKeys.length > 128) {
-    _pageKeys.remove(_pageKeys.first);
-  }
   return publicDocumentCache.read<Map<String, Object?>>(
-    key: key,
+    key: pageDocumentKey(uri),
     decodeVariant: 'page.v1.$attribute.$scriptId',
     decode: (bytes) => _decodePage(bytes, scriptId, attribute),
   );

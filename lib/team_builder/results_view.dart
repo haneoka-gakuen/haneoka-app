@@ -3,6 +3,8 @@
 library;
 
 import 'reward_plan_view.dart';
+import 'team_growth_view.dart';
+import 'team_growth.dart';
 
 import 'dart:math' as math;
 
@@ -44,11 +46,14 @@ String hitKey(EngineHit hit) =>
 CardGrowthDisplay? _resultGrowth(
   TeamBuilderController c,
   String key,
-  bool member,
-) {
-  final inputs = c.activity && c.settings.rewardMode == 'recommendation'
-      ? c.pt.job?.request
-      : c.resultInputs;
+  bool member, {
+  EngineRequest? frozenInputs,
+}) {
+  final inputs =
+      frozenInputs ??
+      (c.activity && c.settings.rewardMode == 'recommendation'
+          ? c.pt.job?.request
+          : c.resultInputs);
   if (inputs == null) return null;
   final input = member
       ? inputs.members.where((row) => row.key == key).firstOrNull
@@ -589,6 +594,17 @@ class _ResultsViewState extends State<ResultsView> {
                     subtitle: Text(
                       '+${formatNumber(locale, row['gain'] as num, 2)}',
                     ),
+                    onTap: () => showTeamGrowth(
+                      context,
+                      c,
+                      c.training.resultSource(c.results!.overall.first),
+                      choice: TeamGrowthChoice(
+                        members: row['kind'] == 'members',
+                        key: '${row['key']}',
+                        action: 'full',
+                        target: 'cap',
+                      ),
+                    ),
                   ),
               ] else
                 FilledButton.tonalIcon(
@@ -874,6 +890,27 @@ class _ResultComparisonPanelState extends State<ResultComparisonPanel> {
           Text(
             '#${entry.position} · ${c.tb('outsideRanking', 'Outside current ranking')}',
           ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final entry in entries)
+              if (entry.input.goal is! PlanGoal)
+                OutlinedButton.icon(
+                  onPressed: c.running
+                      ? null
+                      : () => showTeamGrowth(
+                          context,
+                          c,
+                          c.training.comparedSource(entry),
+                        ),
+                  icon: const Icon(Symbols.trending_up_rounded),
+                  label: Text(
+                    '#${entry.position} · ${c.tb('tg.title', 'Training comparison')}',
+                  ),
+                ),
+          ],
+        ),
         LayoutBuilder(
           builder: (context, box) {
             final valueWidth = (box.maxWidth - 104) / picked.length;
@@ -1163,6 +1200,18 @@ class _HitCardState extends State<_HitCard> {
                 );
                 final actions = Wrap(
                   children: [
+                    if (widget.settings.goal != GoalKind.plan)
+                      IconButton(
+                        tooltip: c.tb('tg.title', 'Training comparison'),
+                        onPressed: c.running || c.stale
+                            ? null
+                            : () => showTeamGrowth(
+                                context,
+                                c,
+                                c.training.resultSource(hit),
+                              ),
+                        icon: const Icon(Symbols.trending_up_rounded),
+                      ),
                     IconButton(
                       tooltip: c.tb('saveTeam', 'Save team'),
                       onPressed: c.stale
@@ -1333,10 +1382,12 @@ class Formation extends StatelessWidget {
     required this.controller,
     required this.hit,
     required this.settings,
+    this.inputs,
   });
   final TeamBuilderController controller;
   final EngineHit hit;
   final BuildSettings settings;
+  final EngineRequest? inputs;
 
   @override
   Widget build(BuildContext context) {
@@ -1366,7 +1417,12 @@ class Formation extends StatelessWidget {
                         catalog: catalog,
                         members: true,
                         id: member,
-                        growth: _resultGrowth(c, hit.members[index], true),
+                        growth: _resultGrowth(
+                          c,
+                          hit.members[index],
+                          true,
+                          frozenInputs: inputs,
+                        ),
                         outline: index == 0 ? theme.colorScheme.primary : null,
                       ),
                       const SizedBox(height: 4),
@@ -1375,7 +1431,12 @@ class Formation extends StatelessWidget {
                           catalog: catalog,
                           members: false,
                           id: cardIdOf(snapKey),
-                          growth: _resultGrowth(c, snapKey, false),
+                          growth: _resultGrowth(
+                            c,
+                            snapKey,
+                            false,
+                            frozenInputs: inputs,
+                          ),
                         )
                       else
                         AspectRatio(

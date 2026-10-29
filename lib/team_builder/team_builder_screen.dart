@@ -36,8 +36,9 @@ class TeamBuilderScreen extends StatefulWidget {
     this.initialTab,
     this.returnTab,
     this.initialLeague,
+    this.server,
   });
-  final String? initialTab, returnTab;
+  final String? initialTab, returnTab, server;
   final int? initialLeague;
   final GameSave? importSave;
 
@@ -108,7 +109,7 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
     final state = AppScope.of(context);
     final controller = _controller ??= TeamBuilderController(
       state,
-      serverOverride: widget.importSave?.release?.server,
+      serverOverride: widget.server ?? widget.importSave?.release?.server,
     )..addListener(_changed);
     controller.activate(
       _tab == _Tab.arena

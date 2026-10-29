@@ -26,6 +26,7 @@ import 'engine/objectives.dart';
 import 'engine_client.dart';
 import 'pt_controller.dart';
 import 'settings.dart';
+import 'team_growth.dart';
 import 'song_comparison.dart';
 import 'result_comparison.dart';
 import 'pt_recommendation.dart' show PtJob;
@@ -420,6 +421,25 @@ class TeamBuilderController extends ChangeNotifier {
   (int, int) growthProgress = (0, 0);
   bool growthRunning = false;
   bool get currentGrowth => growthContext == _fingerprint();
+
+  late final training = TeamGrowthService(this);
+  Object? _auxiliaryTask;
+  Object? acquireAuxiliaryTask() {
+    if (running || _disposed) return null;
+    final task = _auxiliaryTask = Object();
+    running = true;
+    notifyListeners();
+    return task;
+  }
+
+  bool ownsAuxiliaryTask(Object task) =>
+      !_disposed && identical(_auxiliaryTask, task);
+  void releaseAuxiliaryTask(Object task) {
+    if (!ownsAuxiliaryTask(task)) return;
+    _auxiliaryTask = null;
+    running = false;
+    notifyListeners();
+  }
 
   late final pt = PtController(this);
   late final comparison = SongComparison(this);
@@ -1270,7 +1290,7 @@ class TeamBuilderController extends ChangeNotifier {
     _activeContext = fingerprint;
     changed();
     try {
-      final result = await engine.growth(input, (done, total) {
+      final result = await training.priorities(input, (done, total) {
         if (generation == runGeneration && fingerprint == _fingerprint()) {
           growthProgress = (done, total);
           changed();
@@ -1297,6 +1317,7 @@ class TeamBuilderController extends ChangeNotifier {
   }
 
   void cancel() {
+    _auxiliaryTask = null;
     ++runGeneration;
     _activeContext = null;
     running = growthRunning = false;
