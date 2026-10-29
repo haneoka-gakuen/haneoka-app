@@ -651,6 +651,14 @@ class EngineRequest {
     'player': player.toJson(),
     'unknownPolicy': unknownPolicy.name,
     'goal': goalJson(goal),
+    // The native engine scopes the master per call; it wants both fields, and
+    // zeros mean "keep the recorded value" (`song_rules.rs`).
+    if (goal case GekisoGoal(:final musicType, :final missions))
+      if (musicType != null || missions != null)
+        'songRules': {
+          'musicType': musicType ?? 0,
+          'missions': missions ?? const [0, 0, 0],
+        },
     'constraints': constraints.toJson(),
     'k': k,
     'timeLimitMs': timeLimitMs?.isFinite == true ? timeLimitMs : null,
