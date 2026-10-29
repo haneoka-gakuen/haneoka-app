@@ -904,7 +904,9 @@
         "noProfileCard": "プロフィールカードなし",
         "noSupportCard": "サポートカードなし",
         "points": "ポイント",
-        "favoriteCard": "お気に入りメンバー"
+        "favoriteCard": "お気に入りメンバー",
+        "observed": "取得日時",
+        "officialSource": "ゲーム公式ランキング"
       }
     },
     "events": {
@@ -3147,7 +3149,8 @@
       "ended": "イベント終了",
       "duration": "{days}日 {time}",
       "unknownDeadline": "終了時刻は未提供です",
-      "cached": "最後に取得したイベント情報を表示しています。"
+      "cached": "最後に取得したイベント情報を表示しています。",
+      "totalRanking": "楽曲総合ランキング"
     },
     "stampMaker": {
       "title": "スタンプ作成",

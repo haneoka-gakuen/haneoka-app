@@ -30,7 +30,7 @@ import 'controller.dart';
 import 'engine/api.dart';
 import 'engine/num.dart';
 import 'engine/execution.dart';
-import 'engine/live.dart' show orders;
+import 'engine/live.dart' show orders, PlayModel;
 import 'engine_client.dart';
 import 'result_image.dart';
 import 'result_metric.dart';
@@ -50,10 +50,7 @@ CardGrowthDisplay? _resultGrowth(
   EngineRequest? frozenInputs,
 }) {
   final inputs =
-      frozenInputs ??
-      (c.activity && c.settings.rewardMode == 'recommendation'
-          ? c.pt.job?.request
-          : c.resultInputs);
+      frozenInputs ?? (c.usesPtResults ? c.pt.job?.request : c.resultInputs);
   if (inputs == null) return null;
   final input = member
       ? inputs.members.where((row) => row.key == key).firstOrNull
@@ -69,9 +66,7 @@ void openResultSongAnalysis(
   EngineHit hit,
   BuildSettings settings,
 ) {
-  final inputs = c.activity && c.settings.rewardMode == 'recommendation'
-      ? c.pt.job?.request
-      : c.resultInputs;
+  final inputs = c.requestForHit(hit);
   if (inputs == null) return;
   final master = c.catalog!.master,
       box = resolveBox(
@@ -149,9 +144,7 @@ List<(String, String)> resultConditions(
   EngineHit hit,
   BuildSettings settings,
 ) {
-  final input = c.activity && c.settings.rewardMode == 'recommendation'
-      ? c.pt.job?.request
-      : c.resultInputs;
+  final input = c.requestForHit(hit);
   if (input == null) return [];
   final goal = input.goal;
   final metric = resultMetric(hit, settings, c.tb);
@@ -525,6 +518,20 @@ class _ResultsViewState extends State<ResultsView> {
           ),
         ],
         const SizedBox(height: 12),
+        if (results.cpChallenge case final hit?) ...[
+          _HitCard(
+            key: ValueKey((c.resultSession, 'cp-challenge')),
+            controller: c,
+            hit: hit,
+            index: -1,
+            settings: c.settingsForHit(hit),
+            compared: c.compared.any(
+              (row) => row.id == c.compareEntry(hit, 0)?.id,
+            ),
+            onCompare: () => c.toggleCompared(hit, 0),
+          ),
+          const SizedBox(height: 12),
+        ],
         if (shown.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 32),
@@ -1165,7 +1172,9 @@ class _HitCardState extends State<_HitCard> {
                       foregroundColor: best
                           ? theme.colorScheme.onPrimary
                           : theme.colorScheme.onSurfaceVariant,
-                      child: Text('${widget.index + 1}'),
+                      child: widget.index < 0
+                          ? const Icon(Symbols.swords_rounded, size: 18)
+                          : Text('${widget.index + 1}'),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -1178,6 +1187,8 @@ class _HitCardState extends State<_HitCard> {
                               if (hit.song case final song?
                                   when widget.settings.songs.length > 1)
                                 '${catalog.songTitle(song.songId)} ${catalog.difficultyLabel(song.songId, song.difficulty)}',
+                              if (widget.index < 0)
+                                c.tb('pt.challengeBest', 'Challenge team'),
                             ].join(' · '),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -1632,7 +1643,7 @@ class _SkillOrdersState extends State<_SkillOrders> {
   EngineHit get hit => widget.hit;
 
   Future<Timeline> _timeline(int index) => _timelines[index] ??= () {
-    final request = c.request();
+    final request = c.requestForHit(hit);
     final engine = c.engine;
     if (request == null || engine == null) {
       return Future<Timeline>.error(StateError('no-request'));
@@ -1646,7 +1657,7 @@ class _SkillOrdersState extends State<_SkillOrders> {
         snapKeys: hit.snaps,
         song: hit.song!,
         order: orders[index],
-        play: c.play,
+        play: PlayModel.fromJson(objectRow(goalJson(request.goal)['play'])),
       ),
     );
   }();
@@ -2051,7 +2062,12 @@ Future<List<int>> renderHitImage(
       attributeLabel: catalog.attributeName(catalog.attribute(members, id)),
       rarityLabel: cardRarityName(catalog.rarity(members, id)),
       leader: leader,
-      growth: _resultGrowth(c, key, members),
+      growth: _resultGrowth(
+        c,
+        key,
+        members,
+        frozenInputs: c.requestForHit(hit),
+      ),
     );
   }
 

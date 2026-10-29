@@ -29,12 +29,57 @@ class EventTrackerScreen extends StatefulWidget {
   State<EventTrackerScreen> createState() => _EventTrackerScreenState();
 }
 
-class _EventTrackerScreenState extends State<EventTrackerScreen> {
+class _EventTrackerScreenState extends State<EventTrackerScreen>
+    with WidgetsBindingObserver {
   String? _region;
   String? _challenge;
   Future<(Map, Map?, Map, CatalogVisuals)>? _data;
   Timer? _clock;
+  Timer? _poll;
+  Duration _pollEvery = const Duration(seconds: 60);
+  bool _refreshing = false;
   final _rankings = GlobalKey<RankingListState>();
+  final _points = GlobalKey<RankingListState>();
+  final _total = GlobalKey<RankingListState>();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  void _schedulePoll() {
+    _poll?.cancel();
+    if (!mounted) return;
+    _poll = Timer(_pollEvery, () {
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed &&
+          ModalRoute.of(context)?.isCurrent == true) {
+        _refresh();
+      } else {
+        _schedulePoll();
+      }
+    });
+  }
+
+  void _refresh() {
+    if (!mounted || _refreshing) return;
+    final region = _region, pending = _load();
+    setState(() => _data = pending);
+    pending.then((_) {
+      if (!mounted || region != _region) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || region != _region) return;
+        _rankings.currentState?.refresh();
+        _points.currentState?.refresh();
+        _total.currentState?.refresh();
+      });
+    }, onError: (Object _, StackTrace _) {});
+  }
 
   @override
   void didChangeDependencies() {
@@ -54,25 +99,41 @@ class _EventTrackerScreenState extends State<EventTrackerScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _clock?.cancel();
+    _poll?.cancel();
     super.dispose();
   }
 
   Future<(Map, Map?, Map, CatalogVisuals)> _load() async {
-    final api = AppScope.of(context).api;
-    final current =
-        await api.live('/api/v1/game/records/$_region/events/current') as Map;
-    final event = current['event'] as Map?;
-    final (events, songs, visuals) = await (
-      api.catalog('events'),
-      api.catalog('songs'),
-      CatalogVisuals.of(api),
-    ).wait;
-    final info = ((events as Map?)?['entries'] as Map?)?.values
-        .whereType<Map>()
-        .where((e) => '${e['id']}' == '${event?['id']}')
-        .firstOrNull;
-    return (current, info, (songs as Map?) ?? const {}, visuals);
+    final region = _region;
+    final api = AppScope.of(context).apiFor(region == 'jp' ? 'jp' : 'intl');
+    _refreshing = true;
+    try {
+      final current =
+          await api.live('/api/v1/game/records/$region/events/current') as Map;
+      if (region == _region) {
+        _pollEvery = Duration(
+          seconds: current['provider'] == 'official' ? 30 : 60,
+        );
+      }
+      final event = current['event'] as Map?;
+      final (events, songs, visuals) = await (
+        api.catalog('events'),
+        api.catalog('songs'),
+        CatalogVisuals.of(api),
+      ).wait;
+      final info = ((events as Map?)?['entries'] as Map?)?.values
+          .whereType<Map>()
+          .where((e) => '${e['id']}' == '${event?['id']}')
+          .firstOrNull;
+      return (current, info, (songs as Map?) ?? const {}, visuals);
+    } finally {
+      if (region == _region) {
+        _refreshing = false;
+        _schedulePoll();
+      }
+    }
   }
 
   String _countdown(SiteText t, num? end) {
@@ -113,10 +174,7 @@ class _EventTrackerScreenState extends State<EventTrackerScreen> {
         BarAction(
           icon: Symbols.refresh_rounded,
           label: t('tools.eventTracker.refresh', 'Refresh'),
-          onPressed: () {
-            setState(() => _data = _load());
-            _rankings.currentState?.refresh();
-          },
+          onPressed: _refresh,
         ),
       ],
       body: FutureBuilder(
@@ -310,27 +368,52 @@ class _EventTrackerScreenState extends State<EventTrackerScreen> {
                   onPlayer: openPlayer,
                 ),
               const SizedBox(height: 24),
-              DetailSection(
-                icon: Symbols.leaderboard_rounded,
-                title: t(
-                  'tools.eventTracker.pointRanking',
-                  'Event point ranking',
+              if (event['totalRankingEnabled'] == true) ...[
+                DetailSection(
+                  icon: Symbols.leaderboard_rounded,
+                  title: t('tools.eventTracker.totalRanking'),
+                  child:
+                      const {
+                        'collecting',
+                        'finalizing',
+                        'archived',
+                      }.contains(event['totalRankingStatus'])
+                      ? RankingList(
+                          key: _total,
+                          region: _region!,
+                          summary: true,
+                          endpoint:
+                              '/api/v1/game/records/$_region/events/${event['id']}/total/latest',
+                          onPlayer: openPlayer,
+                        )
+                      : Text(t('tools.eventTracker.pending')),
                 ),
-                child: event['pointRankingEnabled'] == true
-                    ? RankingList(
-                        region: _region!,
-                        points: true,
-                        endpoint:
-                            '/api/v1/game/records/$_region/events/${event['id']}/latest',
-                        onPlayer: openPlayer,
-                      )
-                    : Text(
-                        t('tools.eventTracker.pointsDisabled', ''),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: scheme.onSurfaceVariant,
+                const SizedBox(height: 24),
+              ],
+              if (current['provider'] != 'official' ||
+                  event['pointRankingEnabled'] == true)
+                DetailSection(
+                  icon: Symbols.leaderboard_rounded,
+                  title: t(
+                    'tools.eventTracker.pointRanking',
+                    'Event point ranking',
+                  ),
+                  child: event['pointRankingEnabled'] == true
+                      ? RankingList(
+                          key: _points,
+                          region: _region!,
+                          points: true,
+                          endpoint:
+                              '/api/v1/game/records/$_region/events/${event['id']}/latest',
+                          onPlayer: openPlayer,
+                        )
+                      : Text(
+                          t('tools.eventTracker.pointsDisabled', ''),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
                         ),
-                      ),
-              ),
+                ),
             ],
           );
         },

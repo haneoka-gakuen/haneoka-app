@@ -483,11 +483,16 @@ class PtCheckpoint {
     );
   }
 
-  Future<void> _writes = Future.value();
-  Future<void> save(PtJob job) {
-    final payload = jsonEncode(job.toJson());
+  static Future<void> _writes = Future.value();
+  Future<void> _write(
+    String server,
+    String owner,
+    String payload, {
+    bool result = false,
+  }) {
     final pending = _writes.then((_) async {
-      final file = await _file(job.server, job.owner);
+      final base = await _file(server, owner);
+      final file = result ? File('${base.path}.result') : base;
       await file.parent.create(recursive: true);
       final temp = File('${file.path}.tmp');
       await temp.writeAsString(payload, flush: true);
@@ -497,7 +502,26 @@ class PtCheckpoint {
     return pending;
   }
 
+  Future<void> save(PtJob job) =>
+      _write(job.server, job.owner, jsonEncode(job.toJson()));
+
+  Future<void> saveResult(Doc value) => _write(
+    value['server'] as String,
+    value['owner'] as String,
+    jsonEncode({...value, 'version': 'reward-cycle-result-v1'}),
+    result: true,
+  );
+
+  Future<Doc?> latestResult(String server, String owner) async {
+    await _writes;
+    final base = await _file(server, owner), file = File('${base.path}.result');
+    if (!await file.exists()) return null;
+    final value = objectRow(jsonDecode(await file.readAsString()));
+    return value['version'] == 'reward-cycle-result-v1' ? value : null;
+  }
+
   Future<PtJob?> latest(String server, String owner) async {
+    await _writes;
     final file = await _file(server, owner);
     if (!await file.exists()) return null;
     final json = jsonDecode(await file.readAsString());

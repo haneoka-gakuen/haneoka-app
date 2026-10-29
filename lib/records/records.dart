@@ -285,13 +285,14 @@ class RankingList extends StatefulWidget {
     required this.endpoint,
     required this.region,
     this.points = false,
+    this.summary = false,
     this.onPlayer,
   });
 
   /// `/api/v1/game/records/{region}/…/ranking`.
   final String endpoint;
   final String region;
-  final bool points;
+  final bool points, summary;
   final void Function(String profileId)? onPlayer;
 
   @override
@@ -300,6 +301,7 @@ class RankingList extends StatefulWidget {
 
 class RankingListState extends State<RankingList> {
   Future<(Map, CardCatalog)>? _data;
+  (Map, CardCatalog)? _last;
   int _limit = 20;
 
   @override
@@ -312,6 +314,7 @@ class RankingListState extends State<RankingList> {
   void didUpdateWidget(RankingList oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.endpoint != widget.endpoint) {
+      _last = null;
       _limit = 20;
       _data = _load();
     }
@@ -320,10 +323,19 @@ class RankingListState extends State<RankingList> {
   void refresh() => setState(() => _data = _load(fresh: true));
 
   Future<(Map, CardCatalog)> _load({bool fresh = false}) async {
+    final endpoint = widget.endpoint;
     final api = AppScope.of(context)
         .apiFor(widget.region == 'jp' ? 'jp' : 'intl');
-    final response = await api.live(widget.endpoint);
-    return (response as Map, await CardCatalog.of(api));
+    final response = await api.live(endpoint) as Map;
+    final previous = _last?.$1;
+    final ranking =
+        response['snapshotId'] != null &&
+            response['snapshotId'] == previous?['snapshotId']
+        ? {...response, 'rows': previous!['rows']}
+        : response;
+    final result = (ranking, await CardCatalog.of(api));
+    if (mounted && endpoint == widget.endpoint) _last = result;
+    return result;
   }
 
   @override
@@ -331,9 +343,10 @@ class RankingListState extends State<RankingList> {
     final t = AppScope.of(context).text;
     final theme = Theme.of(context);
     return FutureBuilder(
+      key: ValueKey(widget.endpoint),
       future: _data,
       builder: (context, snapshot) {
-        if (snapshot.hasError) {
+        if (snapshot.hasError && _last == null) {
           return Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -348,7 +361,7 @@ class RankingListState extends State<RankingList> {
             ),
           );
         }
-        final data = snapshot.data;
+        final data = snapshot.data ?? _last;
         if (data == null) {
           return const Padding(
             padding: EdgeInsets.all(32),
@@ -367,7 +380,7 @@ class RankingListState extends State<RankingList> {
             ),
           );
         }
-        final fetched = ranking['fetchedAtMs'];
+        final fetched = ranking['observedAtMs'] ?? ranking['fetchedAtMs'];
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -375,7 +388,7 @@ class RankingListState extends State<RankingList> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                 child: Text(
-                  '${rankingLabel(t, 'updated', 'Updated')} · ${DateFormat.yMd(t.locale).add_Hms().format(DateTime.fromMillisecondsSinceEpoch(fetched.toInt()))}',
+                  '${rankingLabel(t, ranking['provider'] == 'official' ? 'observed' : 'updated')} · ${DateFormat.yMd(t.locale).add_Hms().format(DateTime.fromMillisecondsSinceEpoch(fetched.toInt()))}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -386,10 +399,18 @@ class RankingListState extends State<RankingList> {
               _Row(
                 row: row,
                 cards: cards,
-                points: widget.points,
+                points: widget.points || widget.summary,
                 onPlayer: widget.onPlayer,
               ),
             ],
+            if (ranking['provider'] == 'official')
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Text(rankingLabel(t, 'officialSource')),
+              ),
             if (rows.length > _limit)
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -528,7 +549,14 @@ class _Row extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    row['score'] is num ? number.format(row['score']) : '—',
+                    row['scoreExact'] is String
+                        ? (row['scoreExact'] as String).replaceAllMapped(
+                            RegExp(r'\B(?=(\d{3})+(?!\d))'),
+                            (_) => number.symbols.GROUP_SEP,
+                          )
+                        : row['score'] is num
+                        ? number.format(row['score'])
+                        : '—',
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontFeatures: const [FontFeature.tabularFigures()],
                     ),

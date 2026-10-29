@@ -10,6 +10,7 @@ import 'engine/live.dart' show ap;
 import 'engine/num.dart';
 import 'engine/objectives.dart' show CpExchange, RouteKind;
 import 'engine/pt_eligibility.dart';
+import 'engine/execution.dart' show completeResponse;
 import 'engine_client.dart';
 import 'pt_recommendation.dart';
 
@@ -246,7 +247,10 @@ class PtController {
     host.ptCompared.clear();
     final generation = ++_generation;
     try {
-      final restored = await _store.latest(host.server, owner);
+      final (restored, saved) = await (
+        _store.latest(host.server, owner),
+        _store.latestResult(host.server, owner),
+      ).wait;
       if (generation != _generation) return;
       for (final task in restored?.tasks ?? const <PtTask>[]) {
         if (task.status == 'running') task.status = 'queued';
@@ -256,11 +260,51 @@ class PtController {
               restored?.owner == owner
           ? restored
           : null;
+      if (host.farmResultMode == null) {
+        if (saved != null &&
+            saved['dataFingerprint'] == dataFingerprint &&
+            saved['owner'] == owner &&
+            intOf(saved['updatedAt']) >= (job?.updatedAt ?? 0)) {
+          host.restoreFarmingResult(saved);
+          host.farmResultMode = 'event';
+        } else if (job != null) {
+          host.farmResultMode = 'recommendation';
+        }
+      }
     } catch (_) {
       if (generation != _generation) return;
       storageError = true;
     }
     host.changed();
+  }
+
+  Future<void> rememberResult() async {
+    final response = host.results,
+        request = host.resultInputs,
+        settings = host.resultSettings;
+    if (response == null ||
+        request == null ||
+        settings == null ||
+        dataFingerprint.isEmpty ||
+        !completeResponse(response) ||
+        response.stopReason != 'complete') {
+      return;
+    }
+    try {
+      await _store.saveResult({
+        'server': host.server,
+        'owner': owner,
+        'dataFingerprint': dataFingerprint,
+        'contextKey': host.resultsFor,
+        'request': request.toJson(),
+        'response': response.toJson(),
+        'settings': settings.toJson(),
+        'session': host.resultSession,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      });
+    } catch (_) {
+      storageError = true;
+    }
   }
 
   void stop() => _runner?.stop();
@@ -290,6 +334,7 @@ class PtController {
     final cycle = this.cycle();
     final signature = _inputSignature();
     running = host.running = true;
+    host.farmResultMode = 'recommendation';
     error = '';
     host.changed();
     try {

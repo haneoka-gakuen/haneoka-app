@@ -17,7 +17,7 @@ import 'engine/pt_eligibility.dart';
 import 'pickers.dart';
 import 'pt_controller.dart';
 import 'pt_recommendation.dart';
-import 'results_view.dart' show Formation, openResultSongAnalysis;
+import 'results_view.dart' show Formation, ResultsView, openResultSongAnalysis;
 import 'settings.dart';
 import 'reward_plan_view.dart';
 import 'widgets.dart';
@@ -150,6 +150,7 @@ class _PtTabState extends State<PtTab> {
     if (c.settings.rewardMode != 'recommendation') {
       return BuildTab(
         controller: c,
+        resultBuilder: _resultView,
         leading: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -182,7 +183,7 @@ class _PtTabState extends State<PtTab> {
         ],
       ),
       action: _run,
-      results: _ranking,
+      results: _resultView,
     );
   }
 
@@ -649,6 +650,9 @@ class _PtTabState extends State<PtTab> {
       ],
     );
   }
+
+  Widget _resultView(BuildContext context) =>
+      c.usesPtResults ? _ranking(context) : ResultsView(controller: c);
 
   Widget _ranking(BuildContext context) {
     final job = pt.job;

@@ -98,9 +98,15 @@ Widget sticky(BuildContext context, Widget scroll, Widget action) {
 }
 
 class BuildTab extends StatefulWidget {
-  const BuildTab({super.key, required this.controller, this.leading});
+  const BuildTab({
+    super.key,
+    required this.controller,
+    this.leading,
+    this.resultBuilder,
+  });
   final TeamBuilderController controller;
   final Widget? leading;
+  final WidgetBuilder? resultBuilder;
 
   @override
   State<BuildTab> createState() => _BuildTabState();
@@ -160,7 +166,7 @@ class _BuildTabState extends State<BuildTab> {
         ],
       ),
       action: _run,
-      results: (_) => ResultsView(controller: c),
+      results: widget.resultBuilder ?? (_) => ResultsView(controller: c),
     );
   }
 

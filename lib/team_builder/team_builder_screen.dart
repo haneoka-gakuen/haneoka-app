@@ -369,15 +369,9 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
             BarAction(
               icon: Symbols.compare_arrows_rounded,
               label: c.tb('compareTeams', 'Compare teams'),
-              badge: c.activity && c.settings.rewardMode == 'recommendation'
-                  ? c.ptCompared.length
-                  : c.compared.length,
-              onPressed: () => showResultComparison(
-                context,
-                c,
-                rewards:
-                    c.activity && c.settings.rewardMode == 'recommendation',
-              ),
+              badge: c.usesPtResults ? c.ptCompared.length : c.compared.length,
+              onPressed: () =>
+                  showResultComparison(context, c, rewards: c.usesPtResults),
             ),
           for (final (tab, icon, key) in const [
             (_Tab.box, Symbols.style_rounded, 'tabBox'),

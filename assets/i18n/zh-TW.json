@@ -904,7 +904,9 @@
         "noProfileCard": "未設定名片",
         "noSupportCard": "未設定留影卡",
         "points": "積分",
-        "favoriteCard": "最愛成員卡"
+        "favoriteCard": "最愛成員卡",
+        "observed": "採集時間",
+        "officialSource": "遊戲官方榜單"
       }
     },
     "events": {
@@ -3147,7 +3149,8 @@
       "ended": "活動已截止",
       "duration": "{days} 天 {time}",
       "unknownDeadline": "未提供截止時間",
-      "cached": "正在顯示最近一次取得的活動資訊。"
+      "cached": "正在顯示最近一次取得的活動資訊。",
+      "totalRanking": "樂曲總榜"
     },
     "stampMaker": {
       "title": "貼圖製作",

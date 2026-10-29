@@ -904,7 +904,9 @@
         "noProfileCard": "프로필 카드 없음",
         "noSupportCard": "서포트 카드 없음",
         "points": "포인트",
-        "favoriteCard": "즐겨찾는 멤버 카드"
+        "favoriteCard": "즐겨찾는 멤버 카드",
+        "observed": "수집 시각",
+        "officialSource": "게임 공식 랭킹"
       }
     },
     "events": {
@@ -3147,7 +3149,8 @@
       "ended": "이벤트 종료",
       "duration": "{days}일 {time}",
       "unknownDeadline": "마감 시간이 제공되지 않았습니다",
-      "cached": "마지막으로 가져온 이벤트 정보를 표시합니다."
+      "cached": "마지막으로 가져온 이벤트 정보를 표시합니다.",
+      "totalRanking": "악곡 종합 랭킹"
     },
     "stampMaker": {
       "title": "스탬프 만들기",

@@ -904,7 +904,9 @@
         "noProfileCard": "No profile card",
         "noSupportCard": "No support card",
         "points": "Points",
-        "favoriteCard": "Favorite member card"
+        "favoriteCard": "Favorite member card",
+        "observed": "Collected",
+        "officialSource": "Official game rankings"
       }
     },
     "events": {
@@ -3147,7 +3149,8 @@
       "ended": "Event ended",
       "duration": "{days}d {time}",
       "unknownDeadline": "End time unavailable",
-      "cached": "Showing the last available event information."
+      "cached": "Showing the last available event information.",
+      "totalRanking": "Total song ranking"
     },
     "stampMaker": {
       "title": "Stamp maker",

@@ -86,6 +86,11 @@ class TeamBuilderController extends ChangeNotifier {
   EngineResponse? results;
   BuildSettings? resultSettings;
   EngineRequest? resultInputs;
+  String? farmResultMode;
+  bool get usesPtResults =>
+      activity &&
+      settings.rewardMode != 'plan' &&
+      (farmResultMode ?? settings.rewardMode) == 'recommendation';
   bool _activity = false;
   bool _arenaActive = false;
   Doc arenaDraft = arenaDefaults();
@@ -173,8 +178,36 @@ class TeamBuilderController extends ChangeNotifier {
     compared = previous?.compared ?? [];
   }
 
+  void restoreFarmingResult(Doc saved) {
+    _taskResults['event'] = _TaskResults(
+      EngineResponse.fromJson(objectRow(saved['response'])),
+      BuildSettings(objectRow(saved['settings'])).forGoal(GoalKind.event),
+      EngineRequest.fromJson(objectRow(saved['request'])),
+      '${saved['contextKey']}',
+      '${saved['session']}',
+      [],
+    );
+    if (_taskKey == 'event') _restoreTaskResults();
+  }
+
   BuildSettings settingsForHit(EngineHit hit) {
     final s = resultSettings ?? settings;
+    if (identical(results?.cpChallenge, hit)) {
+      final goal = requestForHit(hit)?.goal;
+      if (goal is EventGoal) {
+        return s
+            .copyWith({
+              'route': 'challenge',
+              'aggregation': 'individual',
+              'ptCycle': false,
+              'ptMode': 'solo',
+              'songs': goal.songs.map((song) => song.toJson()).toList(),
+              'challengePoints': goal.consumption,
+              'farming': {...s.farming, 'play': 'challenge', 'ptCycle': false},
+            })
+            .forGoal(GoalKind.event);
+      }
+    }
     if (s.goal != GoalKind.plan) return s;
     final challenge = identical(results?.plan?.challenge, hit);
     return s
@@ -185,6 +218,31 @@ class TeamBuilderController extends ChangeNotifier {
           'ptCycle': false,
         })
         .forGoal(GoalKind.event);
+  }
+
+  EngineRequest? requestForHit(EngineHit hit) {
+    final input = usesPtResults ? pt.job?.request : resultInputs;
+    if (input == null || !identical(results?.cpChallenge, hit)) return input;
+    final goal = input.goal;
+    if (goal is! EventGoal) return input;
+    final auto = objectRow(goal.rewardPlan?['autoCp']);
+    if (auto.isEmpty) return input;
+    final plan = {...goal.rewardPlan!}..remove('autoCp');
+    plan['levels'] = (plan['levels'] as List).take(1).toList();
+    final request = freshGrowthRequest(input).toJson()
+      ..remove('aggregation')
+      ..['k'] = 1
+      ..['goal'] = {
+        ...goalJson(goal),
+        'route': 'challenge',
+        'songs': auto['songs'],
+        'consumption': auto['consumption'],
+        'ranking': 'primary',
+        'gekiso': null,
+        'cpExchange': null,
+        'rewardPlan': plan,
+      };
+    return EngineRequest.fromJson(request);
   }
 
   ComparedResult? ptCompareEntry(EngineHit hit, PtJob job, int position) {
@@ -258,7 +316,7 @@ class TeamBuilderController extends ChangeNotifier {
   }
 
   ComparedResult? compareEntry(EngineHit hit, int position) {
-    final input = resultInputs, s = settingsForHit(hit);
+    final input = requestForHit(hit), s = settingsForHit(hit);
     if (input == null) return null;
     return ComparedResult(
       hit: EngineHit.fromJson(hit.toJson()),
@@ -294,7 +352,10 @@ class TeamBuilderController extends ChangeNotifier {
   void syncCompared() {
     final hits = results?.plan != null
         ? [?results!.plan!.normal, ?results!.plan!.challenge]
-        : results?.results.expand((row) => row.hits).toList() ?? <EngineHit>[];
+        : [
+            ?results?.cpChallenge,
+            ...?results?.results.expand((row) => row.hits),
+          ];
     compared = [
       for (final selected in compared)
         () {
@@ -1131,6 +1192,7 @@ class TeamBuilderController extends ChangeNotifier {
     }
     final owner = jsonEncode([store?.owner, server, catalog?.data['identity']]);
     if (_resultOwner != null && _resultOwner != owner) {
+      farmResultMode = null;
       results = null;
       resultSettings = null;
       resultInputs = null;
@@ -1184,7 +1246,7 @@ class TeamBuilderController extends ChangeNotifier {
       ..remove('contextKey')
       ..remove('requestId');
     return _contextValue = jsonEncode([
-      'native-conservative-bounds-v3',
+      'native-conservative-bounds-v4',
       store?.owner,
       server,
       catalog?.data['identity'],
@@ -1223,6 +1285,7 @@ class TeamBuilderController extends ChangeNotifier {
       );
     }
     final settings = searchSettings;
+    if (activity && settings.goal == GoalKind.event) farmResultMode = 'event';
     final generation = ++runGeneration;
     if (!resume) {
       resultSession = DateTime.now().microsecondsSinceEpoch.toString();
@@ -1270,6 +1333,9 @@ class TeamBuilderController extends ChangeNotifier {
         resultSettings = settings;
         resultInputs = request;
         syncCompared();
+        if (activity && settings.goal == GoalKind.event) {
+          await pt.rememberResult();
+        }
       }
     } on EngineCancelled {
       // Cancelled by the reader.

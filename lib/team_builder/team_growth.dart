@@ -278,10 +278,8 @@ class TeamGrowthService {
   }
 
   TeamGrowthSource? resultSource(EngineHit hit) {
-    final job = host.activity && host.settings.rewardMode == 'recommendation'
-        ? host.pt.job
-        : null;
-    final base = job?.request ?? host.resultInputs;
+    final job = host.usesPtResults ? host.pt.job : null;
+    final base = job?.request ?? host.requestForHit(hit);
     if (base == null || base.goal is PlanGoal || host.running) return null;
     final settings = job == null
         ? host.settingsForHit(hit)

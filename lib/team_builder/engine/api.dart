@@ -1027,6 +1027,7 @@ class EngineResponse {
     this.error,
     this.timing,
     this.resolvedRewardPlan,
+    this.cpChallenge,
   });
   factory EngineResponse.fromJson(Map<String, Object?> json) => EngineResponse(
     results: [
@@ -1047,6 +1048,9 @@ class EngineResponse {
     resolvedRewardPlan: json['resolvedRewardPlan'] is Map
         ? objectRow(json['resolvedRewardPlan'])
         : null,
+    cpChallenge: json['cpChallenge'] is Map
+        ? EngineHit.fromJson(objectRow(json['cpChallenge']))
+        : null,
     stopReason: json['stopReason'] as String?,
     error: json['error'] as String?,
     timing: json['timing'] is Map
@@ -1055,6 +1059,7 @@ class EngineResponse {
   );
   final PlanSummary? plan;
   final Doc? resolvedRewardPlan;
+  final EngineHit? cpChallenge;
   String? stopReason;
   String? error;
   EngineTiming? timing;
@@ -1071,6 +1076,7 @@ class EngineResponse {
     'elapsedMs': elapsedMs,
     if (plan != null) 'plan': plan!.toJson(),
     if (resolvedRewardPlan != null) 'resolvedRewardPlan': resolvedRewardPlan,
+    if (cpChallenge != null) 'cpChallenge': cpChallenge!.toJson(),
     'stopReason': stopReason,
     'error': error,
     'timing': timing?.toJson(),

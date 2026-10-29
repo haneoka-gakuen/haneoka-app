@@ -1277,7 +1277,7 @@ class _EngineCoordinator {
     ]) {
       input.remove(field);
     }
-    return jsonEncode(input);
+    return jsonEncode(['native-conservative-bounds-v4', input]);
   }
 
   Future<EngineResponse> run(
@@ -1432,8 +1432,10 @@ class _EngineCoordinator {
       ], compareHits).take(request.k),
     );
     var stopped = false, lastShown = -double.infinity;
+    EngineHit? cpChallenge;
     void publish(EngineResponse response, [bool force = false]) {
       if (stopped) return;
+      cpChallenge = response.cpChallenge ?? cpChallenge;
       final hadCandidate = latest.overall.isNotEmpty;
       for (final result in response.results) {
         final previous = latest.results
@@ -1458,6 +1460,7 @@ class _EngineCoordinator {
         unknownCards: response.unknownCards,
         elapsedMs: executionClock() - started,
         plan: response.plan,
+        cpChallenge: cpChallenge,
         stopReason: response.stopReason,
         error: response.error,
         timing: EngineTiming(
@@ -1575,6 +1578,19 @@ class _EngineCoordinator {
         if (resolved.resolvedRewardPlan == null) {
           latest.stopReason = resolved.stopReason ?? 'budget';
           return latest;
+        }
+        cpChallenge = resolved.cpChallenge;
+        if (cpChallenge != null) {
+          publish(
+            EngineResponse(
+              results: latest.results,
+              overall: latest.overall,
+              unknownCards: latest.unknownCards,
+              elapsedMs: latest.elapsedMs,
+              cpChallenge: cpChallenge,
+            ),
+            true,
+          );
         }
         request = request.copyWith(
           goal: (request.goal as EventGoal).copyWith(

@@ -135,7 +135,13 @@ const _backoff = [1500, 4000, 10000, 30000, 60000];
 
 /// Local-first replica of the box with background cloud sync.
 class BoxStore extends ChangeNotifier {
-  BoxStore(this.server);
+  BoxStore(this.server) {
+    _stores.add(this);
+  }
+  static final _stores = <BoxStore>{};
+  static final _replicas = <(String, String?), _Replica>{};
+  static final _writeVersions = <(String, String?), int>{};
+  static Future<void> _writing = Future.value();
   final String server;
   final _account = HaneokaAccount.instance;
   _Replica _replica = _Replica.empty();
@@ -150,6 +156,7 @@ class BoxStore extends ChangeNotifier {
   bool _inflight = false;
   int _failures = 0;
   bool _disposed = false;
+  int _ownerGeneration = 0;
 
   Map<String, BoxEntry> get entries => _replica.entries;
   String? get owner => _owner;
@@ -191,6 +198,8 @@ class BoxStore extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _ownerGeneration++;
+    _stores.remove(this);
     _flushTimer?.cancel();
     _pullTimer?.cancel();
     _account.removeListener(_accountChanged);
@@ -207,6 +216,7 @@ class BoxStore extends ChangeNotifier {
 
   Future<_Replica> _read(String? owner) async {
     try {
+      await _writing;
       final file = await _file(owner);
       if (!await file.exists()) return _Replica.empty();
       final json = jsonDecode(await file.readAsString());
@@ -219,22 +229,20 @@ class BoxStore extends ChangeNotifier {
     }
   }
 
-  Future<void> _writing = Future.value();
-  bool _dirty = false;
-
-  /// Writes the replica; overlapping calls collapse into one write after
-  /// the one in progress.
+  /// Capture the owner and snapshot before queueing the device write.
   Future<void> _persist() {
     if (!_ownerKnown) return Future.value();
-    if (_dirty) return _writing;
-    _dirty = true;
+    final owner = _owner, key = (server, _owner);
+    final version = (_writeVersions[key] ?? 0) + 1;
+    _writeVersions[key] = version;
+    final payload = jsonEncode(_replica.toJson());
     return _writing = _writing
         .then((_) async {
-          _dirty = false;
-          final file = await _file(_owner);
+          if (_writeVersions[key] != version) return;
+          final file = await _file(owner);
           await file.parent.create(recursive: true);
           final temp = File('${file.path}.tmp');
-          await temp.writeAsString(jsonEncode(_replica.toJson()));
+          await temp.writeAsString(payload, flush: true);
           await temp.rename(file.path);
         })
         .catchError((Object _) {});
@@ -245,17 +253,26 @@ class BoxStore extends ChangeNotifier {
       _clock = math.max(DateTime.now().millisecondsSinceEpoch, _clock + 1);
 
   Future<void> _useOwner(String? owner) async {
+    final generation = ++_ownerGeneration;
     final previous = _owner;
     final wasKnown = _ownerKnown;
     _owner = owner;
     _ownerKnown = true;
-    _replica = await _read(owner);
+    final key = (server, owner);
+    var replica = _replicas[key];
+    if (replica == null) {
+      final loaded = await _read(owner);
+      replica = _replicas.putIfAbsent(key, () => loaded);
+    }
+    if (_disposed || generation != _ownerGeneration) return;
+    _replica = replica;
     for (final entry in _replica.entries.values) {
       _observe(entry.t);
     }
     // Signing in merges what was edited signed out; clocks decide every key.
     if (owner != null && wasKnown && previous == null) {
       final anonymous = await _read(null);
+      if (_disposed || generation != _ownerGeneration) return;
       _applyMigration([
         for (final e in anonymous.entries.entries)
           BoxOp(e.key, e.value.v, e.value.t, e.value.c),
@@ -464,8 +481,17 @@ class BoxStore extends ChangeNotifier {
 
   void _changed() {
     if (_disposed) return;
-    version++;
-    notifyListeners();
+    for (final store in _stores.toList()) {
+      if (store._disposed ||
+          !store._ownerKnown ||
+          store._owner != _owner ||
+          !identical(store._replica, _replica)) {
+        continue;
+      }
+      store._observe(_clock);
+      store.version++;
+      store.notifyListeners();
+    }
   }
 }
 

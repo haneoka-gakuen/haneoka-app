@@ -51,6 +51,28 @@ class RewardPlanControls extends StatelessWidget {
       icon: Symbols.emoji_events_rounded,
       title: t('title', 'Reward plan'),
       children: [
+        if (s.route == 'live' &&
+            plan.primary != 'challenge-points' &&
+            s.eventId != null &&
+            c.catalog!.challengeSongs(s.eventId).isNotEmpty)
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              c.tb(
+                'farm.cpConversion',
+                'Include challenge rewards from earned CP',
+              ),
+            ),
+            value: plan.autoCp,
+            onChanged: (checked) => set(
+              plan
+                  .mode(
+                    'challenge-points',
+                    checked == true ? 'convert' : 'ignore',
+                  )
+                  .option('challenge-points', {'auto': checked == true}),
+            ),
+          ),
         ToolField(
           label: t('primary', 'Main reward'),
           child: Segmented<String>(
@@ -127,6 +149,7 @@ class RewardPlanControls extends StatelessWidget {
                 context,
                 c.catalog!,
                 s.planChallengeSongs,
+                selectionContext: 'pt:conversion-challenge',
                 allowed: [
                   for (final row in c.catalog!.challengeSongs(s.eventId))
                     row.liveMusicId,

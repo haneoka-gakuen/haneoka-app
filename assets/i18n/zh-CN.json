@@ -904,7 +904,9 @@
         "noProfileCard": "未设置名片",
         "noSupportCard": "未设置留影卡",
         "points": "积分",
-        "favoriteCard": "最爱成员卡"
+        "favoriteCard": "最爱成员卡",
+        "observed": "采集时间",
+        "officialSource": "游戏官方榜单"
       }
     },
     "events": {
@@ -3147,7 +3149,8 @@
       "ended": "活动已截止",
       "duration": "{days} 天 {time}",
       "unknownDeadline": "截止时间未提供",
-      "cached": "正在显示最近一次取得的活动信息。"
+      "cached": "正在显示最近一次取得的活动信息。",
+      "totalRanking": "乐曲总榜"
     },
     "stampMaker": {
       "title": "表情制作",
