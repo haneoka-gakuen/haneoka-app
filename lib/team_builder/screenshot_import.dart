@@ -185,8 +185,8 @@ Future<(ui.Image, Uint8List)> prepareScreenshot(LocalScreenshot local) async {
       )
       .toDouble();
   while (true) {
-    final width = (rect.width * scale).round();
-    final height = (rect.height * scale).round();
+    final width = (rect.width * scale).floor();
+    final height = (rect.height * scale).floor();
     if (width < 128 || height < 128) throw const ScreenshotError('image-crop');
     final recorder = ui.PictureRecorder();
     ui.Canvas(recorder).drawImageRect(
