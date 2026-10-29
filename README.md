@@ -17,7 +17,7 @@ Flutter 原生客户端，与 [Haneoka Web](https://haneoka.org) 共用资源、
 | 谱面编辑、图案、分组／图层、标记和路标 | `lib/chart_editor/` |
 | SS／USC／SUS／MMW 导入导出与格式诊断 | `formats.dart`、`usc.dart`、`sus.dart`、`sus_export.dart`、`mmws.dart` |
 | 编辑器快捷键、音符音效和节拍器 | `shortcuts.dart`、`feedback.dart` |
-| 封面拼图、截图导入和 3–8 阶求解 | `lib/games/song_puzzle.dart`、`puzzle_recognition.dart`、`puzzle_constructive.dart` |
+| 封面拼图、截图导入和 3–8 阶求解 | `lib/games/song_puzzle.dart`、`puzzle_recognition.dart`、`puzzle_constructive.dart`、`puzzle_solver.dart` |
 | 社区、歌单、谱面发布、管理 | `lib/community/`、`lib/playlists/`、`lib/admin/` |
 | 日历、游玩记录、玩家查询、抽卡记录、表情制作 | `lib/home/`、`lib/records/`、`lib/gacha_history/`、`lib/tools/` |
 

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:isolate';
 
 import 'package:flutter/material.dart';
 import 'package:material_new_shapes/material_new_shapes.dart';
@@ -14,15 +13,9 @@ import '../ui/shapes.dart';
 import '../ui/theme.dart';
 import '../ui/tile.dart';
 import 'puzzle_model.dart';
+import 'puzzle_solver.dart';
 import 'puzzle_import.dart';
 import 'puzzle_recognition.dart';
-
-Future<SolveResult> _solveInBackground(
-  int size,
-  List<int> start,
-  List<int> goal,
-  int budget,
-) => Isolate.run(() => solvePuzzle(size, start, goal, budget));
 
 class _Song {
   const _Song(
@@ -77,6 +70,7 @@ class _SongPuzzleScreenState extends State<SongPuzzleScreen> {
   final _history = <({List<int> tiles, int moves})>[];
   int _revision = 0;
   bool _busy = false;
+  PuzzleSolveTask? _solver;
   _Solution? _solution;
   int _replayIndex = 0;
   Timer? _replay;
@@ -98,6 +92,7 @@ class _SongPuzzleScreenState extends State<SongPuzzleScreen> {
 
   @override
   void dispose() {
+    _solver?.cancel();
     _replay?.cancel();
     super.dispose();
   }
@@ -154,6 +149,8 @@ class _SongPuzzleScreenState extends State<SongPuzzleScreen> {
   }
 
   void _invalidate() {
+    _solver?.cancel();
+    _solver = null;
     _replay?.cancel();
     _replay = null;
     _revision++;
@@ -261,12 +258,14 @@ class _SongPuzzleScreenState extends State<SongPuzzleScreen> {
       _busy = true;
     });
     final revision = _revision;
-    final result = await _solveInBackground(size, start, goal, budget);
+    final task = _solver = PuzzleSolveTask(size, start, goal, budget);
+    final result = await task.result;
+    if (identical(_solver, task)) _solver = null;
     if (!mounted || revision != _revision) return;
     setState(() {
       _busy = false;
       _message = result.status;
-      if (result.status != 'optimal') return;
+      if (result.status != 'optimal' && result.status != 'found') return;
       var board = start;
       final directions = <String>[];
       for (final tile in result.path) {

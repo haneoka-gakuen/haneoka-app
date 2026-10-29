@@ -49,33 +49,49 @@ class _PuzzleImportScreenState extends State<PuzzleImportScreen> {
       allowedExtensions: ['png', 'jpg', 'jpeg', 'webp'],
     );
     if (picked == null || !mounted) return;
-    final file = picked;
-    if ((await file.length() ?? 0) > 32 * 1024 * 1024) {
-      setState(() => _error = 'imageTooLarge');
-      return;
-    }
-    final bytes = await file.readAsBytes();
-    final codec = await ui.instantiateImageCodec(bytes, targetWidth: 1600, allowUpscaling: false);
-    final frame = await codec.getNextFrame();
-    codec.dispose();
-    if (!mounted) {
-      frame.image.dispose();
-      return;
-    }
-    final pixels = await frame.image.toByteData(format: ui.ImageByteFormat.png);
-    if (!mounted) {
-      frame.image.dispose();
-      return;
-    }
-    _image?.dispose();
+    final generation = ++_generation;
     setState(() {
-      _image = frame.image;
-      _bytes = pixels!.buffer.asUint8List();
-      _crop = null;
-      _result = null;
-      _tiles = [];
+      _busy = true;
       _error = null;
     });
+    try {
+      if ((await picked.length() ?? 0) > 32 * 1024 * 1024) {
+        throw const FormatException('imageTooLarge');
+      }
+      final bytes = await picked.readAsBytes();
+      final image = await _decodeScreenshot(bytes);
+      if (!mounted || generation != _generation) {
+        image.dispose();
+        return;
+      }
+      final pixels = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (!mounted || generation != _generation) {
+        image.dispose();
+        return;
+      }
+      if (pixels == null) {
+        image.dispose();
+        throw const FormatException('imageError');
+      }
+      _image?.dispose();
+      setState(() {
+        _image = image;
+        _bytes = pixels.buffer.asUint8List();
+        _crop = null;
+        _result = null;
+        _tiles = [];
+        _busy = false;
+      });
+    } catch (error) {
+      if (mounted && generation == _generation) {
+        setState(() {
+          _busy = false;
+          _error = error is FormatException ? error.message : 'imageError';
+        });
+      }
+      return;
+    }
+
     await _recognize(true);
   }
 
@@ -327,4 +343,31 @@ class _CropPainter extends CustomPainter {
   @override
   bool shouldRepaint(_CropPainter old) =>
       old.image != image || old.crop != crop;
+}
+
+Future<ui.Image> _decodeScreenshot(Uint8List bytes) async {
+  final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
+  ui.ImageDescriptor? descriptor;
+  try {
+    descriptor = await ui.ImageDescriptor.encoded(buffer);
+    if (descriptor.width * descriptor.height > 32000000) {
+      throw const FormatException('imageTooLarge');
+    }
+    final scale = math.min(
+      1.0,
+      1600 / math.max(descriptor.width, descriptor.height),
+    );
+    final codec = await descriptor.instantiateCodec(
+      targetWidth: math.max(1, (descriptor.width * scale).round()),
+      targetHeight: math.max(1, (descriptor.height * scale).round()),
+    );
+    try {
+      return (await codec.getNextFrame()).image;
+    } finally {
+      codec.dispose();
+    }
+  } finally {
+    descriptor?.dispose();
+    buffer.dispose();
+  }
 }

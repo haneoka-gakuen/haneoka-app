@@ -346,9 +346,13 @@ List<PuzzleCrop> _locate(img.Image image, int size) {
     regions.add(c);
     if (regions.length >= 14) break;
   }
-  for (final ratio in [1.0, .8, .6]) {
+  for (final ratio in [1.0, .9, .8, .75, .7, .6, .5]) {
     final side = limit * ratio;
     regions.add((x: (width - side) / 2, y: (height - side) / 2, side: side));
+    final step = math.max(3.0, side / (size * 2));
+    for (var y = 0.0; y + side <= height; y += step) {
+      regions.add((x: (width - side) / 2, y: y, side: side));
+    }
   }
   return [
     for (final c in regions)

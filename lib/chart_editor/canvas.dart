@@ -719,6 +719,10 @@ class ChartEditorPainter extends CustomPainter {
             Offset(x(sa.$1), ya),
             Offset(x(sa.$1 + sa.$2), ya),
             skin.ribbonColors,
+            List.generate(
+              skin.ribbonColors.length,
+              (index) => index / (skin.ribbonColors.length - 1),
+            ),
           );
         }
         canvas.drawPath(path, paint);
