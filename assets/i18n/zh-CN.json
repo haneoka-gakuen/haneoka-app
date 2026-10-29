@@ -4531,7 +4531,15 @@
       },
       "gameAccountPlayerId": "玩家 ID {id}",
       "gameAccountRank": "玩家等级 {value}",
-      "gameAccountRating": "高分评级 {value}"
+      "gameAccountRating": "高分评级 {value}",
+      "appealsTitle": "我的申诉",
+      "appealStatus": {
+        "pending": "待审核",
+        "rejected": "已驳回",
+        "accepted": "已受理"
+      },
+      "unmute": "取消屏蔽",
+      "unblock": "取消拉黑"
     },
     "charts": {
       "title": "社区谱面",

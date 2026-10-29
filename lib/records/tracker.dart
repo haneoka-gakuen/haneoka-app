@@ -1,3 +1,5 @@
+import '../core/catalog_source.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -21,7 +23,8 @@ import 'records.dart';
 /// chosen game server, its challenge songs and their live rankings, and the
 /// point ranking where the event has one.
 class EventTrackerScreen extends StatefulWidget {
-  const EventTrackerScreen({super.key});
+  const EventTrackerScreen({super.key, this.initialRegion});
+  final String? initialRegion;
   @override
   State<EventTrackerScreen> createState() => _EventTrackerScreenState();
 }
@@ -37,7 +40,12 @@ class _EventTrackerScreenState extends State<EventTrackerScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final state = AppScope.of(context);
-    _region ??= defaultRecordRegion(state.server, state.text.locale);
+    _region ??= const {'jp', 'tw', 'en', 'kr'}.contains(widget.initialRegion)
+        ? widget.initialRegion
+        : defaultRecordRegion(
+            CatalogSourceScope.serverOf(context),
+            state.text.locale,
+          );
     _data ??= _load();
     _clock ??= Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
@@ -160,7 +168,7 @@ class _EventTrackerScreenState extends State<EventTrackerScreen> {
           final songKit = CatalogKit(
             songProfile,
             t,
-            state.api,
+            CatalogSourceScope.apiOf(context),
             visuals,
             songTitles: state.songTitle,
           );
@@ -195,7 +203,11 @@ class _EventTrackerScreenState extends State<EventTrackerScreen> {
                         width: 80,
                         height: 80,
                         child: AppImage(
-                          candidates: [state.api.asset(image).toString()],
+                          candidates: [
+                            CatalogSourceScope.apiOf(context)
+                                .asset(image)
+                                .toString(),
+                          ],
                         ),
                       ),
                     ),

@@ -1,3 +1,5 @@
+import '../core/catalog_source.dart';
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
@@ -20,6 +22,8 @@ const _families = {
   'support': 'catalog.cards.fields.supportSkill',
   'gekisouSupport': 'catalog.cards.fields.gekisouSupportSkill',
 };
+
+String _skillPageId(Entry skill) => '${skill['family']}-${skill['id']}';
 
 String _family(SiteText t, Object? family) =>
     t(_families['$family'] ?? '', '$family');
@@ -44,7 +48,8 @@ String _levels(Entry skill) {
 /// The website's skill catalogue (`skills-workspace`): every skill a card
 /// carries, by type and effect, each with its own page.
 class SkillsScreen extends StatefulWidget {
-  const SkillsScreen({super.key});
+  const SkillsScreen({super.key, this.id});
+  final String? id;
   @override
   State<SkillsScreen> createState() => _SkillsScreenState();
 }
@@ -60,10 +65,10 @@ class _SkillsScreenState extends State<SkillsScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final state = AppScope.of(context);
-    if (_dataKey != state.publicDataKey) {
-      _dataKey = state.publicDataKey;
+    if (_dataKey != CatalogSourceScope.keyOf(context)) {
+      _dataKey = CatalogSourceScope.keyOf(context);
       _data = pageData(
-        '/${state.server}/${state.text.locale}/skills/',
+        '/${CatalogSourceScope.serverOf(context)}/${state.text.locale}/skills/',
         'skill-catalog-data',
       );
     }
@@ -72,7 +77,7 @@ class _SkillsScreenState extends State<SkillsScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AppScope.of(context).text;
-    final api = AppScope.of(context).api;
+    final api = CatalogSourceScope.apiOf(context);
     return FutureBuilder(
       future: _data,
       builder: (context, snapshot) {
@@ -90,18 +95,47 @@ class _SkillsScreenState extends State<SkillsScreen> {
               (e) => _unlinked || (e['cards'] as List? ?? const []).isNotEmpty,
             )
             .toList();
+        if (widget.id != null) {
+          final skill = entries
+              ?.where(
+                (e) =>
+                    _skillPageId(e) == widget.id || '${e['key']}' == widget.id,
+              )
+              .firstOrNull;
+          if (skill != null) return SkillDetailScreen(skill: skill);
+          return ShellPage(
+            title: t('catalog.cards.fields.skills'),
+            body: Center(
+              child: snapshot.connectionState == ConnectionState.waiting
+                  ? const CircularProgressIndicator()
+                  : Text(t('common.states.unavailable')),
+            ),
+          );
+        }
         final effects = <String, Object?>{
           for (final e in entries ?? const <Entry>[])
             for (final effect
                 in (e['effects'] as List? ?? const []).whereType<Map>())
               '${effect['id']}': effect['name'],
         };
-        void open(BuildContext context, Entry skill) => Navigator.of(context)
-            .push(
-              MaterialPageRoute<void>(
-                builder: (_) => SkillDetailScreen(skill: skill),
+        void open(BuildContext context, Entry skill) {
+          final api = CatalogSourceScope.apiOf(context);
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              settings: RouteSettings(
+                name: Uri(
+                  path: '/catalog/skills/${_skillPageId(skill)}',
+                  queryParameters: {'server': api.server},
+                ).toString(),
               ),
-            );
+              builder: (_) => CatalogSourceScope(
+                api: api,
+                child: SkillDetailScreen(skill: skill),
+              ),
+            ),
+          );
+        }
+
         return BrowseScreen(
           onOpen: open,
           title: t('catalog.cards.fields.skills', 'Skills'),
@@ -110,7 +144,7 @@ class _SkillsScreenState extends State<SkillsScreen> {
           onRetry: () => setState(() {
             final state = AppScope.of(context);
             _data = pageData(
-              '/${state.server}/${state.text.locale}/skills/',
+              '/${CatalogSourceScope.serverOf(context)}/${state.text.locale}/skills/',
               'skill-catalog-data',
             );
           }),
@@ -238,7 +272,7 @@ class SkillDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
     final t = state.text;
-    final api = state.api;
+    final api = CatalogSourceScope.apiOf(context);
     final title = t.text(skill['name']).isEmpty
         ? '${skill['key']}'
         : t.text(skill['name']);
@@ -252,7 +286,7 @@ class SkillDetailScreen extends StatelessWidget {
         if ((cost['steps'] as List? ?? const []).isNotEmpty) cost,
     ];
     String href(Map card) =>
-        '/${state.server}/${t.locale}/${card['kind']}/${card['id']}/';
+        '/${CatalogSourceScope.serverOf(context)}/${t.locale}/${card['kind']}/${card['id']}/';
     Widget grid(List<Map> list, double ratio) => LayoutBuilder(
       builder: (context, constraints) {
         final columns = constraints.maxWidth < 500 ? 2 : 4;
@@ -400,7 +434,9 @@ class _CostState extends State<_Cost> {
                   : t.text((item['reference'] as Map?)?['name']),
               (item['count'] as num).toInt(),
               image: switch ((item['reference'] as Map?)?['image']) {
-                final String path => state.api.asset(path).toString(),
+                final String path => CatalogSourceScope.apiOf(
+                  context,
+                ).asset(path).toString(),
                 _ => null,
               },
               onTap: switch (item['reference']) {
@@ -409,7 +445,7 @@ class _CostState extends State<_Cost> {
                         r['resource'] == 'support-cards' =>
                   () => openLink(
                     context,
-                    '/${state.server}/${t.locale}/${r['resource']}/${r['id']}/',
+                    '/${CatalogSourceScope.serverOf(context)}/${t.locale}/${r['resource']}/${r['id']}/',
                   ),
                 _ => null,
               },
@@ -437,7 +473,7 @@ class _CostState extends State<_Cost> {
                     avatar: card['image'] is String
                         ? AppImage(
                             candidates: [
-                              state.api
+                              CatalogSourceScope.apiOf(context)
                                   .asset(card['image'] as String)
                                   .toString(),
                             ],
@@ -446,7 +482,7 @@ class _CostState extends State<_Cost> {
                     label: Text(t.text(card['name'])),
                     onPressed: () => openLink(
                       context,
-                      '/${state.server}/${t.locale}/${card['kind']}/${card['id']}/',
+                      '/${CatalogSourceScope.serverOf(context)}/${t.locale}/${card['kind']}/${card['id']}/',
                     ),
                   ),
               ],

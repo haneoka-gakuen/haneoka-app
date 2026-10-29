@@ -1,3 +1,6 @@
+import '../core/catalog_source.dart';
+import '../core/api.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:intl/intl.dart';
@@ -27,9 +30,13 @@ String _category(SiteText t, Object? category) => t(
 
 /// The game's announcements for the release server, newest first
 /// (`fetchAnnouncements`, `sortAnnouncements`).
-Future<List<Announcement>> fetchAnnouncements(AppState state) async {
-  final value = await state.api.json(
-    '/api/v1/announcements?server=${state.server}&locale=${state.text.locale}',
+Future<List<Announcement>> fetchAnnouncements(
+  AppState state, {
+  HaneokaApi? api,
+}) async {
+  api ??= state.api;
+  final value = await api.json(
+    '/api/v1/announcements?server=${api.server}&locale=${state.text.locale}',
   );
   final list = [
     for (final entry
@@ -68,7 +75,7 @@ class AnnouncementRow extends StatelessWidget {
         MaterialPageRoute<void>(
           builder: (_) => AnnouncementScreen(
             entry: entry,
-            server: AppScope.of(context).server,
+            server: CatalogSourceScope.serverOf(context),
           ),
         ),
       ),
@@ -180,9 +187,12 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final state = AppScope.of(context);
-    if (_dataKey != state.publicDataKey) {
-      _dataKey = state.publicDataKey;
-      _entries = fetchAnnouncements(state);
+    if (_dataKey != CatalogSourceScope.keyOf(context)) {
+      _dataKey = CatalogSourceScope.keyOf(context);
+      _entries = fetchAnnouncements(
+        state,
+        api: CatalogSourceScope.apiOf(context),
+      );
     }
   }
 
@@ -200,7 +210,10 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                 icon: const Icon(Symbols.refresh_rounded),
                 label: Text(t('home.announcements.retry', 'Retry')),
                 onPressed: () => setState(
-                  () => _entries = fetchAnnouncements(AppScope.of(context)),
+                  () => _entries = fetchAnnouncements(
+                    AppScope.of(context),
+                    api: CatalogSourceScope.apiOf(context),
+                  ),
                 ),
               ),
             );
@@ -219,9 +232,11 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
           return RefreshIndicator(
             onRefresh: () async {
               final state = AppScope.of(context);
-              await state.api.revalidate();
+              final api = CatalogSourceScope.apiOf(context);
+              await api.revalidate();
               if (!mounted) return;
-              final next = fetchAnnouncements(state);
+              if (!context.mounted) return;
+              final next = fetchAnnouncements(state, api: api);
               setState(() => _entries = next);
               await next;
             },
@@ -275,7 +290,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   Object? _dataKey;
 
   Future<Announcement> _load(AppState state) async {
-    final server = widget.server ?? state.server;
+    final server = widget.server ?? CatalogSourceScope.serverOf(context);
     final document = await state
         .apiFor(server)
         .json(
@@ -292,8 +307,8 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final state = AppScope.of(context);
-    if (_dataKey != state.publicDataKey) {
-      _dataKey = state.publicDataKey;
+    if (_dataKey != CatalogSourceScope.keyOf(context)) {
+      _dataKey = CatalogSourceScope.keyOf(context);
       _detail = _load(state);
     }
   }

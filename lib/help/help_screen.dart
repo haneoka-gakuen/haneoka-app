@@ -1,3 +1,5 @@
+import '../core/catalog_source.dart';
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
@@ -13,23 +15,106 @@ List<Map> _values(Object? value) => switch (value) {
 
 num _num(Object? value) => value is num ? value : 0;
 
+Object? _helpText(Object? preferred, Object? other) {
+  if (preferred is List && other is List) {
+    return [
+      for (
+        var i = 0;
+        i < (preferred.length > other.length ? preferred.length : other.length);
+        i++
+      )
+        (preferred.elementAtOrNull(i) is String &&
+                (preferred[i] as String).isNotEmpty)
+            ? preferred[i]
+            : other.elementAtOrNull(i),
+    ];
+  }
+  return preferred == null || preferred == '' ? other : preferred;
+}
+
+Future<Map<String, Object?>> _loadHelp(BuildContext context) async {
+  final selected = CatalogSourceScope.serverOf(context),
+      apis = CatalogSourceScope.apisOf(context);
+  final sources = await Future.wait([
+    for (final entry in apis.entries)
+      entry.value
+          .catalog('help')
+          .then((data) => (entry.key, (data as Map).cast<String, Object?>())),
+  ]);
+  final documents = {for (final (server, data) in sources) server: data},
+      categories = <String, Map>{},
+      tips = <String, Map>{};
+  for (final server in [selected, ...apis.keys.where((s) => s != selected)]) {
+    final data = documents[server]!;
+    for (final category in _values(data['categories'])) {
+      final target = categories.putIfAbsent(
+        '${category['categoryId']}',
+        () => {...category, 'subcategories': <String, Map>{}},
+      );
+      target['title'] = _helpText(target['title'], category['title']);
+      final topics = target['subcategories'] as Map<String, Map>;
+      for (final entry in _values(category['subcategories'])) {
+        final id = '${entry['helpSubcategoryId']}';
+        final old = topics[id];
+        topics[id] = old == null
+            ? {...entry, '_server': server}
+            : {
+                ...old,
+                'title': _helpText(old['title'], entry['title']),
+                'description': _helpText(
+                  old['description'],
+                  entry['description'],
+                ),
+              };
+      }
+    }
+    for (final tip in _values(data['loadingTips'])) {
+      final id = '${tip['tipId']}', old = tips[id];
+      tips[id] = old == null
+          ? {...tip, '_server': server}
+          : {
+              ...old,
+              'title': _helpText(old['title'], tip['title']),
+              'description': _helpText(old['description'], tip['description']),
+            };
+    }
+  }
+  return {
+    ...documents[selected]!,
+    'categories': [
+      for (final row in categories.values)
+        {
+          ...row,
+          'subcategories': (row['subcategories'] as Map).values.toList(),
+        },
+    ],
+    'loadingTips': tips.values.toList(),
+  };
+}
+
 /// The game's help (`help-workspace`): the manual by category, or the
 /// loading tips; each topic opens in place.
 class HelpScreen extends StatefulWidget {
-  const HelpScreen({super.key});
+  const HelpScreen({super.key, this.id, this.initialMode});
+  final String? id, initialMode;
   @override
   State<HelpScreen> createState() => _HelpScreenState();
 }
 
 class _HelpScreenState extends State<HelpScreen> {
   Future<Object?>? _data;
-  String _mode = 'manual';
+  Object? _dataKey;
+  late String _mode = widget.initialMode == 'tips' ? 'tips' : 'manual';
   int? _category;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _data ??= AppScope.of(context).api.catalog('help');
+    final key = CatalogSourceScope.keyOf(context);
+    if (_dataKey != key) {
+      _dataKey = key;
+      _data = _loadHelp(context);
+    }
   }
 
   @override
@@ -38,6 +123,42 @@ class _HelpScreenState extends State<HelpScreen> {
     final t = state.text;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    if (widget.id != null) {
+      return FutureBuilder(
+        future: _data,
+        builder: (context, snapshot) {
+          final document = snapshot.data as Map?;
+          final entries = [
+            for (final category in _values(document?['categories']))
+              ..._values(category['subcategories']),
+          ];
+          final entry = entries
+              .where((e) => '${e['helpSubcategoryId']}' == widget.id)
+              .firstOrNull;
+          return ShellPage(
+            title: entry == null
+                ? t('navigation.help')
+                : t.text(entry['title']),
+            showBack: true,
+            body: entry == null
+                ? Center(
+                    child: snapshot.connectionState == ConnectionState.waiting
+                        ? const CircularProgressIndicator()
+                        : Text(t('common.states.unavailable')),
+                  )
+                : ListView(
+                    padding: const EdgeInsets.all(24),
+                    children: [
+                      SelectableText(
+                        t.text(entry['description']).replaceAll('\r', ''),
+                        style: theme.textTheme.bodyLarge,
+                      ),
+                    ],
+                  ),
+          );
+        },
+      );
+    }
     return ShellPage(
       title: t('navigation.help', 'Help'),
       actions: [
@@ -65,8 +186,7 @@ class _HelpScreenState extends State<HelpScreen> {
           if (snapshot.hasError) {
             return Center(
               child: FilledButton.tonal(
-                onPressed: () =>
-                    setState(() => _data = state.api.catalog('help')),
+                onPressed: () => setState(() => _data = _loadHelp(context)),
                 child: Text(t('common.actions.retry', 'Retry')),
               ),
             );
@@ -157,6 +277,32 @@ class _HelpScreenState extends State<HelpScreen> {
                     data: theme.copyWith(dividerColor: Colors.transparent),
                     child: ExpansionTile(
                       initiallyExpanded: index == 0 && entries.length < 8,
+                      trailing: _mode != 'manual'
+                          ? null
+                          : IconButton(
+                              tooltip: t('common.actions.open'),
+                              icon: const Icon(Symbols.open_in_new_rounded),
+                              onPressed: () {
+                                final api = CatalogSourceScope.apiOf(context);
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    settings: RouteSettings(
+                                      name: Uri(
+                                        path:
+                                            '/catalog/help/${item['helpSubcategoryId']}',
+                                        queryParameters: {'server': api.server},
+                                      ).toString(),
+                                    ),
+                                    builder: (_) => CatalogSourceScope(
+                                      api: api,
+                                      child: HelpScreen(
+                                        id: '${item['helpSubcategoryId']}',
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                       shape: const Border(),
                       collapsedShape: const Border(),
                       tilePadding: const EdgeInsets.symmetric(horizontal: 16),

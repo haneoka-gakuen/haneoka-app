@@ -1,3 +1,5 @@
+import '../core/catalog_source.dart';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -54,14 +56,19 @@ class _TgwCardScreenState extends State<TgwCardScreen> {
   Future<(List<Map>, Object?)>? _data;
   int? _rank;
 
+  Object? _dataKey;
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _data ??= _load();
+    final key = CatalogSourceScope.keyOf(context);
+    if (_dataKey != key) {
+      _dataKey = key;
+      _data = _load();
+    }
   }
 
   Future<(List<Map>, Object?)> _load() async {
-    final api = AppScope.of(context).api;
+    final api = CatalogSourceScope.apiOf(context);
     final base = '/api/v1/servers/${api.server}/tgw-card';
     final document = (await api.json(base)) as Map;
     final entries = document['entries'];
@@ -203,7 +210,11 @@ class _TgwCardScreenState extends State<TgwCardScreen> {
       width: 60,
       height: 28,
       child: AppImage(
-        candidates: [state.api.asset(_cardArt(first, '_small')).toString()],
+        candidates: [
+          CatalogSourceScope.apiOf(context)
+              .asset(_cardArt(first, '_small'))
+              .toString(),
+        ],
       ),
     );
     Widget label(String kind) => Text(
@@ -359,7 +370,8 @@ class _TierView extends StatelessWidget {
     final rankRewards = (tier['rankRewards'] as List? ?? const [])
         .whereType<Map>()
         .toList();
-    String asset(String path) => state.api.asset(path).toString();
+    String asset(String path) =>
+        CatalogSourceScope.apiOf(context).asset(path).toString();
 
     // The game's card: face, rank plate and rank numeral layered as in-game.
     final art = SizedBox(

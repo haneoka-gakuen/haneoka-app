@@ -146,8 +146,21 @@ class _PtTabState extends State<PtTab> {
         ],
       ],
     );
+    pt.sync();
     if (c.settings.rewardMode != 'recommendation') {
-      return BuildTab(controller: c, leading: modes);
+      return BuildTab(
+        controller: c,
+        leading: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            modes,
+            if (pt.showIssues && pt.issues.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _issues(context),
+            ],
+          ],
+        ),
+      );
     }
     pt.measure = c.searchSettings.measure == 'items' ? 'items' : 'points';
     pt.sync();
@@ -315,6 +328,8 @@ class _PtTabState extends State<PtTab> {
                     catalog,
                     s.songs,
                     allowed: catalog.normalEventSongIds(s.eventId),
+                    selectionContext: 'pt:live',
+                    songRules: c.songRulesFor(s, gekiso: s.ptGekiso),
                   );
                   if (picked != null) {
                     c.updateSettings({
@@ -338,6 +353,7 @@ class _PtTabState extends State<PtTab> {
                             context,
                             catalog,
                             s.planChallengeSongs,
+                            selectionContext: 'pt:challenge',
                             allowed: [
                               for (final row in master.challengeMusics)
                                 if (row.eventId == s.eventId) row.liveMusicId,

@@ -8,6 +8,7 @@ import 'engine/full/play.dart' show Accuracy;
 import 'engine/num.dart';
 import 'engine/objectives.dart' show Criterion;
 import 'engine_client.dart';
+import 'settings.dart' show normalizeSongRules;
 
 class SongComparisonRow {
   SongComparisonRow(this.song, {this.hit});
@@ -29,6 +30,7 @@ class SongComparison {
     'missEvery': 0,
     'rank': null,
     'sort': 'contribution',
+    'songRules': null,
   };
   Doc settings = {...defaults};
   List<SongComparisonRow> rows = [];
@@ -85,7 +87,35 @@ class SongComparison {
     settings['just'],
     settings['missEvery'],
     settings['rank'],
+    songRules,
   ]);
+
+  ({int musicType, List<int> missions})? get ruleValues =>
+      settings['songRules'] == null
+      ? null
+      : normalizeSongRules(settings['songRules']);
+  Doc? get songRules {
+    final rule = ruleValues;
+    return rule == null ||
+            rule.musicType == 0 && rule.missions.every((v) => v == 0)
+        ? null
+        : {'musicType': rule.musicType, 'missions': rule.missions};
+  }
+
+  bool hasMission(int mission) {
+    final rules = ruleValues;
+    return songs.any((ref) {
+      final original =
+          host.catalog?.master.songs[ref.songId]?.gekisoMissions ??
+          const <int>[];
+      return [
+        for (var i = 0; i < 3; i++)
+          (rules?.missions[i] ?? 0) == 0
+              ? (original.elementAtOrNull(i) ?? 0)
+              : rules!.missions[i],
+      ].contains(mission);
+    });
+  }
 
   void restore() {
     final stored = host.view?.prefs['song-comparison'];
@@ -175,7 +205,7 @@ class SongComparison {
         numOf(settings[key]).isFinite &&
         numOf(settings[key]) >= 0 &&
         numOf(settings[key]) <= 100;
-    if (host.hasMission(3, songs) && !percent('just') ||
+    if (hasMission(3) && !percent('just') ||
         settings['mode'] == 'custom' && !percent('great')) {
       issues.add('percent');
     }
@@ -221,6 +251,7 @@ class SongComparison {
           snaps: snaps,
           player: c.view!.player,
           unknownPolicy: UnknownPolicy.min,
+          songRules: songRules,
           goal: GekisoGoal(
             songs: [row.song],
             criterion: Criterion.mean,
@@ -228,9 +259,7 @@ class SongComparison {
               great: settings['mode'] == 'ap'
                   ? 0
                   : numOf(settings['great']) / 100,
-              just: host.hasMission(3, songs)
-                  ? numOf(settings['just']) / 100
-                  : 1,
+              just: hasMission(3) ? numOf(settings['just']) / 100 : 1,
               missEvery: settings['mode'] == 'ap'
                   ? 0
                   : intOf(settings['missEvery']),

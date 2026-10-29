@@ -797,6 +797,25 @@ class _BuildTabState extends State<BuildTab> {
                 single: single,
                 allowed: allowed,
                 allowedCharts: c.arenaActive ? c.arena.charts : null,
+                songRules: c.arenaActive
+                    ? c.arena.rule
+                    : c.songRulesFor(
+                        c.searchSettings,
+                        gekiso:
+                            c.searchSettings.goal == GoalKind.gekiso ||
+                            c.searchSettings.goal == GoalKind.event &&
+                                c.searchSettings.ptGekiso,
+                      ),
+                selectionContext:
+                    '${c.arenaActive
+                        ? 'arena'
+                        : c.activity
+                        ? 'pt'
+                        : 'build'}:${c.searchSettings.goal.name}:${single
+                        ? 'single'
+                        : allowed == null
+                        ? 'songs'
+                        : 'restricted'}${c.arenaActive ? ':${c.arena.leagueId}' : ''}',
               );
               if (picked != null) onChanged(picked);
             },

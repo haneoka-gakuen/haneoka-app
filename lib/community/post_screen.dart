@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -13,6 +15,7 @@ import 'community_widgets.dart';
 import 'editor.dart';
 import 'feed_screen.dart';
 import 'reactions.dart';
+import 'actions.dart';
 import 'user_screen.dart';
 
 /// A post with its discussion (`renderPostDetail`).
@@ -35,7 +38,10 @@ class _PostScreenState extends State<PostScreen> {
   int _commentCount = 0;
   String _sort = 'hot';
   bool _loading = true;
+  int _generation = 0;
+  Object? _owner = HaneokaAccount.instance.user?['id'];
   bool _loadingComments = false;
+  int _commentsGeneration = 0;
   Object? _error;
   final _expanded = <String>{};
   final _replyLoading = <String>{};
@@ -47,17 +53,44 @@ class _PostScreenState extends State<PostScreen> {
   void initState() {
     super.initState();
     _post = widget.initial;
+    HaneokaAccount.instance.addListener(_accountChanged);
     HaneokaAccount.instance.load().then((_) => _load());
+  }
+
+  void _accountChanged() {
+    final owner = HaneokaAccount.instance.user?['id'];
+    if (owner == _owner) return;
+    _owner = owner;
+    _generation++;
+    setState(() {
+      _post = null;
+      _viewer = {};
+      _comments = [];
+      _commentsCursor = null;
+      _loadingComments = false;
+      _replyLoading.clear();
+      _expanded.clear();
+      _loading = true;
+    });
+    unawaited(_load());
+  }
+
+  @override
+  void dispose() {
+    _generation++;
+    HaneokaAccount.instance.removeListener(_accountChanged);
+    super.dispose();
   }
 
   Future<void> _load() async {
     if (!mounted) return;
+    final generation = ++_generation;
     try {
       final data = await communityRequest(
         'GET',
         '$_path?${Uri(queryParameters: {'commentsSort': _sort}).query}',
       );
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       setState(() {
         _post = jsonMap(data['post']);
         _viewer = jsonMap(data['viewer']);
@@ -71,7 +104,7 @@ class _PostScreenState extends State<PostScreen> {
         _error = null;
       });
     } catch (error) {
-      if (mounted) {
+      if (mounted && generation == _generation) {
         setState(() {
           _error = error;
           _loading = false;
@@ -81,8 +114,9 @@ class _PostScreenState extends State<PostScreen> {
   }
 
   Future<void> _loadComments({bool append = false}) async {
-    if (_loadingComments) return;
+    if (append && _loadingComments) return;
     setState(() => _loadingComments = true);
+    final generation = _generation, commentsGeneration = ++_commentsGeneration;
     try {
       final query = {
         'commentsOnly': 'true',
@@ -94,7 +128,11 @@ class _PostScreenState extends State<PostScreen> {
         'GET',
         '$_path?${Uri(queryParameters: query).query}',
       );
-      if (!mounted) return;
+      if (!mounted ||
+          generation != _generation ||
+          commentsGeneration != _commentsGeneration) {
+        return;
+      }
       final incoming = jsonList(data['comments']);
       setState(() {
         final known = {for (final c in _comments) '${c['id']}'};
@@ -111,7 +149,11 @@ class _PostScreenState extends State<PostScreen> {
     } catch (_) {
       // The list stays as it was; scrolling tries again.
     } finally {
-      if (mounted) setState(() => _loadingComments = false);
+      if (mounted &&
+          generation == _generation &&
+          commentsGeneration == _commentsGeneration) {
+        setState(() => _loadingComments = false);
+      }
     }
   }
 
@@ -122,12 +164,13 @@ class _PostScreenState extends State<PostScreen> {
       return;
     }
     setState(() => _replyLoading.add(rootId));
+    final generation = _generation;
     try {
       final data = await communityRequest(
         'GET',
         '$_path?${Uri(queryParameters: {'commentsOnly': 'true', 'commentsRoot': rootId, 'commentsCursor': '$cursor', 'commentsSort': _sort}).query}',
       );
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       final known = {for (final c in _comments) '${c['id']}'};
       setState(() {
         _comments = [
@@ -147,15 +190,20 @@ class _PostScreenState extends State<PostScreen> {
     }
   }
 
-  void _replace(Json comment) => setState(() {
-    _comments = [
-      for (final c in _comments)
-        if (c['id'] == comment['id']) comment else c,
-    ];
-  });
+  void _replace(Json comment) {
+    setState(() {
+      _comments = [
+        for (final c in _comments)
+          c['id'] == comment['id']
+              ? ({...comment}..remove('_refreshThread'))
+              : c,
+      ];
+    });
+    if (comment['_refreshThread'] == true) unawaited(_loadComments());
+  }
 
   Future<void> _toggleFollow() async {
-    if (!await requireSession(context)) return;
+    if (!await requireSession(context) || !mounted || _post == null) return;
     final uid = '${_post?['authorUid']}';
     final following = _viewer['following'] == true;
     setState(() => _viewer = {..._viewer, 'following': !following});
@@ -181,7 +229,7 @@ class _PostScreenState extends State<PostScreen> {
   }
 
   Future<void> _toggleBookmark() async {
-    if (!await requireSession(context)) return;
+    if (!await requireSession(context) || !mounted || _post == null) return;
     final bookmarked = _viewer['bookmarked'] == true;
     setState(() => _viewer = {..._viewer, 'bookmarked': !bookmarked});
     try {
@@ -203,6 +251,9 @@ class _PostScreenState extends State<PostScreen> {
   }
 
   Future<void> _compose({Json? replyTo}) async {
+    if (HaneokaAccount.instance.signedIn && _viewer['canComment'] == false) {
+      return;
+    }
     if (!await requireSession(context) || !mounted) return;
     final sent = await showModalBottomSheet<bool>(
       context: context,
@@ -288,6 +339,12 @@ class _PostScreenState extends State<PostScreen> {
                                       post: post,
                                       viewer: _viewer,
                                       onFollow: _toggleFollow,
+                                      onChanged: (next) => setState(() {
+                                        _post = next;
+                                        _viewer = jsonMap(next['viewer']);
+                                      }),
+                                      onRemoved: () =>
+                                          Navigator.of(context).pop(),
                                     ),
                                     const SizedBox(height: 16),
                                     Divider(color: scheme.outlineVariant),
@@ -570,10 +627,13 @@ class _PostHead extends StatelessWidget {
     required this.post,
     required this.viewer,
     required this.onFollow,
+    required this.onChanged,
+    required this.onRemoved,
   });
   final Json post;
   final Json viewer;
-  final VoidCallback onFollow;
+  final VoidCallback onFollow, onRemoved;
+  final ValueChanged<Json> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -617,6 +677,14 @@ class _PostHead extends StatelessWidget {
                   ],
                 ),
               ),
+            ),
+            CommunityRecordMenu(
+              kind: 'post',
+              record: post,
+              viewer: viewer,
+              detail: true,
+              onChanged: onChanged,
+              onRemoved: onRemoved,
             ),
             if (!own)
               viewer['following'] == true
@@ -772,6 +840,11 @@ class CommentTile extends StatelessWidget {
                           ],
                         ],
                       ),
+                    ),
+                    CommunityRecordMenu(
+                      kind: 'comment',
+                      record: comment,
+                      onChanged: onChanged,
                     ),
                     if (floor > 0)
                       Text(

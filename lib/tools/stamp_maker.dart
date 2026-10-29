@@ -1,4 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
+
+import '../core/local_drafts.dart';
+
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
@@ -63,7 +67,8 @@ class StampMakerScreen extends StatefulWidget {
   State<StampMakerScreen> createState() => _StampMakerScreenState();
 }
 
-class _StampMakerScreenState extends State<StampMakerScreen> {
+class _StampMakerScreenState extends State<StampMakerScreen>
+    with WidgetsBindingObserver {
   Future<(List<_Stamp>, List<_Stamp>, List<(String, String, Color, String?)>)>?
   _catalog;
   _Stamp? _stamp;
@@ -77,6 +82,39 @@ class _StampMakerScreenState extends State<StampMakerScreen> {
   late final _text = TextEditingController();
   bool _busy = false;
   static bool _pretendardLoaded = false;
+  Timer? _draftTimer;
+  bool _restoredDraft = false;
+  Future<void> _saveDraft() =>
+      LocalDrafts.flush('haneoka:stamp-maker:draft:v1')
+          .catchError((Object _) {});
+  void _scheduleDraft() {
+    if (!_restoredDraft) return;
+    LocalDrafts.stage(
+      'haneoka:stamp-maker:draft:v1',
+      jsonEncode({
+        'schema': 'haneoka-stamp-draft-v1',
+        'stampId': _stamp?.id,
+        'textless': _textless,
+        'language': _imageLanguage,
+        'selected': _selected,
+        'exportSize': _exportSize,
+        'layers': _layers.map(stampLayerJson).toList(),
+      }),
+    );
+    _draftTimer?.cancel();
+    _draftTimer = Timer(const Duration(milliseconds: 300), _saveDraft);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) unawaited(_saveDraft());
+  }
 
   String _t(String key, String fallback) =>
       AppScope.of(context).text('tools.stampMaker.$key', fallback);
@@ -89,6 +127,10 @@ class _StampMakerScreenState extends State<StampMakerScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _draftTimer?.cancel();
+    unawaited(_saveDraft());
+    _image?.dispose();
     _text.dispose();
     super.dispose();
   }
@@ -203,33 +245,78 @@ class _StampMakerScreenState extends State<StampMakerScreen> {
       (a, b) => (int.tryParse(a.$1) ?? 0).compareTo(int.tryParse(b.$1) ?? 0),
     );
     if (textless.isEmpty) _textless = false;
-    final first = (_textless ? textless : originals).firstOrNull;
-    if (first != null) unawaited(_choose(first, colors));
+    _Stamp? restored;
+    try {
+      final raw = await LocalDrafts.read('haneoka:stamp-maker:draft:v1');
+      if (!mounted) return (originals, textless, colors);
+      if (raw != null) {
+        final saved = jsonDecode(raw) as Map<String, dynamic>;
+        if (saved['schema'] == 'haneoka-stamp-draft-v1') {
+          _textless = saved['textless'] as bool;
+          _imageLanguage = saved['language'] as String?;
+          _exportSize = saved['exportSize'] as int;
+          final layers = (saved['layers'] as List)
+              .map(
+                (l) => stampLayerFromJson((l as Map).cast<String, dynamic>()),
+              )
+              .toList();
+          if (layers.isNotEmpty) {
+            _layers
+              ..clear()
+              ..addAll(layers);
+            _selected = (saved['selected'] as int).clamp(0, _layers.length - 1);
+            _text.text = _layer.settings.text;
+          }
+          restored = (_textless ? textless : originals)
+              .where((s) => s.id == saved['stampId'])
+              .firstOrNull;
+        }
+      }
+    } catch (_) {}
+    if (_layers.any((layer) => layer.settings.font == 'Pretendard SemiBold')) {
+      unawaited(_ensurePretendard());
+    }
+    _restoredDraft = true;
+    final first = restored ?? (_textless ? textless : originals).firstOrNull;
+    if (first != null) {
+      unawaited(_choose(first, restored == null ? colors : const [], false));
+    }
     return (originals, textless, colors);
   }
 
   Future<void> _choose(
     _Stamp stamp, [
     List<(String, String, Color, String?)> colors = const [],
+    bool persist = true,
   ]) async {
-    setState(() => _stamp = stamp);
+    setState(() {
+      _stamp = stamp;
+      final character = colors
+          .where((c) => stamp.characters.contains(c.$1))
+          .firstOrNull;
+      if (character != null) {
+        for (final layer in _layers) {
+          if (layer.image == null) layer.settings.fill = character.$3;
+        }
+      }
+    });
+    if (persist) _scheduleDraft();
     for (final source in stamp.sources) {
       try {
         final response = await netClient.get(Uri.parse(source));
         if (response.statusCode != 200) continue;
         final codec = await ui.instantiateImageCodec(response.bodyBytes);
         final frame = await codec.getNextFrame();
-        if (!mounted || _stamp != stamp) return;
+        codec.dispose();
+        if (!mounted || _stamp != stamp) {
+          frame.image.dispose();
+          return;
+        }
+        final previous = _image;
         setState(() => _image = frame.image);
-        // The stamp's character colours the text, as the site does.
-        final character = colors
-            .where((c) => stamp.characters.contains(c.$1))
-            .firstOrNull;
-        if (character != null) {
-          setState(() {
-            for (final layer in _layers) {
-              if (layer.image == null) layer.settings.fill = character.$3;
-            }
+        if (previous != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            previous.dispose();
           });
         }
         return;
@@ -273,7 +360,10 @@ class _StampMakerScreenState extends State<StampMakerScreen> {
 
   StampLayer get _layer => _layers[_selected];
 
-  void _edit(VoidCallback change) => setState(change);
+  void _edit(VoidCallback change) {
+    setState(change);
+    _scheduleDraft();
+  }
 
   Future<List<int>> _png(int size) =>
       stampPng(size.toDouble(), _image, _layers);

@@ -145,13 +145,54 @@ class PtController {
 
   /// Recomputes the unmet inputs when the request changed.
   void sync() {
-    final request = this.request();
+    final custom = host.activity && host.settings.rewardMode == 'event';
+    final request = custom ? host.request() : this.request();
     final master = host.catalog?.master;
-    final signature = _inputSignature();
+    final signature = custom
+        ? canonical([
+            request?.toJson(),
+            host.settings.farming['requireGrowth'],
+            owner,
+            dataFingerprint,
+          ])
+        : _inputSignature();
     if (signature == _signature) return;
     _signature = signature;
     issues = const [];
     if (request == null || master == null) return;
+    if (custom) {
+      if (request.goal is EventGoal &&
+          host.settings.farming['requireGrowth'] == true) {
+        final input = request.toJson();
+        input['k'] = 1;
+        input['player'] = {
+          ...request.player.toJson(),
+          'characterMemory': {
+            for (final id in master.characters.keys)
+              '$id': request.player.characterMemory['$id'] ?? 0,
+          },
+        };
+        input['goal'] = {
+          ...goalJson(request.goal),
+          'ranking': 'pt-only',
+          'route': 'live',
+          'measure': 'points',
+          'play': {'great': 0, 'good': 0, 'bad': 0, 'miss': 0},
+          'songs': <Object?>[],
+        };
+        issues = validatePtRequest(master, EngineRequest.fromJson(input))
+            .where(
+              (issue) => const {
+                'practice',
+                'player',
+                'inventory',
+                'constraint',
+              }.contains(issue.code),
+            )
+            .toList();
+      }
+      return;
+    }
     final goal = request.goal as EventGoal;
     final found = <PtIssue>[];
     for (final route in [
@@ -173,7 +214,10 @@ class PtController {
                 dropGekiso: true,
               );
         found.addAll(
-          validatePtRequest(master, request.withGoal(variant, null)),
+          validatePtRequest(
+            master,
+            request.withGoal(variant, null),
+          ).where((issue) => issue.code != 'skill'),
         );
       }
     }

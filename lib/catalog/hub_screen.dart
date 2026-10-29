@@ -1,4 +1,7 @@
+import '../core/catalog_source.dart';
+
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -24,28 +27,7 @@ class CatalogHubScreen extends StatefulWidget {
 }
 
 class _CatalogHubScreenState extends State<CatalogHubScreen> {
-  Future<List<Map<String, Object?>>>? _data;
-  Object? _key;
-  void _load() {
-    final state = AppScope.of(context);
-    final kind = widget.section == 'library' ? 'catalog' : widget.section;
-    final path = ['catalog', 'stories'].contains(kind)
-        ? '/${state.server}/${state.text.locale}/$kind/'
-        : '/${state.text.locale}/$kind/';
-    _data = hubData(state.api.origin, path);
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final state = AppScope.of(context);
-    final key = (state.publicDataKey, state.text.locale, widget.section);
-    if (_key != key) {
-      _key = key;
-      _load();
-    }
-  }
-
+  int _revision = 0;
   @override
   Widget build(BuildContext context) {
     final text = AppScope.of(context).text;
@@ -57,61 +39,143 @@ class _CatalogHubScreenState extends State<CatalogHubScreen> {
         BarAction(
           icon: Symbols.refresh_rounded,
           label: text('common.actions.refresh'),
-          onPressed: () => setState(_load),
+          onPressed: () => setState(() => _revision++),
         ),
       ],
-      body: FutureBuilder(
-        future: _data,
-        builder: (context, snapshot) {
-          final tiles = snapshot.data;
-          if (tiles == null && !snapshot.hasError) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final entries =
-              tiles ??
-              [
-                for (final section in navSections.where(
-                  (s) => widget.section == 'community'
-                      ? ['community', 'mirrors', 'sekai'].contains(s.id)
-                      : s.id == widget.section,
-                ))
-                  for (final item in section.items)
-                    {
-                      'columns': 3,
-                      'rows': 2,
-                      'visual': 'icon',
-                      'links': [
-                        {'route': item.route, 'label': item.label},
-                      ],
-                    },
-              ];
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              final padding = pagePadding(context);
-              final width = constraints.maxWidth - padding.horizontal;
-              return GridView.builder(
-                padding: padding,
-                gridDelegate: _MosaicDelegate(
-                  entries,
-                  width > 700 ? 12 : 6,
-                  width <= 420
-                      ? 80
-                      : width <= 700
-                      ? 90
-                      : 100,
-                ),
-                itemCount: entries.length,
-                itemBuilder: (context, index) => _MosaicTile(
-                  data: entries[index],
-                  navigate: widget.navigate,
-                ),
-              );
-            },
+      body: DestinationMosaic(
+        key: ValueKey(_revision),
+        section: widget.section,
+        navigate: (route) {
+          final api = CatalogSourceScope.maybeApi(context);
+          widget.navigate(
+            api == null
+                ? route
+                : Uri.parse(route)
+                      .replace(
+                        queryParameters: {
+                          ...Uri.parse(route).queryParameters,
+                          'server': api.server,
+                        },
+                      )
+                      .toString(),
           );
         },
       ),
     );
   }
+}
+
+class DestinationMosaic extends StatefulWidget {
+  const DestinationMosaic({
+    super.key,
+    required this.section,
+    required this.navigate,
+    this.sliver = false,
+    this.padding,
+  });
+  final String section;
+  final ValueChanged<String> navigate;
+  final bool sliver;
+  final EdgeInsets? padding;
+  @override
+  State<DestinationMosaic> createState() => _DestinationMosaicState();
+}
+
+class _DestinationMosaicState extends State<DestinationMosaic> {
+  Future<List<Map<String, Object?>>>? _data;
+  Object? _key;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final state = AppScope.of(context),
+        kind = widget.section == 'library' ? 'catalog' : widget.section;
+    final key = (CatalogSourceScope.keyOf(context), kind);
+    if (_key != key) {
+      _key = key;
+      final path = kind == 'home'
+          ? '/${CatalogSourceScope.serverOf(context)}/${state.text.locale}/'
+          : ['catalog', 'stories'].contains(kind)
+          ? '/${CatalogSourceScope.serverOf(context)}/${state.text.locale}/$kind/'
+          : '/${state.text.locale}/$kind/';
+      _data = hubData(CatalogSourceScope.apiOf(context).origin, path);
+    }
+  }
+
+  Widget _box(Widget child) =>
+      widget.sliver ? SliverToBoxAdapter(child: child) : child;
+  @override
+  Widget build(BuildContext context) => FutureBuilder(
+    future: _data,
+    builder: (context, snapshot) {
+      if (!snapshot.hasData && !snapshot.hasError) {
+        return _box(
+          const SizedBox(
+            height: 320,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        );
+      }
+      final entries =
+          snapshot.data ??
+          [
+            for (final section in navSections.where(
+              (s) => widget.section == 'home'
+                  ? !['home'].contains(s.id)
+                  : widget.section == 'community'
+                  ? ['community', 'mirrors', 'sekai'].contains(s.id)
+                  : s.id == widget.section,
+            ))
+              for (final item in section.items)
+                {
+                  'columns': 3,
+                  'rows': 2,
+                  'visual': 'icon',
+                  'links': [
+                    {'route': item.route, 'label': item.label},
+                  ],
+                },
+          ];
+      final padding = widget.padding ?? pagePadding(context);
+      Widget grid(double width, {required bool sliver}) {
+        final delegate = _MosaicDelegate(
+          entries,
+          width > 700 ? 12 : 6,
+          width <= 420
+              ? 80
+              : width <= 700
+              ? 90
+              : 100,
+        );
+        final children = SliverChildBuilderDelegate(
+          (context, index) =>
+              _MosaicTile(data: entries[index], navigate: widget.navigate),
+          childCount: entries.length,
+        );
+        return sliver
+            ? SliverGrid(gridDelegate: delegate, delegate: children)
+            : GridView.custom(
+                padding: padding,
+                gridDelegate: delegate,
+                childrenDelegate: children,
+              );
+      }
+
+      return widget.sliver
+          ? SliverPadding(
+              padding: padding,
+              sliver: SliverLayoutBuilder(
+                builder: (context, constraints) =>
+                    grid(constraints.crossAxisExtent, sliver: true),
+              ),
+            )
+          : LayoutBuilder(
+              builder: (context, constraints) => grid(
+                constraints.maxWidth - padding.horizontal,
+                sliver: false,
+              ),
+            );
+    },
+  );
 }
 
 class _MosaicTile extends StatelessWidget {
@@ -129,7 +193,9 @@ class _MosaicTile extends StatelessWidget {
         state.text('${link['label'] ?? item(link)?.label}');
     final compound = links.length > 1;
     return Material(
-      color: colors.surfaceContainer,
+      color: HSLColor.fromColor(colors.surfaceContainer)
+          .withSaturation(0)
+          .toColor(),
       borderRadius: BorderRadius.circular(28),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -167,7 +233,11 @@ class _MosaicTile extends StatelessWidget {
                         label(links.first),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium,
+                        style: (data['columns'] == 6
+                            ? (MediaQuery.sizeOf(context).width <= 700
+                                  ? Theme.of(context).textTheme.titleLarge
+                                  : Theme.of(context).textTheme.headlineSmall)
+                            : Theme.of(context).textTheme.titleMedium),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -190,7 +260,9 @@ class _HubArt extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = AppScope.of(context), colors = Theme.of(context).colorScheme;
     Widget image(Object? value, {BoxFit fit = BoxFit.contain}) => AppImage(
-      candidates: [state.api.asset('$value').toString()],
+      candidates: [
+        CatalogSourceScope.apiOf(context).asset('$value').toString(),
+      ],
       fit: fit,
       localized: false,
     );
@@ -348,37 +420,163 @@ class _HubArt extends StatelessWidget {
         ),
       );
     }
+    if (visual == 'discussion') {
+      return Center(
+        child: Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            for (final (i, symbol) in [
+              Symbols.forum_rounded,
+              Symbols.favorite_rounded,
+              Symbols.sell_rounded,
+            ].indexed)
+              Transform.translate(
+                offset: Offset(
+                  0,
+                  i == 1
+                      ? 18
+                      : i == 2
+                      ? -12
+                      : 0,
+                ),
+                child: Container(
+                  width: 72,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: i == 1
+                        ? colors.tertiaryContainer
+                        : colors.secondaryContainer,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Icon(
+                    symbol,
+                    size: 40,
+                    color: i == 1
+                        ? colors.onTertiaryContainer
+                        : colors.onSecondaryContainer,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+    if (visual == 'personal') {
+      return Center(
+        child: SizedBox(
+          width: 160,
+          height: 116,
+          child: Stack(
+            children: [
+              Positioned(
+                left: 8,
+                top: 18,
+                child: Icon(
+                  Symbols.account_circle_rounded,
+                  size: 88,
+                  color: colors.primary,
+                ),
+              ),
+              Positioned(
+                right: 4,
+                top: 8,
+                child: Icon(
+                  Symbols.notifications_rounded,
+                  size: 40,
+                  color: colors.tertiary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     if (images.isEmpty) {
       return Center(child: Icon(icon, size: 64, color: colors.primary));
     }
-    if (['chart', 'sonolus', 'puzzle', 'guess'].contains(visual)) {
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: image(images.first, fit: BoxFit.cover),
-            ),
-          ),
-          Align(
-            alignment: Alignment.bottomRight,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: colors.primaryContainer,
-                  borderRadius: BorderRadius.circular(16),
+    if (visual == 'guess') {
+      return Padding(
+        padding: const EdgeInsets.all(12),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ImageFiltered(
+                imageFilter: ui.ImageFilter.blur(sigmaX: 7, sigmaY: 7),
+                child: image(images.first, fit: BoxFit.cover),
+              ),
+              Center(
+                child: Icon(
+                  Symbols.graphic_eq_rounded,
+                  size: 64,
+                  color: colors.onPrimaryContainer,
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Icon(icon, size: 40, color: colors.onPrimaryContainer),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (visual == 'puzzle') {
+      return Padding(
+        padding: const EdgeInsets.all(12),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              image(images.first, fit: BoxFit.cover),
+              CustomPaint(painter: _HubPuzzlePainter(colors.surfaceContainer)),
+            ],
+          ),
+        ),
+      );
+    }
+    if (visual == 'sonolus' || visual == 'chart') {
+      return Padding(
+        padding: const EdgeInsets.all(12),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            CustomPaint(
+              painter: _HubScorePainter(
+                colors.primary,
+                colors.onSurface.withValues(alpha: .12),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FractionallySizedBox(
+                widthFactor: .58,
+                heightFactor: .8,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: image(images.first),
                 ),
               ),
             ),
-          ),
-        ],
+            Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: visual == 'sonolus'
+                    ? Image.asset(
+                        'assets/settings/sonolus-icon.png',
+                        width: 80,
+                        height: 80,
+                      )
+                    : Icon(
+                        Symbols.edit_note_rounded,
+                        size: 64,
+                        color: colors.primary,
+                      ),
+              ),
+            ),
+          ],
+        ),
       );
     }
     return LayoutBuilder(
@@ -418,10 +616,7 @@ class _HubArt extends StatelessWidget {
                       : (i.$1 - (images.length - 1) / 2) * .11,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: image(
-                      i.$2,
-                      fit: portrait ? BoxFit.contain : BoxFit.cover,
-                    ),
+                    child: image(i.$2, fit: BoxFit.contain),
                   ),
                 ),
               ),
@@ -509,4 +704,76 @@ class _MosaicGridLayout extends SliverGridLayout {
   double computeMaxScrollOffset(int childCount) => geometries
       .take(childCount)
       .fold(0.0, (value, g) => math.max(value, g.trailingScrollOffset));
+}
+
+class _HubScorePainter extends CustomPainter {
+  const _HubScorePainter(this.note, this.grid);
+  final Color note, grid;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = grid
+      ..strokeWidth = 1;
+    for (var i = 0; i <= 6; i++) {
+      final x = i * size.width / 6;
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+    for (var y = 0.0; y < size.height; y += 35) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+    paint.color = note;
+    for (var i = 0; i < 9; i++) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(
+            (i % 6) * size.width / 6,
+            (i * .11 % 1) * size.height,
+            size.width * .15,
+            6,
+          ),
+          const Radius.circular(3),
+        ),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_HubScorePainter oldDelegate) =>
+      note != oldDelegate.note || grid != oldDelegate.grid;
+}
+
+class _HubPuzzlePainter extends CustomPainter {
+  const _HubPuzzlePainter(this.gap);
+  final Color gap;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = gap
+      ..strokeWidth = 4;
+    for (var i = 1; i < 3; i++) {
+      canvas.drawLine(
+        Offset(i * size.width / 3, 0),
+        Offset(i * size.width / 3, size.height),
+        paint,
+      );
+      canvas.drawLine(
+        Offset(0, i * size.height / 3),
+        Offset(size.width, i * size.height / 3),
+        paint,
+      );
+    }
+    canvas.drawRect(
+      Rect.fromLTWH(
+        size.width * 2 / 3,
+        size.height * 2 / 3,
+        size.width / 3,
+        size.height / 3,
+      ),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_HubPuzzlePainter oldDelegate) => gap != oldDelegate.gap;
 }

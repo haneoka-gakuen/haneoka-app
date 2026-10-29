@@ -680,7 +680,16 @@ class _TeamsTabState extends State<TeamsTab> {
               icon: const Icon(Symbols.library_music_rounded),
               label: Text(c.tb('chooseSongs', 'Choose songs')),
               onPressed: () async {
-                final selected = await pickSongs(context, catalog, s.songs);
+                final selected = await pickSongs(
+                  context,
+                  catalog,
+                  s.songs,
+                  selectionContext: 'teams',
+                  songRules: c.songRulesFor(
+                    s,
+                    gekiso: s.manualScoreMode == 'gekiso',
+                  ),
+                );
                 if (selected != null) {
                   c.updateSettings({
                     'songs': selected.map((row) => row.toJson()).toList(),

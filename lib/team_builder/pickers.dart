@@ -8,13 +8,16 @@ import 'package:intl/intl.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../catalog/catalog_screen.dart' show cardRarityName;
-import '../catalog/catalog_query.dart';
 import '../ui/tile.dart';
 import 'catalog.dart';
 import 'catalog_sort.dart';
-import 'engine/api.dart';
 import 'engine/num.dart';
 import 'widgets.dart';
+import '../catalog/browse.dart' show BrowseFilterPanel;
+import '../shell/page.dart';
+import '../ui/account_dialog.dart';
+
+export 'song_picker.dart' show pickSongs;
 
 /// Card filters: bands, characters, attributes, rarities, artwork presence
 /// and a total-stat range (`card-filters.ts`).
@@ -478,6 +481,8 @@ class SelectionPane extends StatefulWidget {
     required this.minTileWidth,
     required this.aspectRatio,
     this.footer,
+    this.quickFilters,
+    this.status,
   });
   final String title;
   final String searchLabel;
@@ -492,100 +497,148 @@ class SelectionPane extends StatefulWidget {
   final Widget Function(BuildContext context, int index) item;
   final double minTileWidth;
   final double aspectRatio;
-  final Widget? footer;
+  final Widget? footer, quickFilters, status;
 
   @override
   State<SelectionPane> createState() => _SelectionPaneState();
 }
 
 class _SelectionPaneState extends State<SelectionPane> {
-  bool _filters = false;
-  late final _search = TextEditingController(text: widget.query);
+  final _updates = ValueNotifier<int>(0);
+  bool _filterOpen = false;
+  ModalRoute<void>? _filterRoute;
+  @override
+  void didUpdateWidget(SelectionPane oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _updates.value++;
+    });
+  }
 
   @override
   void dispose() {
-    _search.dispose();
+    final route = _filterRoute;
+    if (route != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (route.isActive) route.navigator?.removeRoute(route);
+      });
+    }
+    _updates.dispose();
     super.dispose();
+  }
+
+  Future<void> _openFilters() async {
+    setState(() => _filterOpen = true);
+    try {
+      await showGeneralDialog<void>(
+        context: context,
+        useRootNavigator: true,
+        barrierDismissible: true,
+        barrierLabel: MaterialLocalizations.of(context)
+            .modalBarrierDismissLabel,
+        barrierColor: Theme.of(context).colorScheme.scrim
+            .withValues(alpha: .32),
+        transitionDuration: const Duration(milliseconds: 300),
+        pageBuilder: (context, _, _) {
+          _filterRoute = ModalRoute.of(context);
+          return Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: AccountDialog(
+              child: ListenableBuilder(
+                listenable: _updates,
+                builder: (context, _) => BrowseFilterPanel(
+                  switches: const [],
+                  facets: const [],
+                  sorts: const [],
+                  sort: null,
+                  descending: true,
+                  selected: const {},
+                  counts: (_) => const {},
+                  onToggle: (_, _) {},
+                  onSort: (_) {},
+                  onOrder: () {},
+                  onReset: () {},
+                  fields: [widget.filters],
+                ),
+              ),
+            ),
+          );
+        },
+        transitionBuilder: (context, animation, _, child) => SlideTransition(
+          position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(
+            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+          ),
+          child: child,
+        ),
+      );
+    } finally {
+      _filterRoute = null;
+      if (mounted) setState(() => _filterOpen = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-        actions: [
-          IconButton(
-            tooltip: widget.filterLabel,
-            isSelected: _filters,
-            onPressed: () => setState(() => _filters = !_filters),
-            icon: Badge(
-              isLabelVisible: widget.activeFilters > 0,
-              label: Text('${widget.activeFilters}'),
-              child: const Icon(Symbols.filter_list_rounded),
-            ),
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(64),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: SearchBar(
-              controller: _search,
-              hintText: widget.searchLabel,
-              leading: const Icon(Symbols.search_rounded),
-              elevation: const WidgetStatePropertyAll(0),
-              onChanged: widget.onQuery,
-            ),
-          ),
+    return ShellPage(
+      title: widget.title,
+      showBack: true,
+      onBack: () => Navigator.of(context).pop(),
+      search: ShellSearch(
+        label: widget.searchLabel,
+        initial: widget.query,
+        onChanged: widget.onQuery,
+      ),
+      status: Text(widget.count, style: theme.textTheme.labelMedium),
+      actions: [
+        BarAction(
+          icon: Symbols.filter_alt_rounded,
+          label: widget.filterLabel,
+          badge: widget.activeFilters,
+          selected: _filterOpen,
+          onPressed: _filterOpen ? null : _openFilters,
         ),
-      ),
-      body: CustomScrollView(
-        slivers: [
-          if (_filters)
-            SliverPadding(
+      ],
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (widget.quickFilters != null)
+            Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              sliver: SliverToBoxAdapter(child: widget.filters),
+              child: widget.quickFilters,
             ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            sliver: SliverToBoxAdapter(
-              child: Text(
-                widget.count,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
+          if (widget.status != null) widget.status!,
+          Expanded(
+            child: CustomScrollView(
+              slivers: [
+                if (widget.itemCount == 0)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(child: Text(widget.empty)),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    sliver: SliverLayoutBuilder(
+                      builder: (context, constraints) => SliverGrid(
+                        gridDelegate: collectionGrid(
+                          context,
+                          constraints.crossAxisExtent,
+                          minWidth: widget.minTileWidth,
+                          aspectRatio: widget.aspectRatio,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          widget.item,
+                          childCount: widget.itemCount,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
-          if (widget.itemCount == 0)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(child: Text(widget.empty)),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              sliver: SliverLayoutBuilder(
-                builder: (context, constraints) => SliverGrid(
-                  gridDelegate: collectionGrid(
-                    context,
-                    constraints.crossAxisExtent,
-                    minWidth: widget.minTileWidth,
-                    aspectRatio: widget.aspectRatio,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    widget.item,
-                    childCount: widget.itemCount,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-      bottomNavigationBar: widget.footer == null
-          ? null
-          : Material(
+          if (widget.footer != null)
+            Material(
               color: theme.colorScheme.surfaceContainer,
               child: SafeArea(
                 top: false,
@@ -595,351 +648,12 @@ class _SelectionPaneState extends State<SelectionPane> {
                 ),
               ),
             ),
-    );
-  }
-}
-
-/// Multi- or single-song chooser; returns the chosen songs.
-Future<List<SongRef>?> pickSongs(
-  BuildContext context,
-  TeamCatalog catalog,
-  List<SongRef> songs, {
-  bool single = false,
-  List<int>? allowed,
-  List<SongRef>? allowedCharts,
-}) => Navigator.of(context).push<List<SongRef>>(
-  MaterialPageRoute(
-    fullscreenDialog: true,
-    builder: (_) => _SongPicker(
-      catalog: catalog,
-      initial: songs,
-      single: single,
-      allowed: allowed,
-      allowedCharts: allowedCharts,
-    ),
-  ),
-);
-
-class _SongPicker extends StatefulWidget {
-  const _SongPicker({
-    required this.catalog,
-    required this.initial,
-    required this.single,
-    this.allowed,
-    this.allowedCharts,
-  });
-  final TeamCatalog catalog;
-  final List<SongRef> initial;
-  final bool single;
-  final List<int>? allowed;
-  final List<SongRef>? allowedCharts;
-
-  @override
-  State<_SongPicker> createState() => _SongPickerState();
-}
-
-class _SongPickerState extends State<_SongPicker> {
-  late List<SongRef> _songs = [...widget.initial];
-  String _query = '';
-  int _difficulty = 3;
-  final _bands = <int>{};
-  final _attributes = <int>{};
-  final _missions = <String>{};
-  bool _containsMissions = false;
-
-  @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: widget.catalog,
-    builder: (context, _) => _content(context),
-  );
-
-  Widget _content(BuildContext context) {
-    final catalog = widget.catalog;
-    final t = catalog.t;
-    String tb(
-      String key,
-      String fallback, [
-      Map<String, Object?> v = const {},
-    ]) => t('tools.teamBuilder.$key', fallback, v);
-    final plan = catalog.songQueryEngine
-        .parse(_query)
-        .withMissionMode(_containsMissions ? 'contains' : 'only');
-    final query = plan.text.trim().toLowerCase();
-    final missionPlan = CatalogQuery('', {
-      'gekisouType': _missions.toList(),
-      'gekisouMatch': plan.facets['gekisouMatch']!,
-    });
-    final candidates = [
-      for (final key in objectRow(catalog.data['songs']).keys)
-        if (int.tryParse(key) case final id?)
-          if ((widget.allowed == null || widget.allowed!.contains(id)) &&
-              catalog.difficultyRow(id, _difficulty) != null &&
-              (widget.allowedCharts == null ||
-                  widget.allowedCharts!.contains(SongRef(id, _difficulty))) &&
-              (_bands.isEmpty || catalog.songBands(id).any(_bands.contains)) &&
-              (_attributes.isEmpty ||
-                  _attributes.contains(intOf(catalog.song(id)['musicType']))) &&
-              catalog.songQueryEngine.matches(catalog.song(id), missionPlan) &&
-              catalog.songQueryEngine.matches({
-                ...catalog.song(id),
-                'difficulty': [catalog.difficultyRow(id, _difficulty)],
-              }, plan) &&
-              (query.isEmpty ||
-                  '${catalog.songTitle(id)} ${catalog.songPresentation.artist(catalog.displaySong(id))} ${catalog.songBands(id).map(catalog.bandName).join(' ')}'
-                      .toLowerCase()
-                      .contains(query)))
-            id,
-    ];
-    final sort =
-        catalog.resourceSort[TeamResource.songs] ?? const TeamResourceSort();
-    if (chartMetricSortFields.contains(sort.field) &&
-        !catalog.metricsLoaded &&
-        catalog.metricsError == null) {
-      catalog.loadChartMetadata();
-    }
-    final ids = catalog
-        .sortedCharts(candidates.map((id) => SongRef(id, _difficulty)))
-        .map((song) => song.songId)
-        .toList();
-    final selected = {
-      for (final song in _songs)
-        if (song.difficulty == _difficulty) song.songId,
-    };
-    void toggle(int id) {
-      final ref = SongRef(id, _difficulty);
-      if (widget.single) {
-        Navigator.of(context).pop([ref]);
-        return;
-      }
-      setState(() {
-        _songs = _songs.contains(ref)
-            ? [..._songs.where((s) => s != ref)]
-            : [..._songs, ref];
-      });
-    }
-
-    Widget facet(
-      String label,
-      List<(String, String, String?)> options,
-      Set<String> chosen,
-      void Function(String value) toggle,
-    ) => ToolField(
-      label: label,
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final (value, name, icon) in options)
-            FilterChip(
-              avatar: icon == null ? null : _emblem(icon),
-              label: Text(name),
-              selected: chosen.contains(value),
-              onSelected: (_) => setState(() => toggle(value)),
-            ),
-        ],
-      ),
-    );
-    final bandValues = {for (final b in _bands) '$b'};
-    final attributeValues = {for (final a in _attributes) '$a'};
-    return SelectionPane(
-      title: widget.single
-          ? tb('chooseSong', 'Choose a song')
-          : tb('chooseSongs', 'Choose songs'),
-      searchLabel: t('common.actions.search', 'Search'),
-      filterLabel: tb('filters', 'Filters'),
-      query: _query,
-      onQuery: (value) => setState(() => _query = value),
-      activeFilters: _bands.length + _attributes.length + _missions.length,
-      filters: Builder(
-        builder: (context) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            facet(
-              t('catalog.analysis.fields.gekisouType', 'Gekiso type'),
-              [
-                (
-                  'Combo',
-                  t('catalog.songs.gekisou.gekisouMissionCombo', 'COMBO'),
-                  null,
-                ),
-                (
-                  'Luck',
-                  t('catalog.songs.gekisou.gekisouMissionLuck', 'LUCK'),
-                  null,
-                ),
-                (
-                  'JustCount',
-                  t('catalog.songs.gekisou.gekisouMissionJustCount', 'JUST'),
-                  null,
-                ),
-                ('Mix', t('catalog.songs.gekisou.mixed', 'Mixed'), null),
-              ],
-              _missions,
-              (v) => _missions.contains(v)
-                  ? _missions.remove(v)
-                  : _missions.add(v),
-            ),
-            const SizedBox(height: 12),
-            SegmentedButton<bool>(
-              segments: [
-                ButtonSegment(
-                  value: false,
-                  label: Text(
-                    t('catalog.songs.gekisou.only', 'Only selected types'),
-                  ),
-                ),
-                ButtonSegment(
-                  value: true,
-                  label: Text(
-                    t(
-                      'catalog.songs.gekisou.contains',
-                      'Contains a selected type',
-                    ),
-                  ),
-                ),
-              ],
-              selected: {_containsMissions},
-              onSelectionChanged: (value) =>
-                  setState(() => _containsMissions = value.first),
-            ),
-            TeamResourceSortControl(
-              catalog: catalog,
-              resource: TeamResource.songs,
-            ),
-            const SizedBox(height: 12),
-            facet(
-              t('catalog.fields.band', 'Band'),
-              [
-                for (final id in catalog.bandIds)
-                  ('$id', catalog.bandName(id), catalog.bandIcon(id)),
-              ],
-              bandValues,
-              (v) => _bands.contains(int.parse(v))
-                  ? _bands.remove(int.parse(v))
-                  : _bands.add(int.parse(v)),
-            ),
-            const SizedBox(height: 12),
-            facet(
-              t('catalog.fields.attribute', 'Attribute'),
-              [
-                for (final id in [1, 2, 3, 4, 5])
-                  ('$id', catalog.attributeName(id), catalog.attributeIcon(id)),
-              ],
-              attributeValues,
-              (v) => _attributes.contains(int.parse(v))
-                  ? _attributes.remove(int.parse(v))
-                  : _attributes.add(int.parse(v)),
-            ),
-          ],
-        ),
-      ),
-      count: tb('songCount', '{count} songs', {'count': ids.length}),
-      empty: tb('noSongs', 'No songs match'),
-      itemCount: ids.length,
-      minTileWidth: 150,
-      aspectRatio: 1,
-      item: (context, index) {
-        final id = ids[index];
-        final song = catalog.displaySong(id);
-        final presentation = catalog.songPresentation;
-        return Tile(
-          title: catalog.songTitle(id),
-          subtitle: presentation.artist(song),
-          adornments: presentation.avatars(song),
-          marks: presentation.marks(
-            song,
-            difficulty: catalog.difficultyLabel(id, _difficulty),
-          ),
-          images: [catalog.songJacket(id)],
-          fit: BoxFit.cover,
-          selected: selected.contains(id),
-          serverMark: catalog.mark('songs', id),
-          onTap: () => toggle(id),
-        );
-      },
-      footer: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Segmented<int>(
-            value: _difficulty,
-            grow: false,
-            options: [
-              for (final (index, name) in difficultyNames.indexed)
-                Choice(index, name.toUpperCase()),
-            ],
-            onSelected: (value) => setState(() => _difficulty = value),
-          ),
-          if (!widget.single) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              alignment: WrapAlignment.end,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                Text(
-                  tb('selectedSongs', '{count} selected', {
-                    'count': _songs.length,
-                  }),
-                ),
-                TextButton(
-                  onPressed: () => setState(() {
-                    _songs = [
-                      ..._songs.where(
-                        (s) =>
-                            s.difficulty != _difficulty ||
-                            !ids.contains(s.songId),
-                      ),
-                      for (final id in ids) SongRef(id, _difficulty),
-                    ];
-                  }),
-                  child: Text(
-                    tb('selectMatchingSongs', 'Select all shown songs'),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => setState(() {
-                    _songs = {
-                      ..._songs,
-                      for (final id in ids)
-                        for (final row in catalog.difficultyRows(id))
-                          if (widget.allowedCharts == null ||
-                              widget.allowedCharts!.contains(
-                                SongRef(id, intOf(row['difficulty'])),
-                              ))
-                            SongRef(id, intOf(row['difficulty'])),
-                    }.toList();
-                  }),
-                  child: Text(tb('selectAllCharts', 'Select all difficulties')),
-                ),
-                TextButton(
-                  onPressed: () => setState(
-                    () =>
-                        _songs.removeWhere((song) => ids.contains(song.songId)),
-                  ),
-                  child: Text(
-                    tb('deselectAllCharts', 'Deselect all difficulties'),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => setState(() => _songs = []),
-                  child: Text(t('common.actions.clear', 'Clear')),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.of(context).pop(_songs),
-                  child: Text(tb('useSongs', 'Use these songs')),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );
   }
 }
 
-/// Chooses one card (a formation slot); returns its id, or -1 for "no snap".
 Future<int?> pickCard(
   BuildContext context,
   TeamCatalog catalog, {

@@ -16,6 +16,7 @@ import 'markup.dart';
 import 'post_screen.dart';
 import 'reactions.dart';
 import 'user_screen.dart';
+import 'actions.dart';
 
 /// A paged community list: tags, notifications or the reader's comments.
 abstract class _PagedState<T extends StatefulWidget> extends State<T> {
@@ -24,6 +25,22 @@ abstract class _PagedState<T extends StatefulWidget> extends State<T> {
   bool loading = false;
   bool done = false;
   Object? error;
+  int _generation = 0;
+  Object? _owner = HaneokaAccount.instance.user?['id'];
+  void _accountChanged() {
+    final owner = HaneokaAccount.instance.user?['id'];
+    if (owner == _owner) return;
+    _owner = owner;
+    _generation++;
+    setState(() {
+      items.clear();
+      cursor = null;
+      loading = false;
+      done = false;
+      error = null;
+    });
+    load(reset: true);
+  }
 
   String endpoint(String? cursor);
   String get listKey;
@@ -32,9 +49,17 @@ abstract class _PagedState<T extends StatefulWidget> extends State<T> {
   @override
   void initState() {
     super.initState();
+    HaneokaAccount.instance.addListener(_accountChanged);
     HaneokaAccount.instance.load().then((_) {
       if (mounted) load(reset: true);
     });
+  }
+
+  @override
+  void dispose() {
+    _generation++;
+    HaneokaAccount.instance.removeListener(_accountChanged);
+    super.dispose();
   }
 
   Future<void> load({bool reset = false}) async {
@@ -42,7 +67,8 @@ abstract class _PagedState<T extends StatefulWidget> extends State<T> {
       setState(() => done = true);
       return;
     }
-    if (loading) return;
+    if (loading && !reset) return;
+    final generation = ++_generation;
     setState(() {
       loading = true;
       error = null;
@@ -54,7 +80,7 @@ abstract class _PagedState<T extends StatefulWidget> extends State<T> {
     });
     try {
       final data = await communityRequest('GET', endpoint(cursor));
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       setState(() {
         items.addAll(jsonList(data[listKey]));
         cursor = data['nextCursor'] as String?;
@@ -62,7 +88,7 @@ abstract class _PagedState<T extends StatefulWidget> extends State<T> {
         loading = false;
       });
     } catch (e) {
-      if (mounted) {
+      if (mounted && generation == _generation) {
         setState(() {
           error = e;
           loading = false;
@@ -389,40 +415,6 @@ class _ActivityState extends _PagedState<CommunityActivityScreen> {
     queryParameters: {'cursor': ?cursor, 'limit': '20'},
   ).toString();
 
-  Future<void> _delete(Json comment) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        content: Text(
-          communityLabel(
-            context,
-            'deleteCommentConfirm',
-            'This comment will be removed and cannot be restored.',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(communityLabel(context, 'cancel', 'Cancel')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(communityLabel(context, 'delete', 'Delete')),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    try {
-      await communityRequest(
-        'DELETE',
-        '/api/v1/community/comments/${Uri.encodeComponent('${comment['id']}')}',
-        body: {'version': comment['version']},
-      );
-      if (mounted) setState(() => items.remove(comment));
-    } catch (_) {}
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -469,13 +461,11 @@ class _ActivityState extends _PagedState<CommunityActivityScreen> {
                             ),
                           ),
                         ),
-                        if (jsonMap(comment['viewer'])['canDelete'] == true)
-                          TextButton(
-                            onPressed: () => _delete(comment),
-                            child: Text(
-                              communityLabel(context, 'delete', 'Delete'),
-                            ),
-                          ),
+                        CommunityRecordMenu(
+                          kind: 'comment',
+                          record: comment,
+                          onChanged: (_) => load(reset: true),
+                        ),
                       ],
                     ),
                   ],

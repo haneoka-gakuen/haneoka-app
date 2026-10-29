@@ -412,3 +412,67 @@ Future<List<int>> stampPng(
   final data = await rendered.toByteData(format: ui.ImageByteFormat.png);
   return data!.buffer.asUint8List();
 }
+
+Map<String, Object?> stampLayerJson(StampLayer layer) {
+  final text = layer.settings, bg = text.background, image = layer.image;
+  return {
+    'kind': image == null ? 'text' : 'image',
+    'text': text.text,
+    'x': text.x,
+    'y': text.y,
+    'size': text.size,
+    'rotation': text.rotation,
+    'font': text.font,
+    'fill': text.fill.toARGB32(),
+    'stroke': text.stroke.toARGB32(),
+    'strokeWidth': text.strokeWidth,
+    'writingMode': text.writingMode,
+    'background': {
+      'color': bg.color.toARGB32(),
+      'alpha': bg.alpha,
+      'padding': bg.padding,
+      'radius': bg.radius,
+    },
+    if (image != null)
+      'image': {
+        'x': image.x,
+        'y': image.y,
+        'scale': image.scale,
+        'rotation': image.rotation,
+      },
+  };
+}
+
+StampLayer stampLayerFromJson(Map<String, dynamic> value) {
+  final bg = (value['background'] as Map).cast<String, dynamic>();
+  final text = StampText(
+    text: value['text'] as String,
+    x: (value['x'] as num).toDouble(),
+    y: (value['y'] as num).toDouble(),
+    size: (value['size'] as num).toDouble(),
+    rotation: (value['rotation'] as num).toDouble(),
+    font: value['font'] as String,
+    fill: Color(value['fill'] as int),
+    stroke: Color(value['stroke'] as int),
+    strokeWidth: (value['strokeWidth'] as num).toDouble(),
+    writingMode: value['writingMode'] as String,
+    background: StampBackground(
+      color: Color(bg['color'] as int),
+      alpha: (bg['alpha'] as num).toDouble(),
+      padding: (bg['padding'] as num).toDouble(),
+      radius: (bg['radius'] as num).toDouble(),
+    ),
+  );
+  final image = value['image'] as Map?;
+  return StampLayer._(
+    text,
+    image == null
+        ? null
+        : StampImageTransform(
+            x: (image['x'] as num).toDouble(),
+            y: (image['y'] as num).toDouble(),
+            scale: (image['scale'] as num).toDouble(),
+            rotation: (image['rotation'] as num).toDouble(),
+          ),
+  );
+}

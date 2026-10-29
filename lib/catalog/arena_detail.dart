@@ -173,6 +173,21 @@ class _ArenaScreenState extends State<ArenaScreen> with WidgetsBindingObserver {
                     choose(current, anchor: 'arena-period-${period.start}'),
               ),
             BarAction(
+              icon: Symbols.calendar_month_rounded,
+              label: text('tools.calendar.title'),
+              onPressed: () => openLink(
+                context,
+                Uri(
+                  path:
+                      '/${widget.server ?? state.server}/${text.locale}/calendar/',
+                  queryParameters: {
+                    'kinds': 'arena,arena-rotation,event',
+                    'view': 'agenda',
+                  },
+                ).toString(),
+              ),
+            ),
+            BarAction(
               icon: Symbols.refresh_rounded,
               label: text('common.actions.refresh'),
               onPressed: () => setState(_load),

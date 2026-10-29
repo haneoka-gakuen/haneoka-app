@@ -4531,7 +4531,15 @@
       },
       "gameAccountPlayerId": "Player ID {id}",
       "gameAccountRank": "Player rank {value}",
-      "gameAccountRating": "High score rating {value}"
+      "gameAccountRating": "High score rating {value}",
+      "appealsTitle": "Your appeals",
+      "appealStatus": {
+        "pending": "Pending",
+        "rejected": "Rejected",
+        "accepted": "Accepted"
+      },
+      "unmute": "Unmute",
+      "unblock": "Unblock"
     },
     "charts": {
       "title": "Community Charts",

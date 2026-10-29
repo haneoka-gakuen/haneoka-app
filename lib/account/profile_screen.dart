@@ -8,6 +8,7 @@ import '../ui/theme.dart';
 import '../ui/tile.dart';
 import 'haneoka_account.dart';
 import 'security_widgets.dart';
+import 'appeals.dart';
 
 /// The reader's haneoka profile and sign-in sessions (`account-workspace`):
 /// display name, handle and bio; every signed-in device, revocable.
@@ -23,10 +24,24 @@ class _AccountProfileScreenState extends State<AccountProfileScreen> {
   final _bio = TextEditingController();
   Future<List<Map<String, Object?>>>? _sessions;
   bool _saving = false;
+  Object? _owner = HaneokaAccount.instance.user?['id'];
+  void _accountChanged() {
+    final owner = HaneokaAccount.instance.user?['id'];
+    if (owner == _owner) return;
+    _owner = owner;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final route = ModalRoute.of(context);
+      if (route != null && route.isActive) {
+        Navigator.of(context).removeRoute(route);
+      }
+    });
+  }
 
   @override
   void initState() {
     super.initState();
+    HaneokaAccount.instance.addListener(_accountChanged);
     final profile = HaneokaAccount.instance.profile ?? const {};
     _name.text = '${profile['displayName'] ?? ''}';
     _handle.text = '${profile['handle'] ?? ''}';
@@ -36,6 +51,7 @@ class _AccountProfileScreenState extends State<AccountProfileScreen> {
 
   @override
   void dispose() {
+    HaneokaAccount.instance.removeListener(_accountChanged);
     _name.dispose();
     _handle.dispose();
     _bio.dispose();
@@ -241,6 +257,8 @@ class _AccountProfileScreenState extends State<AccountProfileScreen> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  surface(const AccountAppeals()),
                   const SizedBox(height: 16),
                   surface(const DeleteAccount()),
                 ],

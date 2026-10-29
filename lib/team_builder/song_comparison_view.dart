@@ -8,6 +8,7 @@ import 'engine/num.dart';
 import 'pickers.dart';
 import 'song_comparison.dart';
 import 'widgets.dart';
+import 'build_tab.dart' show SongRulesEditor;
 
 class SongComparisonTab extends StatelessWidget {
   const SongComparisonTab({super.key, required this.controller});
@@ -150,6 +151,8 @@ class SongComparisonTab extends StatelessWidget {
                   context,
                   catalog,
                   c.songs,
+                  selectionContext: 'song-comparison',
+                  songRules: c.songRules,
                   allowed: catalog.master.songs.keys
                       .where((id) => c.available('songs', id))
                       .toList(),
@@ -160,6 +163,16 @@ class SongComparisonTab extends StatelessWidget {
                   });
                 }
               },
+            ),
+            ExpansionTile(
+              title: Text(controller.tb('songRules', 'Song rules')),
+              children: [
+                SongRulesEditor(
+                  controller: controller,
+                  rules: c.ruleValues,
+                  onChanged: (value) => c.update({'songRules': value}),
+                ),
+              ],
             ),
             for (final song in c.songs)
               SongRow(
@@ -198,7 +211,7 @@ class SongComparisonTab extends StatelessWidget {
               ],
               onChanged: (value) => c.update({'mode': value}),
             ),
-            if (controller.hasMission(3, c.songs)) number('just'),
+            if (c.hasMission(3)) number('just'),
             if (s['mode'] == 'custom') ...[
               number('great'),
               number('missEvery'),

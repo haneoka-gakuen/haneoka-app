@@ -96,6 +96,7 @@ dependencies:
   http: ^1.6.0
   html: ^0.15.7
   intl: any
+  unorm_dart: ^0.3.2
   material_new_shapes: ^1.0.0
   material_symbols_icons: ^4.2960.0
   media_kit: ^1.2.6

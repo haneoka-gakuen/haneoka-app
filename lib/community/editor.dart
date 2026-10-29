@@ -1,4 +1,7 @@
 import 'dart:async';
+
+import '../core/local_drafts.dart';
+
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
@@ -19,6 +22,8 @@ import '../ui/tile.dart';
 import 'community_widgets.dart';
 import 'post_screen.dart';
 import 'sections.dart';
+import 'reactions.dart';
+import 'actions.dart' show communityMessage;
 
 Object? _decode(String text) {
   try {
@@ -236,6 +241,7 @@ class _Upload {
   Json? attachment;
   double progress = 0;
   String? error;
+  bool cancelled = false;
   bool get ready =>
       attachment != null &&
       const {'ready', 'scanning', 'review'}.contains(attachment!['status']) &&
@@ -268,8 +274,14 @@ const _mediaTypes = {
 /// Writing a post (`renderPostEditor`): the forum, a title, the body with
 /// markup and stickers, images and videos, tags and who can see it.
 class PostEditorScreen extends StatefulWidget {
-  const PostEditorScreen({super.key, this.forum, this.image, this.purpose});
-  final Json? forum;
+  const PostEditorScreen({
+    super.key,
+    this.forum,
+    this.image,
+    this.purpose,
+    this.post,
+  });
+  final Json? forum, post;
 
   /// A picture to attach at once: the stamp maker's PNG.
   final ({String name, Uint8List bytes})? image;
@@ -280,10 +292,12 @@ class PostEditorScreen extends StatefulWidget {
   State<PostEditorScreen> createState() => _PostEditorScreenState();
 }
 
-class _PostEditorScreenState extends State<PostEditorScreen> {
+class _PostEditorScreenState extends State<PostEditorScreen>
+    with WidgetsBindingObserver {
   final _title = TextEditingController();
   final _body = TextEditingController();
   final _tags = TextEditingController();
+  final _editReason = TextEditingController();
   String _visibility = 'public';
   String? _forumId;
   List<Json> _forums = [];
@@ -291,11 +305,106 @@ class _PostEditorScreenState extends State<PostEditorScreen> {
   bool _preview = false;
   bool _busy = false;
   String _error = '';
+  Timer? _draftTimer;
+  bool _published = false,
+      _restoring = true,
+      _abandoned = false,
+      _sessionClosed = false;
+  late String _draftOwner = '${HaneokaAccount.instance.user?['id'] ?? 'guest'}';
+  late final String _originalDraftKey;
+  String get _draftKey =>
+      'haneoka:community-post-draft:v2:$_draftOwner:/community/posts/new';
+  void _scheduleDraft() {
+    if (widget.post != null || _restoring || _published) return;
+    if ('${HaneokaAccount.instance.user?['id'] ?? 'guest'}' != _draftOwner) {
+      return;
+    }
+    LocalDrafts.stage(
+      _draftKey,
+      jsonEncode({
+        'title': _title.text,
+        'body': _body.text,
+        'tags': _tags.text,
+        'visibility': _visibility,
+        'forumId': _forumId,
+      }),
+    );
+    _draftTimer?.cancel();
+    _draftTimer = Timer(const Duration(milliseconds: 300), _saveDraft);
+  }
+
+  Future<void> _saveDraft() async {
+    if (widget.post != null || _published) return;
+    try {
+      await LocalDrafts.flush(_draftKey);
+    } catch (_) {
+      if (mounted) communityMessage(context, 'draftFailed');
+    }
+  }
+
+  Future<void> _restoreDraft() async {
+    try {
+      final source = await LocalDrafts.read(_draftKey);
+      if (!mounted || widget.post != null || source == null) return;
+      final draft = jsonMap(jsonDecode(source));
+      setState(() {
+        _title.text = '${draft['title'] ?? ''}';
+        _body.text = '${draft['body'] ?? ''}';
+        _tags.text = '${draft['tags'] ?? ''}';
+        _visibility = '${draft['visibility'] ?? 'public'}';
+        _forumId = draft['forumId'] as String? ?? _forumId;
+      });
+    } catch (_) {
+      if (mounted) communityMessage(context, 'draftFailed');
+    } finally {
+      _restoring = false;
+    }
+  }
+
+  void _accountChanged() {
+    final owner = '${HaneokaAccount.instance.user?['id'] ?? 'guest'}';
+    if (_draftOwner == 'guest' || owner == _draftOwner) return;
+    _draftTimer?.cancel();
+    unawaited(_saveDraft());
+    for (final upload in _uploads) {
+      upload.cancelled = true;
+    }
+    _uploads.clear();
+    _title.clear();
+    _body.clear();
+    _tags.clear();
+    _editReason.clear();
+    setState(() => _sessionClosed = true);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) unawaited(_saveDraft());
+  }
 
   @override
   void initState() {
     super.initState();
-    _forumId = widget.forum?['id'] as String?;
+    WidgetsBinding.instance.addObserver(this);
+    _originalDraftKey = _draftKey;
+    HaneokaAccount.instance.addListener(_accountChanged);
+    for (final field in [_title, _body, _tags]) {
+      field.addListener(_scheduleDraft);
+    }
+    if (widget.post == null) {
+      unawaited(_restoreDraft());
+    } else {
+      _restoring = false;
+    }
+    final post = widget.post;
+    _forumId = (post?['forumId'] ?? widget.forum?['id']) as String?;
+    if (post != null) {
+      _title.text = '${post['title'] ?? ''}';
+      _body.text = '${post['body'] ?? ''}';
+      _tags.text = (post['tags'] as List? ?? []).join(', ');
+      _visibility = '${post['visibility'] ?? 'public'}';
+    }
+
     if (widget.image case final image?) {
       final upload = _Upload(image.name, image.bytes, 'image/png');
       _uploads.add(upload);
@@ -327,9 +436,20 @@ class _PostEditorScreenState extends State<PostEditorScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    HaneokaAccount.instance.removeListener(_accountChanged);
+    _abandoned = true;
+    _draftTimer?.cancel();
+    unawaited(_saveDraft());
+    if (!_published) {
+      for (final upload in _uploads) {
+        unawaited(_discardUpload(upload));
+      }
+    }
     _title.dispose();
     _body.dispose();
     _tags.dispose();
+    _editReason.dispose();
     super.dispose();
   }
 
@@ -388,6 +508,20 @@ class _PostEditorScreenState extends State<PostEditorScreen> {
 
   /// Reserve, send (in parts when the server asks), then wait for the
   /// server to accept it (`uploadCommunityAttachment`).
+  Future<void> _discardUpload(_Upload upload) async {
+    final attachment = upload.attachment;
+    if (attachment == null ||
+        '${HaneokaAccount.instance.user?['id'] ?? 'guest'}' != _draftOwner) {
+      return;
+    }
+    try {
+      await communityRequest(
+        'DELETE',
+        '/api/v1/community/attachments/${Uri.encodeComponent('${attachment['id']}')}',
+      );
+    } catch (_) {}
+  }
+
   Future<void> _upload(_Upload upload) async {
     try {
       final intent = await communityRequest(
@@ -403,6 +537,11 @@ class _PostEditorScreenState extends State<PostEditorScreen> {
       var attachment = jsonMap(intent['attachment']).isNotEmpty
           ? jsonMap(intent['attachment'])
           : intent;
+      upload.attachment = attachment;
+      if (_abandoned || upload.cancelled) {
+        await _discardUpload(upload);
+        return;
+      }
       final multipart = jsonMap(attachment['multipart']);
       if (multipart.isEmpty) {
         final response = await _put(
@@ -440,6 +579,10 @@ class _PostEditorScreenState extends State<PostEditorScreen> {
       if (mounted) setState(() => upload.progress = 1);
       // Accepted once scanned or queued for review.
       for (var attempt = 0; attempt < 60; attempt++) {
+        if (_abandoned || upload.cancelled) {
+          await _discardUpload(upload);
+          return;
+        }
         final status = await communityRequest(
           'GET',
           '/api/v1/community/attachments/${Uri.encodeComponent('${attachment['id']}')}',
@@ -480,6 +623,15 @@ class _PostEditorScreenState extends State<PostEditorScreen> {
   }
 
   Future<void> _publish() async {
+    if (!await requireSession(context) || !mounted) return;
+    final owner = '${HaneokaAccount.instance.user?['id'] ?? 'guest'}';
+    if (_draftOwner == 'guest') {
+      _draftOwner = owner;
+    } else if (_draftOwner != owner) {
+      communityMessage(context, 'editForbidden');
+      return;
+    }
+
     String label(String key, String fallback) =>
         communityLabel(context, key, fallback);
     if (_forumId == null) {
@@ -518,26 +670,55 @@ class _PostEditorScreenState extends State<PostEditorScreen> {
     });
     try {
       final result = await communityRequest(
-        'POST',
-        '/api/v1/community/posts',
+        widget.post == null ? 'POST' : 'PATCH',
+        widget.post == null
+            ? '/api/v1/community/posts'
+            : '/api/v1/community/posts/${Uri.encodeComponent('${widget.post!['id']}')}',
         body: {
           'title': _title.text.trim(),
           'body': body,
           'visibility': _visibility,
           'tags': tags,
-          'forumId': _forumId,
-          'attachmentIds': [
-            for (final upload in _uploads) upload.attachment!['id'],
-          ],
+          if (widget.post != null) ...{
+            'version': widget.post!['version'],
+            'editReason': _editReason.text.trim().isEmpty
+                ? communityLabel(context, 'saveChanges', 'Save changes')
+                : _editReason.text.trim(),
+          },
+          if (widget.post == null) 'forumId': _forumId,
+          if (widget.post == null)
+            'attachmentIds': [
+              for (final upload in _uploads) upload.attachment!['id'],
+            ],
         },
       );
+      invalidateCommunityData();
+      _published = true;
+      _draftTimer?.cancel();
+      if (widget.post == null) {
+        await LocalDrafts.remove(_draftKey);
+        if (_originalDraftKey != _draftKey) {
+          await LocalDrafts.remove(_originalDraftKey);
+        }
+      }
+      if (widget.post != null) {
+        if (mounted) Navigator.of(context).pop(jsonMap(result['post']));
+        return;
+      }
       final id = jsonMap(result['post'])['id'] ?? result['id'];
       if (!mounted) return;
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(builder: (_) => PostScreen(id: '$id')),
       );
-    } on AccountError catch (error) {
-      if (mounted) setState(() => _error = error.code);
+    } on AccountError {
+      if (mounted) {
+        setState(
+          () => _error = label(
+            widget.post == null ? 'publishFailed' : 'editSaveFailed',
+            'Unavailable',
+          ),
+        );
+      }
     } catch (_) {
       if (mounted) setState(() => _error = label('unavailable', 'Unavailable'));
     } finally {
@@ -547,13 +728,26 @@ class _PostEditorScreenState extends State<PostEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_sessionClosed) {
+      return ShellPage(
+        title: communityLabel(context, 'editForbidden', 'Unavailable'),
+        body: Center(
+          child: TextButton(
+            onPressed: () => Navigator.of(context).pushReplacement(
+              MaterialPageRoute<void>(builder: (_) => const PostEditorScreen()),
+            ),
+            child: Text(communityLabel(context, 'newPost', 'New post')),
+          ),
+        ),
+      );
+    }
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final t = AppScope.of(context).text;
     String label(String key, String fallback) =>
         communityLabel(context, key, fallback);
     return ShellPage(
-      title: label('newPost', 'New post'),
+      title: label(widget.post == null ? 'newPost' : 'editPost', 'Post'),
       body: ListView(
         padding: pagePadding(context),
         children: [
@@ -574,7 +768,12 @@ class _PostEditorScreenState extends State<PostEditorScreen> {
                             .firstOrNull?['icon'],
                       ),
                     ),
-                    onSelected: (id) => setState(() => _forumId = id),
+                    onSelected: widget.post != null
+                        ? null
+                        : (id) {
+                            setState(() => _forumId = id);
+                            _scheduleDraft();
+                          },
                     dropdownMenuEntries: [
                       for (final forum in _forums)
                         DropdownMenuEntry(
@@ -607,6 +806,14 @@ class _PostEditorScreenState extends State<PostEditorScreen> {
                       ),
                     ],
                   ),
+                  if (widget.post != null)
+                    TextField(
+                      controller: _editReason,
+                      maxLength: 200,
+                      decoration: InputDecoration(
+                        labelText: label('editReason', 'Edit note'),
+                      ),
+                    ),
                   if (_preview)
                     Container(
                       constraints: const BoxConstraints(minHeight: 200),
@@ -639,11 +846,14 @@ class _PostEditorScreenState extends State<PostEditorScreen> {
                       for (final upload in _uploads)
                         _UploadTile(
                           upload: upload,
-                          onRemove: () =>
-                              setState(() => _uploads.remove(upload)),
+                          onRemove: () => setState(() {
+                            upload.cancelled = true;
+                            _uploads.remove(upload);
+                            unawaited(_discardUpload(upload));
+                          }),
                         ),
                       OutlinedButton.icon(
-                        onPressed: _pick,
+                        onPressed: widget.post == null ? _pick : null,
                         icon: const Icon(Symbols.add_photo_alternate_rounded),
                         label: Text(label('addAttachment', 'Attach')),
                       ),
@@ -678,8 +888,10 @@ class _PostEditorScreenState extends State<PostEditorScreen> {
                         ),
                     ],
                     selected: {_visibility},
-                    onSelectionChanged: (v) =>
-                        setState(() => _visibility = v.single),
+                    onSelectionChanged: (v) => setState(() {
+                      _visibility = v.single;
+                      _scheduleDraft();
+                    }),
                   ),
                   if (_error.isNotEmpty) ...[
                     const SizedBox(height: 12),
@@ -762,4 +974,51 @@ class _UploadTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class CommunityPostEditScreen extends StatefulWidget {
+  const CommunityPostEditScreen({super.key, required this.id});
+  final String id;
+  @override
+  State<CommunityPostEditScreen> createState() =>
+      _CommunityPostEditScreenState();
+}
+
+class _CommunityPostEditScreenState extends State<CommunityPostEditScreen> {
+  late Future<Json> _data = communityRequest(
+    'GET',
+    '/api/v1/community/posts/${Uri.encodeComponent(widget.id)}',
+  );
+  @override
+  Widget build(BuildContext context) => FutureBuilder(
+    future: _data,
+    builder: (context, snapshot) {
+      if (snapshot.hasData &&
+          jsonMap(snapshot.data?['viewer'])['canEdit'] == true) {
+        return PostEditorScreen(post: jsonMap(snapshot.data?['post']));
+      }
+      return ShellPage(
+        title: communityLabel(context, 'editPost', 'Edit post'),
+        body: Center(
+          child: snapshot.connectionState == ConnectionState.waiting
+              ? const CircularProgressIndicator()
+              : TextButton(
+                  onPressed: () => setState(
+                    () => _data = communityRequest(
+                      'GET',
+                      '/api/v1/community/posts/${Uri.encodeComponent(widget.id)}',
+                    ),
+                  ),
+                  child: Text(
+                    communityLabel(
+                      context,
+                      snapshot.hasError ? 'editLoadFailed' : 'editForbidden',
+                      'Unavailable',
+                    ),
+                  ),
+                ),
+        ),
+      );
+    },
+  );
 }

@@ -96,8 +96,56 @@ Future<bool> openLink(
   parts
     ..clear()
     ..addAll(Uri.parse(canonical).pathSegments);
+  if (parts.take(2).join('/') == 'account/reset-password' ||
+      parts.take(2).join('/') == 'account/app') {
+    return launchUrl(
+      Uri.parse('https://haneoka.org').resolve(href),
+      mode: LaunchMode.externalApplication,
+    );
+  }
   if (parts.isEmpty) {
-    navigate?.call('/');
+    navigate?.call(
+      Uri(
+        path: '/',
+        queryParameters: {...uri.queryParameters, 'server': ?server},
+      ).toString(),
+    );
+    return navigate != null;
+  }
+  if (parts.first == 'catalog' &&
+      const {
+        'live2d',
+        'spine',
+        'help',
+        'skills',
+        'stories',
+      }.contains(parts.elementAtOrNull(1))) {
+    final kind = parts[1],
+        id =
+            parts.elementAtOrNull(2) ??
+            uri.queryParameters[kind == 'stories'
+                ? 'story'
+                : kind == 'skills'
+                ? 'skill'
+                : 'topic'];
+    navigate?.call(
+      Uri(
+        path:
+            '/catalog/$kind${id == null ? '' : '/${Uri.encodeComponent(id)}'}',
+        queryParameters: {...uri.queryParameters, 'server': ?server},
+        fragment: uri.hasFragment ? uri.fragment : null,
+      ).toString(),
+    );
+    return navigate != null;
+  }
+  if (parts.take(2).join('/') == 'catalog/songs' &&
+      const {'chart', 'ranking'}.contains(parts.elementAtOrNull(3))) {
+    navigate?.call(
+      Uri(
+        path: '/${parts.map(Uri.encodeComponent).join('/')}',
+        queryParameters: {...uri.queryParameters, 'server': ?server},
+      ).toString(),
+    );
     return navigate != null;
   }
   if (parts.first == 'arena' ||
@@ -288,10 +336,15 @@ Future<bool> openLink(
         profile.id.first: int.tryParse(parts[1]) ?? parts[1],
         '_key': parts[1],
         if (server != null && server != selected) serverKey: server,
-      });
+      }, api: server == null ? null : AppScope.of(context).apiFor(server));
       return true;
     }
-    navigate?.call('/catalog/${parts.first}');
+    navigate?.call(
+      Uri(
+        path: '/catalog/${parts.first}',
+        queryParameters: {...uri.queryParameters, 'server': ?server},
+      ).toString(),
+    );
     return navigate != null;
   }
   // A playlist is addressed by query: `/community/playlists?playlist=<id>`.
@@ -312,7 +365,7 @@ Future<bool> openLink(
   }
   final route = Uri.parse('/${parts.map(Uri.encodeComponent).join('/')}')
       .replace(
-        query: uri.hasQuery ? uri.query : null,
+        queryParameters: {...uri.queryParameters, 'server': ?server},
         fragment: uri.hasFragment ? uri.fragment : null,
       )
       .toString();

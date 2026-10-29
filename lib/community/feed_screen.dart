@@ -7,6 +7,9 @@ import '../core/app_state.dart';
 import '../shell/links.dart';
 import '../shell/page.dart';
 import '../ui/app_image.dart';
+import '../ui/account_dialog.dart';
+import '../catalog/browse.dart' show BrowseFilterPanel;
+import '../team_builder/widgets.dart' show Segmented, Choice;
 import '../ui/theme.dart';
 import '../ui/tile.dart';
 import 'community_widgets.dart';
@@ -14,6 +17,7 @@ import 'editor.dart';
 import 'markup.dart';
 import 'post_screen.dart';
 import 'reactions.dart';
+import 'actions.dart';
 import 'user_screen.dart';
 
 /// The website's community feeds (`/community/feeds`, `latest`, `following`,
@@ -43,6 +47,20 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
   bool _done = false;
   Object? _error;
   String _query = '';
+  late String? _tagFilter = widget.tag;
+  final _selectedTags = <String>{};
+  String _tagMode = 'all', _postState = 'active';
+  bool _invalidated = false;
+  ModalRoute<void>? _filterRoute;
+  void _changeFilters(VoidCallback change) {
+    setState(change);
+    _load(reset: true);
+  }
+
+  void _dataChanged() {
+    if (mounted) setState(() => _invalidated = true);
+  }
+
   int _generation = 0;
   Object? _queryKey;
   bool _sessionReady = false;
@@ -58,6 +76,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
       if (mounted) _load(reset: true);
     });
     HaneokaAccount.instance.addListener(_onAccount);
+    communityDataRevision.addListener(_dataChanged);
   }
 
   @override
@@ -73,14 +92,31 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
   @override
   void dispose() {
     HaneokaAccount.instance.removeListener(_onAccount);
+    communityDataRevision.removeListener(_dataChanged);
+    final route = _filterRoute;
+    if (route != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (route.isActive) route.navigator?.removeRoute(route);
+      });
+    }
     super.dispose();
   }
 
-  bool? _signedIn;
+  Object? _owner = HaneokaAccount.instance.user?['id'];
   void _onAccount() {
-    final signedIn = HaneokaAccount.instance.signedIn;
-    if (_signedIn != null && _signedIn != signedIn) _load(reset: true);
-    _signedIn = signedIn;
+    final owner = HaneokaAccount.instance.user?['id'];
+    if (owner == _owner) return;
+    _owner = owner;
+    _generation++;
+    setState(() {
+      _items.clear();
+      _cursor = null;
+      _seed = null;
+      _loading = false;
+      _done = false;
+      _error = null;
+    });
+    _load(reset: true);
   }
 
   String _endpoint(bool append) {
@@ -95,8 +131,12 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
         'locale': state.text.locale,
         if (append && _seed != null) 'seed': '$_seed',
       },
-      'state': 'active',
-      if (widget.tag != null) 'tag': widget.tag!,
+      'state': widget.scope == 'mine' ? _postState : 'active',
+      'tag': ?_tagFilter,
+      if (_selectedTags.isNotEmpty) ...{
+        'tags': _selectedTags.join(','),
+        'tagMatch': _tagMode,
+      },
       if (widget.forum?['id'] case final String id) 'forumId': id,
     };
     return Uri(
@@ -159,7 +199,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
   String get _title {
     String label(String key, String fallback) =>
         communityLabel(context, key, fallback);
-    if (widget.tag != null) return '#${widget.tag}';
+    if (_tagFilter != null) return '#$_tagFilter';
     if (widget.forum != null) {
       final names = jsonMap(widget.forum!['names']);
       final locale = AppScope.of(context).text.locale;
@@ -174,12 +214,65 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
     };
   }
 
+  Future<void> _openFilters() async {
+    try {
+      await showGeneralDialog<void>(
+        context: context,
+        useRootNavigator: true,
+        barrierDismissible: true,
+        barrierLabel: MaterialLocalizations.of(context)
+            .modalBarrierDismissLabel,
+        barrierColor: Theme.of(context).colorScheme.scrim
+            .withValues(alpha: .32),
+        pageBuilder: (context, _, _) {
+          _filterRoute = ModalRoute.of(context);
+          return Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: AccountDialog(child: _FeedFilters(feed: this)),
+          );
+        },
+      );
+    } finally {
+      _filterRoute = null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_invalidated && ModalRoute.of(context)?.isCurrent == true) {
+      _invalidated = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _load(reset: true);
+      });
+    }
     final theme = Theme.of(context);
     final signedOut = _needsSession && !HaneokaAccount.instance.signedIn;
     return ShellPage(
       title: _title,
+      marks: _selectedTags.isEmpty && _tagFilter == null
+          ? null
+          : SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final tag in {?_tagFilter, ..._selectedTags})
+                    Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: InputChip(
+                        label: Text('#$tag'),
+                        onDeleted: () {
+                          setState(() {
+                            if (_tagFilter == tag) _tagFilter = null;
+                            _selectedTags.remove(tag);
+                          });
+                          _load(reset: true);
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+      marksExtent: _selectedTags.isEmpty && _tagFilter == null ? 0 : 240,
       search: ShellSearch(
         label: communityLabel(context, 'search', 'Search'),
         onChanged: (_) {},
@@ -189,6 +282,32 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
         },
       ),
       actions: [
+        BarAction(
+          icon: Symbols.filter_alt_rounded,
+          label: AppScope.of(context).text('common.actions.filter'),
+          badge: _selectedTags.length + (_postState == 'archived' ? 1 : 0),
+          onPressed: signedOut ? null : _openFilters,
+        ),
+        if (HaneokaAccount.instance.signedIn && widget.scope == 'recommended')
+          BarAction(
+            icon: Symbols.restore_rounded,
+            label: communityLabel(
+              context,
+              'resetFeedback',
+              'Reset recommendations',
+            ),
+            onPressed: () async {
+              try {
+                await communityRequest(
+                  'DELETE',
+                  '/api/v1/community/me/post-feedback',
+                );
+                if (mounted) _load(reset: true);
+              } catch (_) {
+                if (context.mounted) communityMessage(context, 'unavailable');
+              }
+            },
+          ),
         BarAction(
           icon: Symbols.edit_rounded,
           label: communityLabel(context, 'newPost', 'New post'),
@@ -244,12 +363,25 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                   else
                     PostMasonry(
                       items: _items,
+                      allowFeedback: widget.scope == 'recommended',
                       width: width,
-                      onChanged: (item, next) => setState(
-                        () => item
-                          ..clear()
-                          ..addAll(next),
-                      ),
+                      onChanged: (item, next) {
+                        if (!mounted) return;
+                        setState(() {
+                          if (next['_removeFromFeed'] == true) {
+                            _items.remove(item);
+                          } else if (next['_restoreToFeed'] == true) {
+                            _items.insert(
+                              0,
+                              {...next}..remove('_restoreToFeed'),
+                            );
+                          } else {
+                            item
+                              ..clear()
+                              ..addAll(next);
+                          }
+                        });
+                      },
                     ),
                   if (_loading)
                     const Padding(
@@ -282,7 +414,9 @@ class PostMasonry extends StatefulWidget {
     required this.items,
     required this.width,
     required this.onChanged,
+    this.allowFeedback = false,
   });
+  final bool allowFeedback;
   final List<Json> items;
   final double width;
   final void Function(Json item, Json next) onChanged;
@@ -364,6 +498,12 @@ class _PostMasonryState extends State<PostMasonry> {
                             ? EntityCommentCard(entry: item)
                             : PostCard(
                                 post: item,
+                                onFeedback: widget.allowFeedback
+                                    ? () => widget.onChanged(item, {
+                                        ...item,
+                                        '_removeFromFeed': true,
+                                      })
+                                    : null,
                                 compact: width < 600,
                                 onChanged: (next) =>
                                     widget.onChanged(item, next),
@@ -406,10 +546,12 @@ class PostCard extends StatelessWidget {
     required this.post,
     required this.onChanged,
     this.compact = false,
+    this.onFeedback,
   });
   final Json post;
   final ValueChanged<Json> onChanged;
   final bool compact;
+  final VoidCallback? onFeedback;
 
   @override
   Widget build(BuildContext context) {
@@ -512,7 +654,19 @@ class PostCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ForumLabel(forum: jsonMap(post['forum'])),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ForumLabel(forum: jsonMap(post['forum'])),
+                      ),
+                      CommunityRecordMenu(
+                        kind: 'post',
+                        record: post,
+                        onChanged: onChanged,
+                        onFeedback: onFeedback,
+                      ),
+                    ],
+                  ),
                   SizedBox(height: compact ? 5 : 6),
                   if (post['adminOnlyContext'] == true &&
                       post['visibility'] == 'private') ...[
@@ -686,6 +840,206 @@ class EntityCommentCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _FeedFilters extends StatefulWidget {
+  const _FeedFilters({required this.feed});
+  final _CommunityFeedScreenState feed;
+  @override
+  State<_FeedFilters> createState() => _FeedFiltersState();
+}
+
+class _FeedFiltersState extends State<_FeedFilters> {
+  final _search = TextEditingController();
+  late Future<Json> _data = _fetch();
+  Future<Json> _fetch([String? cursor]) {
+    final query = {...Uri.parse(widget.feed._endpoint(false)).queryParameters}
+      ..remove('tags')
+      ..remove('tagMatch')
+      ..remove('q')
+      ..remove('seed')
+      ..remove('server')
+      ..remove('locale');
+    return communityRequest(
+      'GET',
+      Uri(
+        path: '/api/v1/community/tag-facets',
+        queryParameters: {
+          ...query,
+          'limit': '100',
+          if (widget.feed._query.isNotEmpty) 'postQ': widget.feed._query,
+          if (_search.text.trim().isNotEmpty) 'q': _search.text.trim(),
+          'cursor': ?cursor,
+        },
+      ).toString(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  void _change(VoidCallback change) {
+    widget.feed._changeFilters(change);
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final feed = widget.feed;
+    String t(String key) => communityLabel(context, key, key);
+    return BrowseFilterPanel(
+      switches: const [],
+      facets: const [],
+      sorts: const [],
+      sort: null,
+      descending: true,
+      selected: const {},
+      counts: (_) => const {},
+      onToggle: (_, _) {},
+      onSort: (_) {},
+      onOrder: () {},
+      onReset: () {},
+      fields: [
+        if (feed.widget.scope == 'mine')
+          Segmented<String>(
+            value: feed._postState,
+            options: [
+              Choice('active', t('stateActive')),
+              Choice('archived', t('stateArchived')),
+            ],
+            onSelected: (v) {
+              _change(() => feed._postState = v);
+              setState(() => _data = _fetch());
+            },
+          ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _search,
+          maxLength: 64,
+          decoration: InputDecoration(
+            labelText: t('tagSearch'),
+            suffixIcon: IconButton(
+              tooltip: AppScope.of(context).text('common.actions.search'),
+              icon: const Icon(Symbols.search_rounded),
+              onPressed: () => setState(() => _data = _fetch()),
+            ),
+          ),
+          onSubmitted: (_) => setState(() => _data = _fetch()),
+        ),
+        const SizedBox(height: 16),
+        Segmented<String>(
+          value: feed._tagMode,
+          options: [
+            Choice('all', t('tagMatchAll')),
+            Choice('any', t('tagMatchAny')),
+          ],
+          onSelected: (v) => _change(() => feed._tagMode = v),
+        ),
+        const SizedBox(height: 16),
+        FutureBuilder(
+          future: _data,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return TextButton(
+                onPressed: () => setState(() => _data = _fetch()),
+                child: Text(AppScope.of(context).text('common.actions.retry')),
+              );
+            }
+            if (!snapshot.hasData) {
+              return const SizedBox(
+                height: 64,
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+            final tags = jsonList(snapshot.data?['tags']),
+                groups = [
+                  ...jsonList(snapshot.data?['groups']),
+                  {'id': '', 'defaultName': t('tags')},
+                ];
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final group in groups)
+                  if (tags.any((tag) => (tag['groupId'] ?? '') == group['id']))
+                    ExpansionTile(
+                      title: Text(
+                        AppScope.of(context).text
+                                .text(group['names'])
+                                .isNotEmpty
+                            ? AppScope.of(context).text.text(group['names'])
+                            : '${group['defaultName'] ?? ''}',
+                      ),
+                      initiallyExpanded: true,
+                      children: [
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final tag in tags.where(
+                              (tag) => (tag['groupId'] ?? '') == group['id'],
+                            ))
+                              FilterChip(
+                                showCheckmark: false,
+                                label: Text(
+                                  '#${tag['displayName']} · ${tag['postCount']}',
+                                ),
+                                selected: feed._selectedTags.contains(
+                                  tag['normalizedName'],
+                                ),
+                                onSelected: (_) => _change(() {
+                                  if (!feed._selectedTags.remove(
+                                    '${tag['normalizedName']}',
+                                  )) {
+                                    feed._selectedTags.add(
+                                      '${tag['normalizedName']}',
+                                    );
+                                  }
+                                }),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                if (snapshot.data?['nextCursor'] case final String cursor
+                    when cursor.isNotEmpty)
+                  TextButton(
+                    onPressed: () async {
+                      final next = await _fetch(cursor);
+                      if (mounted) {
+                        setState(
+                          () => _data = Future.value({
+                            ...next,
+                            'tags': [...tags, ...jsonList(next['tags'])],
+                          }),
+                        );
+                      }
+                    },
+                    child: Text(
+                      AppScope.of(context).text('common.actions.loadMore'),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+        TextButton(
+          onPressed: () {
+            _change(() {
+              feed._tagFilter = null;
+              feed._selectedTags.clear();
+              feed._tagMode = 'all';
+              feed._postState = 'active';
+            });
+            setState(() => _data = _fetch());
+          },
+          child: Text(AppScope.of(context).text('common.actions.clear')),
+        ),
+      ],
     );
   }
 }

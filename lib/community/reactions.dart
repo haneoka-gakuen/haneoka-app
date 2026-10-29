@@ -40,6 +40,8 @@ class _LikeButtonState extends State<LikeButton> {
 
   Future<void> _toggle() async {
     if (_busy || !await requireSession(context)) return;
+    if (!mounted) return;
+    final owner = HaneokaAccount.instance.user?['id'];
     final record = widget.record;
     final viewer = jsonMap(record['viewer']);
     final liked = viewer['liked'] == true;
@@ -59,6 +61,7 @@ class _LikeButtonState extends State<LikeButton> {
         '/api/v1/community/${widget.kind == 'post' ? 'posts' : 'comments'}/${Uri.encodeComponent('${record['id']}')}/reaction',
         body: {'active': !liked},
       );
+      if (!mounted || HaneokaAccount.instance.user?['id'] != owner) return;
       widget.onChanged(
         apply(
           result['active'] == true,
@@ -66,7 +69,9 @@ class _LikeButtonState extends State<LikeButton> {
         ),
       );
     } catch (_) {
-      widget.onChanged(apply(liked, count));
+      if (mounted && HaneokaAccount.instance.user?['id'] == owner) {
+        widget.onChanged(apply(liked, count));
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

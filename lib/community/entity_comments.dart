@@ -379,12 +379,18 @@ class _EntityCommentsState extends State<EntityComments> {
             onExpand: (id, open) =>
                 setState(() => open ? _expanded.add(id) : _expanded.remove(id)),
             onLoadReplies: _loadReplies,
-            onChanged: (comment) => setState(() {
-              _comments = [
-                for (final c in _comments)
-                  c['id'] == comment['id'] ? comment : c,
-              ];
-            }),
+            onChanged: (comment) {
+              if (comment['_refreshThread'] == true) {
+                _load();
+                return;
+              }
+              setState(() {
+                _comments = [
+                  for (final c in _comments)
+                    c['id'] == comment['id'] ? comment : c,
+                ];
+              });
+            },
             onReply: (comment) => _compose(replyTo: comment),
           ),
           if (_cursor != null)

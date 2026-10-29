@@ -19,7 +19,7 @@ import 'engine/execution.dart';
 import 'engine/num.dart';
 import 'engine/objectives.dart' show CpExchange, RouteKind;
 
-const ptVersion = 'reward-mean-score-v4';
+const ptVersion = 'reward-conservative-bounds-v10';
 
 class PtCycle {
   PtCycle(this.songs, this.consumption);

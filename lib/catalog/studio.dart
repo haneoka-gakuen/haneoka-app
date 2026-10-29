@@ -1,3 +1,5 @@
+import '../core/catalog_source.dart';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -22,6 +24,7 @@ class StudioScreen extends StatefulWidget {
 
 class _StudioScreenState extends State<StudioScreen> {
   Future<Object?>? _data;
+  Object? _dataKey;
   int? _unit;
   int? _rank;
   int? _level;
@@ -29,7 +32,11 @@ class _StudioScreenState extends State<StudioScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _data ??= AppScope.of(context).api.catalog('studio');
+    final key = CatalogSourceScope.keyOf(context);
+    if (_dataKey != key) {
+      _dataKey = key;
+      _data = CatalogSourceScope.apiOf(context).catalog('studio');
+    }
   }
 
   @override
@@ -46,8 +53,11 @@ class _StudioScreenState extends State<StudioScreen> {
           if (snapshot.hasError) {
             return Center(
               child: FilledButton.tonal(
-                onPressed: () =>
-                    setState(() => _data = state.api.catalog('studio')),
+                onPressed: () => setState(
+                  () =>
+                      _data = CatalogSourceScope.apiOf(context)
+                          .catalog('studio'),
+                ),
                 child: Text(t('common.actions.retry', 'Retry')),
               ),
             );
@@ -128,7 +138,7 @@ class _StudioScreenState extends State<StudioScreen> {
                           avatar: entry['icon'] is String
                               ? AppImage(
                                   candidates: [
-                                    state.api
+                                    CatalogSourceScope.apiOf(context)
                                         .asset(entry['icon'] as String)
                                         .toString(),
                                   ],
@@ -287,13 +297,13 @@ class _StudioScreenState extends State<StudioScreen> {
         ],
       ),
     );
-    Widget image(Object? reward, IconData fallback) =>
-        switch ((reward as Map?)?['image']) {
-          final String path => AppImage(
-            candidates: [state.api.asset(path).toString()],
-          ),
-          _ => Icon(fallback, color: scheme.primary),
-        };
+    Widget image(Object? reward, IconData fallback) => switch ((reward
+        as Map?)?['image']) {
+      final String path => AppImage(
+        candidates: [CatalogSourceScope.apiOf(context).asset(path).toString()],
+      ),
+      _ => Icon(fallback, color: scheme.primary),
+    };
     final metrics = [
       metric(
         text('coin', 'Coin'),
@@ -351,7 +361,9 @@ class _StudioScreenState extends State<StudioScreen> {
         child: reward['image'] is String
             ? AppImage(
                 candidates: [
-                  state.api.asset(reward['image'] as String).toString(),
+                  CatalogSourceScope.apiOf(context)
+                      .asset(reward['image'] as String)
+                      .toString(),
                 ],
               )
             : null,
@@ -368,7 +380,7 @@ class _StudioScreenState extends State<StudioScreen> {
       onTap: reward['resourceType'] == 1
           ? () => openLink(
               context,
-              '/${state.server}/${t.locale}/items/${reward['resourceId']}/',
+              '/${CatalogSourceScope.serverOf(context)}/${t.locale}/items/${reward['resourceId']}/',
             )
           : null,
     );

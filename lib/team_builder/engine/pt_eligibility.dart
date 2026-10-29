@@ -11,6 +11,7 @@ import 'box.dart';
 import 'full/gekisou.dart' show missionPattern;
 import 'master.dart';
 import 'num.dart';
+import 'full/core.dart' show satI32;
 import 'objectives.dart';
 import 'power.dart';
 import 'skills.dart';
@@ -31,6 +32,26 @@ bool _wholeDouble(double n, [int min = 0]) =>
     n.isFinite && n == n.roundToDouble() && n >= min && n <= 2147483647;
 
 List<PtIssue> validatePtRequest(EngineMaster master, EngineRequest request) {
+  final rules = request.songRules;
+  if (rules != null) {
+    final missions = intListOf(rules['missions']),
+        type = intOf(rules['musicType']);
+    master = master.withSongs({
+      for (final entry in master.songs.entries)
+        entry.key: Song(
+          entry.value.id,
+          type == 0 ? entry.value.musicType : type,
+          entry.value.bestTags,
+          entry.value.bandIds,
+          entry.value.rankGroup,
+          entry.value.difficulties,
+          [
+            for (final (i, mission) in entry.value.gekisoMissions.indexed)
+              (missions.elementAtOrNull(i) ?? 0) == 0 ? mission : missions[i],
+          ],
+        ),
+    });
+  }
   final issues = <PtIssue>[];
   void add(String code, String target) => issues.add(PtIssue(code, target));
   void checkGekisoEffects(Iterable<SkillEffectRow> effects, String target) {
@@ -361,7 +382,7 @@ List<PtIssue> validatePtRequest(EngineMaster master, EngineRequest request) {
   // Bound inversion and native integer settlement require a non-negative,
   // non-overflowing domain.
   if (event != null && boost != null) {
-    if (event.effects.any((row) => row.perRank.any((v) => v < 0))) {
+    if (event.effects.any((row) => row.perRank.any((v) => !_integer(v)))) {
       add('rules', 'event-bonus');
     }
     double top(Iterable<int> values) => (values.toList()..sort((a, b) => b - a))
@@ -380,7 +401,12 @@ List<PtIssue> validatePtRequest(EngineMaster master, EngineRequest request) {
         ? rewards.fold(0, (m, row) => math.max(m, row.count))
         : (points?.values ?? const <int>[]).fold(0, math.max);
     final rate = items ? boost.rewardRate : boost.eventPointRate;
-    if (bonus > 1000000 || (bonus + 10000) * rate * maxBase > 2147483647) {
+    if (bonus > 1000000 ||
+        (bonus.isFinite &&
+            (BigInt.from(bonus.truncate()) + BigInt.from(10000)) *
+                    BigInt.from(satI32(rate)) *
+                    BigInt.from(maxBase) >
+                BigInt.parse('7fffffffffffffff', radix: 16))) {
       add('rules', 'settlement-range');
     }
     if (cp != null) {

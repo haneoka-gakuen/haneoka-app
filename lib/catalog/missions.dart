@@ -1,3 +1,5 @@
+import '../core/catalog_source.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -158,7 +160,13 @@ class RewardChip extends StatelessWidget {
               SizedBox.square(
                 dimension: 24,
                 child: image is String && image.isNotEmpty
-                    ? AppImage(candidates: [state.api.asset(image).toString()])
+                    ? AppImage(
+                        candidates: [
+                          CatalogSourceScope.apiOf(context)
+                              .asset(image)
+                              .toString(),
+                        ],
+                      )
                     : Icon(
                         Symbols.redeem_rounded,
                         size: 18,
@@ -220,8 +228,8 @@ class _MissionsScreenState extends State<MissionsScreen> {
   Future<List<Map<String, Object?>>> _load(AppState state) =>
       crossServerCollection(
         resource: 'missions',
-        selected: state.server,
-        apis: state.catalogApis,
+        selected: CatalogSourceScope.serverOf(context),
+        apis: CatalogSourceScope.apisOf(context),
         rowsPath: 'entries',
       );
 
@@ -586,7 +594,7 @@ class _GroupScreen extends StatelessWidget {
                                       builder: (_) => MissionDetailScreen(
                                         id: '${mission['id']}',
                                         server:
-                                            '${mission[serverKey] ?? AppScope.of(context).server}',
+                                            '${mission[serverKey] ?? CatalogSourceScope.serverOf(context)}',
                                       ),
                                     ),
                                   ),
@@ -650,7 +658,8 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final state = AppScope.of(context), server = widget.server ?? state.server;
+    final state = AppScope.of(context),
+        server = widget.server ?? CatalogSourceScope.serverOf(context);
     if (_dataKey != (state.publicDataKey, server)) {
       _dataKey = (state.publicDataKey, server);
       _server = server;

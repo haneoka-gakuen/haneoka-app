@@ -11,6 +11,8 @@ import 'community_time.dart';
 import 'markup.dart';
 
 const communityOrigin = 'https://haneoka.org';
+final communityDataRevision = ValueNotifier<int>(0);
+void invalidateCommunityData() => communityDataRevision.value++;
 
 typedef Json = Map<String, Object?>;
 

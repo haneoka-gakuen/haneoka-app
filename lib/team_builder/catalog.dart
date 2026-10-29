@@ -54,6 +54,7 @@ class TeamCatalog extends ChangeNotifier {
   final Doc data;
   final EngineMaster master;
   final resourceSort = <TeamResource, TeamResourceSort>{};
+  final songPickerPreferences = <String, Doc>{};
   Map<String, Doc> _chartMetadata = {};
   bool _disposed = false;
   @override
@@ -245,6 +246,7 @@ class TeamCatalog extends ChangeNotifier {
   ];
 
   String attributeName(int attribute) {
+    if (attribute == 99) return t('tools.teamBuilder.arena.any');
     const keys = ['', 'red', 'blue', 'green', 'yellow', 'purple'];
     final key = attribute > 0 && attribute < keys.length ? keys[attribute] : '';
     return key.isEmpty ? '' : t('catalog.songs.liveTypes.$key', key);
@@ -446,7 +448,11 @@ class TeamCatalog extends ChangeNotifier {
   /// Full display identity never replaces the engine's slim calculation row.
   Doc displaySong(int id) =>
       _displaySongs.putIfAbsent(id, () => {...song(id), ...?_songVisuals[id]});
-  String songTitle(int id) => state.songTitle(song(id)['musicTitle']);
+  String songTitle(int id) {
+    final title = state.songTitle(song(id)['musicTitle']);
+    return title.isEmpty ? '#$id' : title;
+  }
+
   String songJacket(int id) =>
       asset(song(id)['jacketUrl'] ?? song(id)['jacketThumbUrl']);
   List<int> songBands(int id) {
@@ -470,7 +476,8 @@ class TeamCatalog extends ChangeNotifier {
     final row = difficultyRow(songId, difficulty);
     if (row == null) return '';
     final name = difficulty >= 0 && difficulty < difficultyNames.length
-        ? difficultyNames[difficulty].toUpperCase()
+        ? (difficultyNames.elementAtOrNull(difficulty) ?? '$difficulty')
+              .toUpperCase()
         : '$difficulty';
     final level = row['displayLevel'] ?? row['playLevel'] ?? '';
     return '$name ${level is num && level == level.roundToDouble() ? level.toInt() : level}';

@@ -5,12 +5,15 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../account/haneoka_account.dart';
 import '../core/app_state.dart';
 import '../shell/page.dart';
+import '../shell/links.dart';
+import '../ui/detail.dart';
 import '../ui/theme.dart';
 import '../ui/tile.dart';
 import 'community_time.dart';
 import 'community_widgets.dart';
 import 'feed_screen.dart';
 import 'reactions.dart';
+import 'actions.dart';
 
 /// A member's public profile (`renderUserDetail`): who they are, their
 /// numbers, linked game accounts, works and posts.
@@ -27,6 +30,25 @@ class _CommunityUserScreenState extends State<CommunityUserScreen> {
   String? _cursor;
   bool _loadingMore = false;
   Object? _error;
+  Object? _owner = HaneokaAccount.instance.user?['id'];
+  int _generation = 0;
+  bool _invalidated = false;
+  void _invalidate() {
+    if (mounted) setState(() => _invalidated = true);
+  }
+
+  void _accountChanged() {
+    final owner = HaneokaAccount.instance.user?['id'];
+    if (owner == _owner) return;
+    _owner = owner;
+    _generation++;
+    setState(() {
+      _document = null;
+      _posts = [];
+      _cursor = null;
+    });
+    _load();
+  }
 
   String get _path =>
       '/api/v1/community/users/${Uri.encodeComponent(widget.uid)}';
@@ -34,14 +56,25 @@ class _CommunityUserScreenState extends State<CommunityUserScreen> {
   @override
   void initState() {
     super.initState();
+    HaneokaAccount.instance.addListener(_accountChanged);
+    communityDataRevision.addListener(_invalidate);
     HaneokaAccount.instance.load().then((_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _generation++;
+    HaneokaAccount.instance.removeListener(_accountChanged);
+    communityDataRevision.removeListener(_invalidate);
+    super.dispose();
   }
 
   Future<void> _load() async {
     if (!mounted) return;
+    final generation = ++_generation;
     try {
       final data = await communityRequest('GET', _path);
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       _document = data;
       setState(() {
         _posts = [
@@ -50,7 +83,7 @@ class _CommunityUserScreenState extends State<CommunityUserScreen> {
         _cursor = data['postsNextCursor'] as String?;
       });
     } catch (error) {
-      if (mounted) setState(() => _error = error);
+      if (mounted && generation == _generation) setState(() => _error = error);
     }
   }
 
@@ -91,6 +124,7 @@ class _CommunityUserScreenState extends State<CommunityUserScreen> {
   }
 
   Future<void> _follow() async {
+    if (_document == null) return;
     if (!await requireSession(context)) return;
     final viewer = jsonMap(_document?['viewer']);
     final following = viewer['following'] == true;
@@ -122,13 +156,65 @@ class _CommunityUserScreenState extends State<CommunityUserScreen> {
     } catch (_) {}
   }
 
+  Future<void> _relationship(String action) async {
+    if (!await requireSession(context) || !mounted) return;
+    if (action == 'report') {
+      await communityStatement(
+        context,
+        appeal: false,
+        kind: 'user',
+        id: widget.uid,
+      );
+      return;
+    }
+    final viewer = jsonMap(_document?['viewer']),
+        active = viewer[action == 'mute' ? 'muted' : 'blocked'] != true;
+    try {
+      await communityRequest('PUT', '$_path/$action', body: {'active': active});
+      invalidateCommunityData();
+      await _load();
+    } catch (_) {
+      if (mounted) communityMessage(context, 'unavailable');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_invalidated && ModalRoute.of(context)?.isCurrent == true) {
+      _invalidated = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _load();
+      });
+    }
     final document = _document;
     final profile = jsonMap(document?['profile']);
     final name = '${profile['displayName'] ?? ''}';
     return ShellPage(
       title: name,
+      actions: [
+        if (document != null && jsonMap(document['profile'])['owner'] != true)
+          for (final action in ['mute', 'block', 'report'])
+            BarAction(
+              icon: action == 'mute'
+                  ? Symbols.volume_off_rounded
+                  : action == 'block'
+                  ? Symbols.block_rounded
+                  : Symbols.flag_rounded,
+              label: communityLabel(
+                context,
+                action == 'report'
+                    ? 'report'
+                    : (jsonMap(document['viewer'])[action == 'mute'
+                                  ? 'muted'
+                                  : 'blocked'] ==
+                              true
+                          ? 'un$action'
+                          : action),
+                action,
+              ),
+              onPressed: () => _relationship(action),
+            ),
+      ],
       body: document == null
           ? Center(
               child: _error != null
@@ -149,7 +235,7 @@ class _CommunityUserScreenState extends State<CommunityUserScreen> {
                         const SizedBox(height: 20),
                         _Stats(stats: jsonMap(profile['stats'])),
                         const SizedBox(height: 20),
-                        ..._gameAccounts(context, document),
+
                         PostMasonry(
                           items: _posts,
                           width: constraints.maxWidth,
@@ -159,6 +245,34 @@ class _CommunityUserScreenState extends State<CommunityUserScreen> {
                               ..addAll(next),
                           ),
                         ),
+                        if (jsonList(document['works']).isNotEmpty)
+                          DetailSection(
+                            icon: Symbols.library_books_rounded,
+                            title: communityLabel(
+                              context,
+                              'customCharts',
+                              'Works',
+                            ),
+                            count: jsonList(document['works']).length,
+                            child: Column(
+                              children: [
+                                for (final work in jsonList(document['works']))
+                                  ListTile(
+                                    title: Text('${work['title'] ?? ''}'),
+                                    subtitle: Text(
+                                      '${work['summary'] ?? work['kind'] ?? ''}',
+                                    ),
+                                    onTap: work['url'] is String
+                                        ? () => openLink(
+                                            context,
+                                            '${work['url']}',
+                                          )
+                                        : null,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ..._gameAccounts(context, document),
                         if (_loadingMore)
                           const Padding(
                             padding: EdgeInsets.all(24),

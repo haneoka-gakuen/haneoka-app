@@ -495,7 +495,13 @@ class EngineMaster {
   final List<BoostRow> challengeBoosts;
 
   /// The same release with other member Gekisou skills.
-  EngineMaster withGekisoSkills(Map<int, GekisoSkill> skills) => EngineMaster(
+  EngineMaster withGekisoSkills(Map<int, GekisoSkill> skills) =>
+      _with(gekisoSkills: skills);
+  EngineMaster withSongs(Map<int, Song> songs) => _with(songs: songs);
+  EngineMaster _with({
+    Map<int, GekisoSkill>? gekisoSkills,
+    Map<int, Song>? songs,
+  }) => EngineMaster(
     server: server,
     releaseId: releaseId,
     params: params,
@@ -521,11 +527,11 @@ class EngineMaster {
     leaderSkills: leaderSkills,
     liveSkills: liveSkills,
     supportSkills: supportSkills,
-    gekisoSkills: skills,
+    gekisoSkills: gekisoSkills ?? this.gekisoSkills,
     gekisoSupportSkills: gekisoSupportSkills,
     liveSkillCategories: liveSkillCategories,
     gekisoSkillCategories: gekisoSkillCategories,
-    songs: songs,
+    songs: songs ?? this.songs,
     scoreRanks: scoreRanks,
     challengeMusics: challengeMusics,
     events: events,

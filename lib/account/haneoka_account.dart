@@ -442,6 +442,7 @@ class HaneokaAccount extends ChangeNotifier {
     bool authorized = true,
     Map<String, String> headers = const {},
   }) async {
+    final owner = _user?['id'], token = _token;
     final request = http.Request(method, Uri.parse('$_origin$path'))
       ..headers.addAll({
         'Accept': 'application/json',
@@ -455,6 +456,9 @@ class HaneokaAccount extends ChangeNotifier {
     final response = await http.Response.fromStream(
       await netClient.send(request),
     );
+    if (authorized && (owner != _user?['id'] || token != _token)) {
+      throw const AccountError('session_changed');
+    }
     final text = utf8.decode(response.bodyBytes);
     final json = text.isEmpty ? null : jsonDecode(text);
     if (response.statusCode >= 400) {

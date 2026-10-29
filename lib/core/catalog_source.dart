@@ -6,6 +6,7 @@ import 'api.dart';
 import 'app_state.dart';
 import 'account_resource.dart';
 import 'private_content_api.dart';
+import 'provider_api.dart';
 
 class CatalogSourceScope extends StatefulWidget {
   const CatalogSourceScope({super.key, required this.api, required this.child});
@@ -36,7 +37,11 @@ class CatalogSourceScope extends StatefulWidget {
       maybeApi(context)?.server ?? AppScope.of(context).server;
   static Map<String, HaneokaApi> apisOf(BuildContext context) {
     final api = maybeApi(context);
-    return api == null ? AppScope.of(context).catalogApis : {api.server: api};
+    return api == null
+        ? AppScope.of(context).catalogApis
+        : api is! ProviderApi && const {'jp', 'intl'}.contains(api.server)
+        ? {...AppScope.of(context).catalogApis, api.server: api}
+        : {api.server: api};
   }
 
   static Object keyOf(BuildContext context) {

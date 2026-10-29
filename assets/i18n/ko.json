@@ -4531,7 +4531,15 @@
       },
       "gameAccountPlayerId": "플레이어 ID {id}",
       "gameAccountRank": "플레이어 랭크 {value}",
-      "gameAccountRating": "하이스코어 레이팅 {value}"
+      "gameAccountRating": "하이스코어 레이팅 {value}",
+      "appealsTitle": "내 이의 신청",
+      "appealStatus": {
+        "pending": "검토 중",
+        "rejected": "거절됨",
+        "accepted": "승인됨"
+      },
+      "unmute": "뮤트 해제",
+      "unblock": "차단 해제"
     },
     "charts": {
       "title": "커뮤니티 채보",

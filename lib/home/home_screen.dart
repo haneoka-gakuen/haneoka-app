@@ -1,3 +1,5 @@
+import '../core/catalog_source.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -10,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../catalog/catalog_screen.dart';
+import '../catalog/hub_screen.dart';
 import '../catalog/cross_server.dart';
 import '../catalog/detail_screen.dart';
 import '../catalog/profiles.dart';
@@ -19,7 +22,6 @@ import '../community/community_time.dart';
 import '../core/api.dart';
 import '../core/net.dart';
 import '../core/page_data.dart';
-import '../shell/navigation.dart';
 import '../shell/links.dart';
 import 'announcements.dart';
 import '../core/app_state.dart';
@@ -225,7 +227,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'limit': '5',
       'scope': 'recommended',
       'kind': 'post',
-      'server': state.server,
+      'server': CatalogSourceScope.serverOf(context),
       'locale': state.text.locale,
     });
     final response = await netClient
@@ -252,7 +254,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<List<Announcement>> _loadNews() async {
     final state = AppScope.of(context);
     try {
-      return (await fetchAnnouncements(state)).take(5).toList();
+      return (await fetchAnnouncements(
+        state,
+        api: CatalogSourceScope.apiOf(context),
+      )).take(5).toList();
     } on Exception {
       final seed = (await _data!).seed;
       if (seed['announcements'] case final List rows) {
@@ -284,7 +289,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final key = AppScope.of(context).publicDataKey;
+    final key = CatalogSourceScope.keyOf(context);
     if (_dataKey != key) {
       _dataKey = key;
       _data = _load();
@@ -292,7 +297,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _fanInfo = _loadFanInfo();
     }
     final communityKey = (
-      AppScope.of(context).server,
+      CatalogSourceScope.serverOf(context),
       AppScope.of(context).text.locale,
     );
     if (_communityKey != communityKey) {
@@ -303,9 +308,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<_HomeData> _load() async {
     final state = AppScope.of(context);
-    final api = state.api;
+    final api = CatalogSourceScope.apiOf(context);
     final seed = await pageData(
-      '/${state.server}/${state.text.locale}/',
+      '/${CatalogSourceScope.serverOf(context)}/${state.text.locale}/',
       'data-home-seed',
       attribute: true,
     ).catchError((_) => <String, Object?>{});
@@ -325,6 +330,22 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _browse(String route) {
+    final api = CatalogSourceScope.maybeApi(context);
+    widget.onBrowse?.call(
+      api == null
+          ? route
+          : Uri.parse(route)
+                .replace(
+                  queryParameters: {
+                    ...Uri.parse(route).queryParameters,
+                    'server': api.server,
+                  },
+                )
+                .toString(),
+    );
+  }
+
   void _open(BuildContext context, String resource, Entry item) {
     final profile = _profile(resource);
     Navigator.of(context).push(
@@ -335,7 +356,7 @@ class _HomeScreenState extends State<HomeScreen> {
           summary: item,
           api: item[serverKey] is String
               ? AppScope.of(context).apiFor(item[serverKey] as String)
-              : null,
+              : CatalogSourceScope.apiOf(context),
         ),
       ),
     );
@@ -459,7 +480,7 @@ class _HomeScreenState extends State<HomeScreen> {
       icon: Symbols.forum_rounded,
       title: t('home.dashboard.communityTitle', 'Trending community'),
       viewAll: t('home.dashboard.openCommunity', 'Open community'),
-      onViewAll: () => widget.onBrowse?.call('/community/feeds'),
+      onViewAll: () => _browse('/community/feeds'),
       child: FutureBuilder(
         future: _community,
         builder: (context, snapshot) {
@@ -745,11 +766,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
           final event =
               ongoing.firstOrNull ?? upcoming.firstOrNull ?? ended.firstOrNull;
-          final songPresentation = SongPresentation(t, state.api, data.visuals);
+          final songPresentation = SongPresentation(
+            t,
+            CatalogSourceScope.apiOf(context),
+            data.visuals,
+          );
           final songKit = CatalogKit(
             _profile('songs'),
             t,
-            state.api,
+            CatalogSourceScope.apiOf(context),
             data.visuals,
             songTitles: state.songTitle,
           );
@@ -763,13 +788,13 @@ class _HomeScreenState extends State<HomeScreen> {
           final cardKit = CatalogKit(
             _profile('cards'),
             t,
-            state.api,
+            CatalogSourceScope.apiOf(context),
             data.visuals,
           );
           final snapKit = CatalogKit(
             _profile('support-cards'),
             t,
-            state.api,
+            CatalogSourceScope.apiOf(context),
             data.visuals,
           );
           final cards =
@@ -798,213 +823,275 @@ class _HomeScreenState extends State<HomeScreen> {
                   });
                   await _data;
                 },
-                child: ListView(
-                  padding: EdgeInsets.fromLTRB(
-                    inset +
-                        ((pane.maxWidth - 1440) / 2).clamp(0, double.infinity),
-                    pane.maxWidth < 600 ? 4 : 8,
-                    inset +
-                        ((pane.maxWidth - 1440) / 2).clamp(0, double.infinity),
-                    24,
-                  ),
-                  children: [
-                    _Spotlight(
-                      children: [
-                        if (banners.isNotEmpty)
-                          _Carousel(banners: banners, t: t, api: state.api),
-                        if (event != null)
-                          _EventCard(
-                            event: event,
-                            t: t,
-                            api: state.apiFor(
-                              '${event[serverKey] ?? state.server}',
+                child: CustomScrollView(
+                  slivers: [
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(
+                        inset +
+                            ((pane.maxWidth - 1440) / 2).clamp(
+                              0,
+                              double.infinity,
                             ),
-                            visuals: data.visuals,
-                            onOpen: () => _open(context, 'events', event),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _HomeBoard(
-                      modules: [
-                        for (final id in _order)
-                          if (!_hidden.contains(id))
-                            (
-                              id,
-                              switch (id) {
-                                'birthdays' => _Birthdays(
-                                  data: data,
-                                  t: t,
-                                  api: state.api,
-                                ),
-                                'news' => _Module(
-                                  framed: true,
-                                  icon: Symbols.newspaper_rounded,
-                                  title: t(
-                                    'home.announcements.title',
-                                    'Announcements',
-                                  ),
-                                  viewAll: t(
-                                    'home.announcements.viewAll',
-                                    'View all',
-                                  ),
-                                  onViewAll: () =>
-                                      widget.onBrowse?.call('/announcements'),
-                                  child: FutureBuilder(
-                                    future: _announcements,
-                                    builder: (context, snapshot) {
-                                      final entries = snapshot.data;
-                                      if (entries == null) {
-                                        return snapshot.hasError
-                                            ? Padding(
-                                                padding: const EdgeInsets.all(
-                                                  24,
-                                                ),
-                                                child: Text(
-                                                  t(
-                                                    'home.dashboard.sourceUnavailable',
-                                                    '',
+                        pane.maxWidth < 600 ? 4 : 8,
+                        inset +
+                            ((pane.maxWidth - 1440) / 2).clamp(
+                              0,
+                              double.infinity,
+                            ),
+                        24,
+                      ),
+                      sliver: SliverMainAxisGroup(
+                        slivers: [
+                          SliverList.list(
+                            children: [
+                              _Spotlight(
+                                children: [
+                                  if (banners.isNotEmpty)
+                                    _Carousel(
+                                      banners: banners,
+                                      t: t,
+                                      api: CatalogSourceScope.apiOf(context),
+                                    ),
+                                  if (event != null)
+                                    _EventCard(
+                                      event: event,
+                                      t: t,
+                                      api: state.apiFor(
+                                        '${event[serverKey] ?? CatalogSourceScope.serverOf(context)}',
+                                      ),
+                                      visuals: data.visuals,
+                                      onOpen: () =>
+                                          _open(context, 'events', event),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              _HomeBoard(
+                                modules: [
+                                  for (final id in _order)
+                                    if (!_hidden.contains(id))
+                                      (
+                                        id,
+                                        switch (id) {
+                                          'birthdays' => _Birthdays(
+                                            data: data,
+                                            t: t,
+                                            api: CatalogSourceScope.apiOf(
+                                              context,
+                                            ),
+                                          ),
+                                          'news' => _Module(
+                                            framed: true,
+                                            icon: Symbols.newspaper_rounded,
+                                            title: t(
+                                              'home.announcements.title',
+                                              'Announcements',
+                                            ),
+                                            viewAll: t(
+                                              'home.announcements.viewAll',
+                                              'View all',
+                                            ),
+                                            onViewAll: () => widget.onBrowse
+                                                ?.call('/announcements'),
+                                            child: FutureBuilder(
+                                              future: _announcements,
+                                              builder: (context, snapshot) {
+                                                final entries = snapshot.data;
+                                                if (entries == null) {
+                                                  return snapshot.hasError
+                                                      ? Padding(
+                                                          padding:
+                                                              const EdgeInsets.all(
+                                                                24,
+                                                              ),
+                                                          child: Text(
+                                                            t(
+                                                              'home.dashboard.sourceUnavailable',
+                                                              '',
+                                                            ),
+                                                            textAlign: TextAlign
+                                                                .center,
+                                                          ),
+                                                        )
+                                                      : const SizedBox(
+                                                          height: 96,
+                                                        );
+                                                }
+                                                return _FitRows(
+                                                  extent: 80,
+                                                  children: [
+                                                    for (final entry
+                                                        in entries.take(5))
+                                                      AnnouncementRow(
+                                                        entry: entry,
+                                                        compact: true,
+                                                      ),
+                                                  ],
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                          'songs' => _Module(
+                                            aside: _railButtons(_songsScroll),
+                                            icon: Symbols.library_music_rounded,
+                                            title: t(
+                                              'home.dashboard.latestSongs',
+                                              'Latest songs',
+                                            ),
+                                            viewAll: t(
+                                              'home.dashboard.viewAll',
+                                              'View all',
+                                            ),
+                                            onViewAll: () => widget.onBrowse
+                                                ?.call('/catalog/songs'),
+                                            child: _Rail(
+                                              width: 148,
+                                              controller: _songsScroll,
+                                              aspectRatio: 1,
+                                              children: [
+                                                for (final song in songs.take(
+                                                  12,
+                                                ))
+                                                  Tile(
+                                                    rail: true,
+                                                    title: songKit.title(song),
+                                                    subtitle: songPresentation
+                                                        .artist(song),
+                                                    adornments: songPresentation
+                                                        .avatars(song),
+                                                    images: songKit.images(
+                                                      song,
+                                                    ),
+                                                    placeholder:
+                                                        Symbols.album_rounded,
+                                                    marks: [
+                                                      ...songPresentation.marks(
+                                                        song,
+                                                        categoryAt: MarkAt.end,
+                                                      ),
+                                                      if (t.release(
+                                                            song['publishedAt'],
+                                                          )
+                                                          case final r
+                                                          when r.isNotEmpty)
+                                                        TileMark.text(
+                                                          MarkAt.bottomStart,
+                                                          r,
+                                                        ),
+                                                    ],
+                                                    onTap: () => _open(
+                                                      context,
+                                                      'songs',
+                                                      song,
+                                                    ),
                                                   ),
-                                                  textAlign: TextAlign.center,
+                                              ],
+                                            ),
+                                          ),
+                                          'cards' => _Module(
+                                            aside: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                TextButton(
+                                                  onPressed: () => _browse(
+                                                    '/catalog/member-cards',
+                                                  ),
+                                                  child: Text(
+                                                    t(
+                                                      'navigation.memberCards',
+                                                      'Members',
+                                                    ),
+                                                  ),
                                                 ),
-                                              )
-                                            : const SizedBox(height: 96);
-                                      }
-                                      return _FitRows(
-                                        extent: 80,
-                                        children: [
-                                          for (final entry in entries.take(5))
-                                            AnnouncementRow(
-                                              entry: entry,
-                                              compact: true,
+                                                TextButton(
+                                                  onPressed: () => _browse(
+                                                    '/catalog/support-cards',
+                                                  ),
+                                                  child: Text(
+                                                    t(
+                                                      'navigation.supportCards',
+                                                      'Snapshot',
+                                                    ),
+                                                  ),
+                                                ),
+                                                _railButtons(_cardsScroll),
+                                              ],
                                             ),
-                                        ],
-                                      );
-                                    },
-                                  ),
-                                ),
-                                'songs' => _Module(
-                                  aside: _railButtons(_songsScroll),
-                                  icon: Symbols.library_music_rounded,
-                                  title: t(
-                                    'home.dashboard.latestSongs',
-                                    'Latest songs',
-                                  ),
-                                  viewAll: t(
-                                    'home.dashboard.viewAll',
-                                    'View all',
-                                  ),
-                                  onViewAll: () =>
-                                      widget.onBrowse?.call('/catalog/songs'),
-                                  child: _Rail(
-                                    width: 148,
-                                    controller: _songsScroll,
-                                    aspectRatio: 1,
-                                    children: [
-                                      for (final song in songs.take(12))
-                                        Tile(
-                                          rail: true,
-                                          title: songKit.title(song),
-                                          subtitle: songPresentation.artist(
-                                            song,
-                                          ),
-                                          adornments: songPresentation.avatars(
-                                            song,
-                                          ),
-                                          images: songKit.images(song),
-                                          placeholder: Symbols.album_rounded,
-                                          marks: [
-                                            ...songPresentation.marks(
-                                              song,
-                                              categoryAt: MarkAt.end,
+                                            icon: Symbols.style_rounded,
+                                            title: t(
+                                              'home.dashboard.latestCards',
+                                              'Latest cards',
                                             ),
-                                            if (t.release(song['publishedAt'])
-                                                case final r when r.isNotEmpty)
-                                              TileMark.text(
-                                                MarkAt.bottomStart,
-                                                r,
-                                              ),
-                                          ],
-                                          onTap: () =>
-                                              _open(context, 'songs', song),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                'cards' => _Module(
-                                  aside: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      TextButton(
-                                        onPressed: () => widget.onBrowse?.call(
-                                          '/catalog/member-cards',
-                                        ),
-                                        child: Text(
-                                          t(
-                                            'navigation.memberCards',
-                                            'Members',
+                                            child: _Rail(
+                                              width: 148,
+                                              controller: _cardsScroll,
+                                              aspectRatio: 1,
+                                              children: [
+                                                for (final (card, kit, resource)
+                                                    in cards.take(12))
+                                                  Tile(
+                                                    rail: true,
+                                                    title: kit.title(card),
+                                                    subtitle: kit.subtitle(
+                                                      card,
+                                                    ),
+                                                    adornments: kit.adornments(
+                                                      card,
+                                                    ),
+                                                    images: kit.images(card),
+                                                    aspectRatio: 1,
+                                                    fit: BoxFit.contain,
+                                                    marks: [
+                                                      ...kit.marks(card),
+                                                      if (t.release(
+                                                            kit.releasedAt(
+                                                              card,
+                                                            ),
+                                                          )
+                                                          case final date
+                                                          when date.isNotEmpty)
+                                                        TileMark.text(
+                                                          MarkAt.bottomStart,
+                                                          date,
+                                                        ),
+                                                    ],
+                                                    onTap: () => _open(
+                                                      context,
+                                                      resource,
+                                                      card,
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                      ),
-                                      TextButton(
-                                        onPressed: () => widget.onBrowse?.call(
-                                          '/catalog/support-cards',
-                                        ),
-                                        child: Text(
-                                          t(
-                                            'navigation.supportCards',
-                                            'Snapshot',
+                                          'community' => _communityModule(
+                                            context,
+                                            t,
                                           ),
-                                        ),
+                                          'fanInfo' => _fanInfoModule(
+                                            context,
+                                            t,
+                                          ),
+                                          _ => const SizedBox.shrink(),
+                                        },
                                       ),
-                                      _railButtons(_cardsScroll),
-                                    ],
-                                  ),
-                                  icon: Symbols.style_rounded,
-                                  title: t(
-                                    'home.dashboard.latestCards',
-                                    'Latest cards',
-                                  ),
-                                  child: _Rail(
-                                    width: 148,
-                                    controller: _cardsScroll,
-                                    aspectRatio: 1,
-                                    children: [
-                                      for (final (card, kit, resource)
-                                          in cards.take(12))
-                                        Tile(
-                                          rail: true,
-                                          title: kit.title(card),
-                                          subtitle: kit.subtitle(card),
-                                          adornments: kit.adornments(card),
-                                          images: kit.images(card),
-                                          aspectRatio: 1,
-                                          fit: BoxFit.contain,
-                                          marks: [
-                                            ...kit.marks(card),
-                                            if (t.release(kit.releasedAt(card))
-                                                case final date
-                                                when date.isNotEmpty)
-                                              TileMark.text(
-                                                MarkAt.bottomStart,
-                                                date,
-                                              ),
-                                          ],
-                                          onTap: () =>
-                                              _open(context, resource, card),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                'community' => _communityModule(context, t),
-                                'fanInfo' => _fanInfoModule(context, t),
-                                _ => const SizedBox.shrink(),
-                              },
-                            ),
-                      ],
+                                ],
+                              ),
+                              const SizedBox(height: 24),
+                            ],
+                          ),
+                          DestinationMosaic(
+                            section: 'home',
+                            navigate: (route) => _browse(route),
+                            sliver: true,
+                            padding: EdgeInsets.zero,
+                          ),
+                          SliverToBoxAdapter(
+                            child: _HomeIndex(onBrowse: _browse, t: t),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 24),
-                    _HomeIndex(onBrowse: widget.onBrowse, t: t),
                   ],
                 ),
               );
@@ -2441,40 +2528,6 @@ class _HomeIndex extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      for (final section in navSections.where(
-        (s) => !const {'community', 'mirrors', 'sekai'}.contains(s.id),
-      )) ...[
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Text(
-            t(section.label),
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-        ),
-        LayoutBuilder(
-          builder: (context, box) {
-            final columns = ((box.maxWidth + 8) / 228).floor().clamp(2, 8);
-            return GridView.count(
-              primary: false,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: columns,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              childAspectRatio:
-                  ((box.maxWidth - (columns - 1) * 8) / columns) / 64,
-              children: [
-                for (final item in section.items)
-                  HubLink(
-                    icon: item.icon,
-                    label: t(item.label),
-                    onTap: () => onBrowse?.call(item.route),
-                  ),
-              ],
-            );
-          },
-        ),
-      ],
       const SizedBox(height: 24),
       Wrap(
         spacing: 12,

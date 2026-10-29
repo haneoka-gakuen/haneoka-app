@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
+import 'package:unorm_dart/unorm_dart.dart' as unorm;
 
 import 'visuals.dart';
 
@@ -30,6 +31,7 @@ class CatalogQueryEngine {
     required this.kind,
     this.characters,
     this.bands,
+    this.aliases = const [],
   });
   final CatalogVisuals? visuals;
   final Map<int, Entry>? characters;
@@ -37,6 +39,7 @@ class CatalogQueryEngine {
   Map<int, Entry> get _characters =>
       characters ?? visuals?.characters ?? const {};
   Map<int, Entry> get _bands => bands ?? visuals?.bands ?? const {};
+  final List<(String, String, String)> aliases;
   final String game;
   final String kind;
   static Map<String, dynamic>? _aliases;
@@ -49,16 +52,9 @@ class CatalogQueryEngine {
   String? _lastQuery;
   CatalogQuery? _lastPlan;
   Map<String, List<(String, String)>>? _dictionary;
-  static String _normalize(String text) => text
-      .replaceAllMapped(
-        RegExp('[！-～]'),
-        (m) => String.fromCharCode(m[0]!.codeUnitAt(0) - 0xfee0),
-      )
-      .replaceAll('　', ' ')
-      .toLowerCase();
+  static String normalize(String text) => unorm.nfkc(text).toLowerCase();
   static String _identity(String text) =>
-      _normalize(text)
-          .replaceAll(RegExp(r'''[\s!！?.，、。・*"'’/／×:：()（）\[\]{}_+\-]'''), '');
+      normalize(text).replaceAll(RegExp(r'[^\p{L}\p{N}]', unicode: true), '');
   Iterable<String> _names(Entry row, String kind) {
     final names = <String>[
       for (final value
@@ -102,6 +98,9 @@ class CatalogQueryEngine {
       if (identity.isNotEmpty) (result[identity] ??= []).add((key, value));
     }
 
+    for (final (name, key, value) in aliases) {
+      add(name, key, value);
+    }
     for (final entry in _characters.entries) {
       for (final name in _names(entry.value, 'character')) {
         add(name, 'character', '${entry.key}');
@@ -122,6 +121,32 @@ class CatalogQueryEngine {
       }
     }
     return result;
+  }
+
+  String removeFacets(String source, Set<String> keys) {
+    final tokens = RegExp(r'''"[^"]*"|'[^']*'|\S+''')
+        .allMatches(source)
+        .map((m) => m[0]!)
+        .toList();
+    final retained = <String>[];
+    for (var index = 0; index < tokens.length;) {
+      var removed = 0;
+      for (var count = math.min(5, tokens.length - index); count > 0; count--) {
+        final value = parse(tokens.sublist(index, index + count).join(' '));
+        if (value.text.isEmpty &&
+            value.facets.isNotEmpty &&
+            value.facets.keys.every(keys.contains)) {
+          removed = count;
+          break;
+        }
+      }
+      if (removed > 0) {
+        index += removed;
+      } else {
+        retained.add(tokens[index++]);
+      }
+    }
+    return retained.join(' ');
   }
 
   CatalogQuery parse(String query) {
@@ -159,7 +184,7 @@ class CatalogQueryEngine {
       ) {
         final parts = tokens.sublist(index, index + length);
         if (parts.any((part) => part.$2)) continue;
-        final expression = _normalize(parts.map((part) => part.$1).join(' '));
+        final expression = normalize(parts.map((part) => part.$1).join(' '));
         final numeric = RegExp(
           r'^(?:(lv|level|rarity|stars?|星[级級]?|稀有度|等[级級]|[级級]|レベル|[★☆*])\s*:?\s*)?(>=|<=|>|<|=|≥|≤)?\s*(\d+(?:\.\d+)?)\s*(星[级級]?|等[级級]|[级級]|レベル|[★☆*])?\s*(?:(\+)|-\s*(\d+(?:\.\d+)?)|(以上|以下))?$',
         ).firstMatch(expression);
@@ -213,7 +238,7 @@ class CatalogQueryEngine {
       }
       if (numericMatched) continue;
       final mission = RegExp(r'^(?:(only|contains):)?(combo|just|luck|mix)$')
-          .firstMatch(_normalize(token.$1));
+          .firstMatch(normalize(token.$1));
       if (kind == 'song' && game == 'our-notes' && mission != null) {
         add(
           'gekisouType',
@@ -237,7 +262,7 @@ class CatalogQueryEngine {
         if (parts.any(
           (part) =>
               part.$2 ||
-              RegExp(r'^[-+★☆*<>=≥≤]+$').hasMatch(_normalize(part.$1)),
+              RegExp(r'^[-+★☆*<>=≥≤]+$').hasMatch(normalize(part.$1)),
         )) {
           continue;
         }
@@ -277,6 +302,7 @@ class CatalogQueryEngine {
     final bands = {
       ...ids(item['bandIds']),
       ...ids(item['bandId']),
+      ...ids(item['collectionBand']),
       for (final id in characters)
         if (_characters[int.tryParse(id)]?['bandId'] case final Object band)
           '$band',
@@ -286,6 +312,7 @@ class CatalogQueryEngine {
         values.any(facets[key]!.contains);
     if (!selected('character', characters) ||
         !selected('collectionBand', bands) ||
+        !selected('category', ids(item['musicCategories'])) ||
         !selected(
           'type',
           ids(item['cardType'] ?? item['musicType'] ?? item['attribute']),

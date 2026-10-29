@@ -16,6 +16,7 @@ class AccountAvatar extends StatefulWidget {
 }
 
 class _AccountAvatarState extends State<AccountAvatar> {
+  Object? _owner = HaneokaAccount.instance.user?['id'];
   Uint8List? _bytes;
   String? _name;
   String? _type;
@@ -111,6 +112,12 @@ class _AccountAvatarState extends State<AccountAvatar> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: HaneokaAccount.instance,
     builder: (context, _) {
+      final owner = HaneokaAccount.instance.user?['id'];
+      if (owner != _owner) {
+        _owner = owner;
+        _bytes = null;
+        _name = _type = null;
+      }
       final profile = HaneokaAccount.instance.profile ?? const {};
       final url = profile['avatarUrl'];
       final review = profile['avatarReview'] as Map?;

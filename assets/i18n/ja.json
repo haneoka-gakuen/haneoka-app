@@ -4531,7 +4531,15 @@
       },
       "gameAccountPlayerId": "プレイヤー ID {id}",
       "gameAccountRank": "プレイヤーランク {value}",
-      "gameAccountRating": "ハイスコアレーティング {value}"
+      "gameAccountRating": "ハイスコアレーティング {value}",
+      "appealsTitle": "申し立て",
+      "appealStatus": {
+        "pending": "審査中",
+        "rejected": "却下",
+        "accepted": "受理済み"
+      },
+      "unmute": "ミュートを解除",
+      "unblock": "ブロックを解除"
     },
     "charts": {
       "title": "コミュニティ譜面",

@@ -1,3 +1,5 @@
+import '../core/catalog_source.dart';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -194,7 +196,8 @@ List<_Segment> _segments(List<Occurrence> items, List<DateTime> week) {
 /// bars and the selected day's agenda, or the agenda alone; birthdays and
 /// activities filtered by facet.
 class CalendarScreen extends StatefulWidget {
-  const CalendarScreen({super.key});
+  const CalendarScreen({super.key, this.initialQuery = const {}});
+  final Map<String, String> initialQuery;
   @override
   State<CalendarScreen> createState() => _CalendarScreenState();
 }
@@ -206,12 +209,31 @@ class _CalendarScreenState extends State<CalendarScreen> {
   bool _agenda = false;
   Set<String> _categories = {...calendarFacets};
 
+  @override
+  void initState() {
+    super.initState();
+    final query = widget.initialQuery;
+    _selected = _parse(query['date']) ?? _selected;
+    _agenda = query['view'] == 'agenda';
+    if (query.containsKey('kinds')) {
+      _categories = {
+        for (final kind in query['kinds']!.split(','))
+          ...switch (kind) {
+            'character' => ['our-notes:character', 'garupa:character'],
+            'cast' => ['our-notes:cast', 'garupa:cast'],
+            'live' => ['external-live'],
+            _ => [kind],
+          },
+      }.where(calendarFacets.contains).toSet();
+    }
+  }
+
   Object? _dataKey;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final key = AppScope.of(context).publicDataKey;
+    final key = CatalogSourceScope.keyOf(context);
     if (_dataKey != key) {
       _dataKey = key;
       _data = _load();
@@ -222,8 +244,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Future<(Json, Map<String, String>)> _load() async {
     final state = AppScope.of(context);
     final page = await pageData(
-      '/${state.server}/${state.text.locale}/calendar/',
-      'calendar-data-${state.server}',
+      '/${CatalogSourceScope.serverOf(context)}/${state.text.locale}/calendar/',
+      'calendar-data-${CatalogSourceScope.serverOf(context)}',
     );
     return (
       page['calendar'] as Json,
@@ -834,7 +856,11 @@ class _Entry extends StatelessWidget {
                 color: scheme.surfaceContainerHighest,
                 child: image is String
                     ? AppImage(
-                        candidates: [state.api.asset(image).toString()],
+                        candidates: [
+                          CatalogSourceScope.apiOf(context)
+                              .asset(image)
+                              .toString(),
+                        ],
                         fit: BoxFit.cover,
                       )
                     : Icon(

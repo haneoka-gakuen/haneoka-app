@@ -1184,6 +1184,7 @@ class TeamBuilderController extends ChangeNotifier {
       ..remove('contextKey')
       ..remove('requestId');
     return _contextValue = jsonEncode([
+      'native-conservative-bounds-v3',
       store?.owner,
       server,
       catalog?.data['identity'],
@@ -1195,6 +1196,15 @@ class TeamBuilderController extends ChangeNotifier {
   bool get stale => results != null && resultsFor != _fingerprint();
 
   Future<void> run({bool resume = false}) async {
+    if (activity && this.settings.rewardMode == 'event') {
+      pt.sync();
+      if (pt.issues.isNotEmpty) {
+        pt.showIssues = true;
+        changed();
+        return;
+      }
+    }
+
     var request = this.request();
     final engine = this.engine;
     if (request == null || engine == null || running) return;
