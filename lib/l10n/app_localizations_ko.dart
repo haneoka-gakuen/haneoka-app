@@ -13,7 +13,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get appTitle => 'Haneoka';
 
   @override
-  String get importTitle => '세이브 가져오기';
+  String get importTitle => '게임 계정 추가';
 
   @override
   String get sourceShizuku => '이 휴대폰 · Shizuku';
@@ -297,7 +297,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get sec_shop => '상점';
 
   @override
-  String get importHeadline => 'Our Notes 세이브 가져오기';
+  String get importHeadline => 'Our Notes 게임 계정 읽기';
 
   @override
   String get importIntro =>
@@ -395,7 +395,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get readAgain => '다시 읽기';
 
   @override
-  String get importedAccounts => '가져온 계정';
+  String get importedAccounts => '게임 계정';
 
   @override
   String savedOn(String time) {
@@ -417,11 +417,11 @@ class AppLocalizationsKo extends AppLocalizations {
   String get remove => '삭제';
 
   @override
-  String get importMore => '세이브 가져오기';
+  String get importMore => '게임 계정 추가';
 
   @override
   String foundAccounts(int count) {
-    return '계정 $count개를 찾았습니다';
+    return '게임 계정 $count개를 찾았습니다';
   }
 
   @override
@@ -483,13 +483,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get tutorialDone => '시작';
 
   @override
-  String get noAccountsYet => '아직 계정이 없습니다';
+  String get noAccountsYet => '아직 게임 계정이 없습니다';
 
   @override
   String get haneokaAccount => 'Haneoka 계정';
 
   @override
-  String get haneokaAccountSummary => '로그인하면 가져온 플레이어를 공개 프로필에 표시할 수 있습니다.';
+  String get haneokaAccountSummary => '로그인하면 게임 계정을 공개 프로필에 표시할 수 있습니다.';
 
   @override
   String get signIn => '로그인';
@@ -546,14 +546,14 @@ class AppLocalizationsKo extends AppLocalizations {
   String get openProfile => '프로필 열기';
 
   @override
-  String get teamBuilderNoSave => '먼저 계정에서 이 서버의 게임 데이터를 읽어 주세요.';
+  String get teamBuilderNoSave => '이 서버의 게임 계정이 아직 없습니다.';
 
   @override
-  String get updateSave => '세이브 업데이트';
+  String get updateSave => '다시 읽기';
 
   @override
   String get updateSaveHint =>
-      '이 플레이어의 새 세이브로 저장된 데이터를 교체합니다. 다른 플레이어는 변경되지 않습니다.';
+      '이 게임 계정의 최신 세이브로 저장된 데이터를 교체합니다. 다른 게임 계정은 변경되지 않습니다.';
 
   @override
   String get importToTeamBuilder => '팀 빌더로 가져오기';
@@ -563,10 +563,10 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get saveAccountMismatch =>
-      '다른 플레이어나 서버의 세이브입니다. 업데이트할 플레이어의 세이브를 선택하세요.';
+      '다른 게임 계정이나 서버의 세이브입니다. 이 게임 계정의 세이브를 선택하세요.';
 
   @override
-  String get saveUpdated => '세이브가 업데이트되었습니다';
+  String get saveUpdated => '게임 계정이 업데이트되었습니다';
 
   @override
   String get cardSort => '카드 정렬';

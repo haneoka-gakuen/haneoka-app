@@ -13,7 +13,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get appTitle => 'Haneoka';
 
   @override
-  String get importTitle => 'セーブを読み込む';
+  String get importTitle => 'ゲームアカウントを追加';
 
   @override
   String get sourceShizuku => 'この端末 · Shizuku';
@@ -297,7 +297,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get sec_shop => 'ショップ';
 
   @override
-  String get importHeadline => 'Our Notes のセーブを読み込む';
+  String get importHeadline => 'Our Notes のゲームアカウントを読み込む';
 
   @override
   String get importIntro =>
@@ -393,7 +393,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get readAgain => 'もう一度読み込む';
 
   @override
-  String get importedAccounts => '読み込んだアカウント';
+  String get importedAccounts => 'ゲームアカウント';
 
   @override
   String savedOn(String time) {
@@ -415,11 +415,11 @@ class AppLocalizationsJa extends AppLocalizations {
   String get remove => '削除';
 
   @override
-  String get importMore => 'セーブを読み込む';
+  String get importMore => 'ゲームアカウントを追加';
 
   @override
   String foundAccounts(int count) {
-    return '$count 件のアカウントが見つかりました';
+    return '$count 件のゲームアカウントが見つかりました';
   }
 
   @override
@@ -481,13 +481,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get tutorialDone => 'プレイ開始';
 
   @override
-  String get noAccountsYet => 'まだアカウントがありません';
+  String get noAccountsYet => 'まだゲームアカウントがありません';
 
   @override
   String get haneokaAccount => 'Haneoka アカウント';
 
   @override
-  String get haneokaAccountSummary => 'サインインすると、取り込んだプレイヤーを公開プロフィールに表示できます。';
+  String get haneokaAccountSummary => 'サインインすると、ゲームアカウントを公開プロフィールに表示できます。';
 
   @override
   String get signIn => 'サインイン';
@@ -544,13 +544,14 @@ class AppLocalizationsJa extends AppLocalizations {
   String get openProfile => 'プロフィールを開く';
 
   @override
-  String get teamBuilderNoSave => '先にアカウントでこのサーバーのゲームデータを読み込んでください。';
+  String get teamBuilderNoSave => 'このサーバーのゲームアカウントがまだありません。';
 
   @override
-  String get updateSave => 'セーブを更新';
+  String get updateSave => '再読み込み';
 
   @override
-  String get updateSaveHint => 'このプレイヤーの新しいセーブで保存済みデータを置き換えます。他のプレイヤーは変更されません。';
+  String get updateSaveHint =>
+      'このゲームアカウントの最新セーブで保存済みデータを置き換えます。他のゲームアカウントは変更されません。';
 
   @override
   String get importToTeamBuilder => '編成に取り込む';
@@ -560,10 +561,10 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get saveAccountMismatch =>
-      '別のプレイヤーまたはサーバーのセーブです。更新するプレイヤーのセーブを選んでください。';
+      '別のゲームアカウントまたはサーバーのセーブです。このゲームアカウントのセーブを選んでください。';
 
   @override
-  String get saveUpdated => 'セーブを更新しました';
+  String get saveUpdated => 'ゲームアカウントを更新しました';
 
   @override
   String get cardSort => 'カードの並び順';

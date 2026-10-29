@@ -265,7 +265,12 @@ Widget? screenFor(String route, {required ValueChanged<String> navigate}) {
     return SpineModelScreen(model: {'id': Uri.decodeComponent(match[1]!)});
   }
   if (route == '/stamp-maker') return const StampMakerScreen();
-  if (route == '/gacha-history') return const HistoryPage();
+  if (route == '/gacha-history') {
+    return HistoryPage(
+      key: ValueKey(uri.fragment),
+      initialTab: uri.fragment.isEmpty ? null : uri.fragment,
+    );
+  }
   if (route == '/team-builder') {
     return TeamBuilderScreen(
       key: ValueKey(uri.toString()),

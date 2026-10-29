@@ -1,7 +1,7 @@
 {
   "@@locale": "en",
   "appTitle": "Haneoka",
-  "importTitle": "Import save",
+  "importTitle": "Add game account",
   "sourceShizuku": "This phone · Shizuku",
   "sourceGrantFolder": "This phone · game folder",
   "sourceFiles": "Files or folder",
@@ -102,7 +102,7 @@
   "sec_stampFavorites": "Favourite stamps",
   "sec_exchange": "Exchange",
   "sec_shop": "Shop",
-  "importHeadline": "Bring in your Our Notes save",
+  "importHeadline": "Read your Our Notes game account",
   "importIntro": "Haneoka reads the save the game keeps on your device and shows your rank, cards, song clears and items. The save stays on this device; exports leave out your name and account ID.",
   "versionQuestion": "Which version do you play?",
   "versionHint": "Used for files that don't say which version they come from.",
@@ -131,7 +131,7 @@
   "openBackups": "Open backups",
   "connect": "Connect",
   "readAgain": "Read again",
-  "importedAccounts": "Imported accounts",
+  "importedAccounts": "Game accounts",
   "savedOn": "Saved {time}",
   "@savedOn": {
     "placeholders": {
@@ -151,8 +151,8 @@
   },
   "cancel": "Cancel",
   "remove": "Remove",
-  "importMore": "Import a save",
-  "foundAccounts": "{count} accounts found",
+  "importMore": "Add game account",
+  "foundAccounts": "{count} game accounts found",
   "@foundAccounts": {
     "placeholders": {
       "count": {
@@ -192,9 +192,9 @@
   "rawData": "Raw data",
   "copyId": "Copy ID",
   "tutorialDone": "Started",
-  "noAccountsYet": "No accounts yet",
+  "noAccountsYet": "No game accounts yet",
   "haneokaAccount": "Haneoka account",
-  "haneokaAccountSummary": "Sign in to show imported players on your public profile.",
+  "haneokaAccountSummary": "Sign in to show your game accounts on your public profile.",
   "signIn": "Sign in",
   "signOut": "Sign out",
   "signInFailed": "Could not sign in",
@@ -219,16 +219,16 @@
     }
   },
   "openProfile": "Open profile",
-  "teamBuilderNoSave": "Read this server's game data in Accounts first.",
+  "teamBuilderNoSave": "No game account for this server yet.",
   "@teamBuilderNoSave": {
     "description": "Team builder: importing cards needs a read save of the selected server."
   },
-  "updateSave": "Update save",
-  "updateSaveHint": "Read a new save for this player to replace the stored copy. Other players stay unchanged.",
+  "updateSave": "Read again",
+  "updateSaveHint": "Reads this game account's latest save and replaces the stored copy. Other game accounts stay unchanged.",
   "importToTeamBuilder": "Import to team builder",
   "importToTeamHint": "Review and import cards, snapshots, character levels and band items directly from this save.",
-  "saveAccountMismatch": "This save belongs to a different player or server. Choose a save for the player being updated.",
-  "saveUpdated": "Save updated",
+  "saveAccountMismatch": "This save belongs to another game account or server. Choose a save for this game account.",
+  "saveUpdated": "Game account updated",
   "cardSort": "Card order",
   "sortRarity": "Rarity",
   "sortNewest": "Newest cards"

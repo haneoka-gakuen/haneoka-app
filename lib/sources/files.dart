@@ -43,6 +43,17 @@ class FileSaveSource {
     }
   }
 
+  /// A path under the game's own data folder names its package.
+  static GameRelease? pathRelease(String path) {
+    for (final release in GameRelease.values) {
+      if (RegExp('(^|[\\\\/])${RegExp.escape(release.packageId)}([\\\\/]|\$)')
+          .hasMatch(path)) {
+        return release;
+      }
+    }
+    return null;
+  }
+
   void addBytes(Uint8List bytes, String name, {DateTime? modifiedAt}) {
     if (_isZip(bytes)) {
       _zip(bytes, name);
@@ -52,7 +63,7 @@ class FileSaveSource {
           bytes: bytes,
           source: name,
           modifiedAt: modifiedAt,
-          release: release,
+          release: release ?? pathRelease(name),
           group: p.dirname(name),
         ),
       );
@@ -96,7 +107,7 @@ class FileSaveSource {
         bytes: await file.readAsBytes(),
         source: file.path,
         modifiedAt: stat.modified,
-        release: release,
+        release: release ?? pathRelease(file.path),
         group: p.dirname(file.path),
       ),
     );
@@ -106,7 +117,7 @@ class FileSaveSource {
       _archive(ZipDecoder().decodeBytes(bytes), name);
 
   void _archive(Archive archive, String name) {
-    final release = _appRelease(archive) ?? this.release;
+    final release = _appRelease(archive) ?? this.release ?? pathRelease(name);
     for (final entry in archive.files) {
       if (!entry.isFile ||
           entry.size == 0 ||
@@ -128,7 +139,7 @@ class FileSaveSource {
           bytes: entry.content,
           source: '$name!${entry.name}',
           modifiedAt: modified,
-          release: release,
+          release: release ?? pathRelease(entry.name),
           group: '$name!${p.dirname(entry.name)}',
         ),
       );

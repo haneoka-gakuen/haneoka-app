@@ -114,6 +114,13 @@ class HistoryCatalog {
           name: localized(value['title']),
           category: categoryLabel('${value['category'] ?? 'other'}'),
           imageUrl: _poolImage(value),
+          bannerUrl: value['image'] is String && '${value['image']}'.isNotEmpty
+              ? api.asset(value['image'] as String).toString()
+              : null,
+          startAt: _time(value['startAt']),
+          endAt: _time(value['endAt']),
+          rates: analysis.gachaPoolRates(_rulePool('$key')),
+          featured: _featured(value, localized),
           exchangeTargets: _exchangeTargets(
             _rulePool('$key'),
             localized,
@@ -121,6 +128,66 @@ class HistoryCatalog {
           ),
         ),
   ];
+
+  static DateTime? _time(Object? value) {
+    final ms = (value is List ? value : [value])
+        .whereType<num>()
+        .where((ms) => ms > 0)
+        .firstOrNull;
+    return ms == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(ms.toInt(), isUtc: true);
+  }
+
+  List<GachaHistoryFeatured> _featured(
+    Map pool,
+    String Function(Object?) localized,
+  ) => [
+    for (final entry
+        in pool['featured'] is List
+            ? (pool['featured'] as List).whereType<Map>()
+            : const <Map>[])
+      if ((entry['resourceType'] == 2 || entry['resourceType'] == 3) &&
+          entry['pickup'] == true &&
+          '${entry['resourceId'] ?? ''}'.isNotEmpty)
+        _featuredCard(entry, localized),
+  ];
+
+  GachaHistoryFeatured _featuredCard(
+    Map entry,
+    String Function(Object?) localized,
+  ) {
+    final type = entry['resourceType'], id = '${entry['resourceId']}';
+    final card = (type == 2 ? cards : snapshots)[id];
+    final row = card is Map ? card : const {};
+    final images = row['images'];
+    final image =
+        (images is Map ? images['thumbnail'] : null) ??
+        row['image'] ??
+        entry['image'];
+    final rarity = row['rarity'] ?? entry['rarity'];
+    final rarityLabel =
+        const {2: 'R', 3: 'SR', 4: 'SSR', 10: 'EX', 20: 'BD'}[rarity] ?? '';
+    final name = localized(
+      row['prefix'] ?? row['cardName'] ?? row['name'] ?? entry['name'],
+    );
+    return GachaHistoryFeatured(
+      key: '${type == 2 ? 'member' : 'support'}:$id',
+      kind: type == 2 ? 'member' : 'support',
+      name: name.isEmpty ? id : name,
+      rarity: rarity is num || rarity is String ? rarity! : '',
+      imageUrl: image is String && image.isNotEmpty
+          ? api.asset(image).toString()
+          : null,
+      href: type == 2
+          ? '/catalog/member-cards/$id'
+          : '/catalog/support-cards/$id',
+      attributeImageUrl: visuals.cardTypeMark(
+        row['cardType'] ?? entry['cardType'],
+      ),
+      rarityImageUrl: visuals.mark('RarityIconCenter_$rarityLabel.png'),
+    );
+  }
 
   Map<String, Object?> _rulePool(String id) {
     final rawBrief = pools[id],

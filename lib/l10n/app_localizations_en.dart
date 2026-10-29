@@ -13,7 +13,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appTitle => 'Haneoka';
 
   @override
-  String get importTitle => 'Import save';
+  String get importTitle => 'Add game account';
 
   @override
   String get sourceShizuku => 'This phone · Shizuku';
@@ -297,7 +297,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sec_shop => 'Shop';
 
   @override
-  String get importHeadline => 'Bring in your Our Notes save';
+  String get importHeadline => 'Read your Our Notes game account';
 
   @override
   String get importIntro =>
@@ -397,7 +397,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readAgain => 'Read again';
 
   @override
-  String get importedAccounts => 'Imported accounts';
+  String get importedAccounts => 'Game accounts';
 
   @override
   String savedOn(String time) {
@@ -419,11 +419,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get remove => 'Remove';
 
   @override
-  String get importMore => 'Import a save';
+  String get importMore => 'Add game account';
 
   @override
   String foundAccounts(int count) {
-    return '$count accounts found';
+    return '$count game accounts found';
   }
 
   @override
@@ -486,14 +486,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tutorialDone => 'Started';
 
   @override
-  String get noAccountsYet => 'No accounts yet';
+  String get noAccountsYet => 'No game accounts yet';
 
   @override
   String get haneokaAccount => 'Haneoka account';
 
   @override
   String get haneokaAccountSummary =>
-      'Sign in to show imported players on your public profile.';
+      'Sign in to show your game accounts on your public profile.';
 
   @override
   String get signIn => 'Sign in';
@@ -551,15 +551,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get openProfile => 'Open profile';
 
   @override
-  String get teamBuilderNoSave =>
-      'Read this server\'s game data in Accounts first.';
+  String get teamBuilderNoSave => 'No game account for this server yet.';
 
   @override
-  String get updateSave => 'Update save';
+  String get updateSave => 'Read again';
 
   @override
   String get updateSaveHint =>
-      'Read a new save for this player to replace the stored copy. Other players stay unchanged.';
+      'Reads this game account\'s latest save and replaces the stored copy. Other game accounts stay unchanged.';
 
   @override
   String get importToTeamBuilder => 'Import to team builder';
@@ -570,10 +569,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get saveAccountMismatch =>
-      'This save belongs to a different player or server. Choose a save for the player being updated.';
+      'This save belongs to another game account or server. Choose a save for this game account.';
 
   @override
-  String get saveUpdated => 'Save updated';
+  String get saveUpdated => 'Game account updated';
 
   @override
   String get cardSort => 'Card order';

@@ -13,7 +13,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appTitle => 'Haneoka';
 
   @override
-  String get importTitle => '导入存档';
+  String get importTitle => '添加游戏账号';
 
   @override
   String get sourceShizuku => '本机 · Shizuku';
@@ -297,7 +297,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sec_shop => '商店';
 
   @override
-  String get importHeadline => '导入你的 Our Notes 存档';
+  String get importHeadline => '读取 Our Notes 游戏账号';
 
   @override
   String get importIntro =>
@@ -393,7 +393,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readAgain => '重新读取';
 
   @override
-  String get importedAccounts => '已导入的账号';
+  String get importedAccounts => '游戏账号';
 
   @override
   String savedOn(String time) {
@@ -415,11 +415,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get remove => '移除';
 
   @override
-  String get importMore => '导入存档';
+  String get importMore => '添加游戏账号';
 
   @override
   String foundAccounts(int count) {
-    return '找到 $count 个账号';
+    return '找到 $count 个游戏账号';
   }
 
   @override
@@ -481,13 +481,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tutorialDone => '开始游戏';
 
   @override
-  String get noAccountsYet => '还没有导入账号';
+  String get noAccountsYet => '还没有游戏账号';
 
   @override
   String get haneokaAccount => 'Haneoka 账号';
 
   @override
-  String get haneokaAccountSummary => '登录后可将导入的玩家展示在公开主页上。';
+  String get haneokaAccountSummary => '登录后可将游戏账号展示在公开主页上。';
 
   @override
   String get signIn => '登录';
@@ -543,25 +543,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get openProfile => '打开主页';
 
   @override
-  String get teamBuilderNoSave => '请先在账号中读取此服务器的游戏数据。';
+  String get teamBuilderNoSave => '还没有此服务器的游戏账号。';
 
   @override
-  String get updateSave => '更新存档';
+  String get updateSave => '重新读取';
 
   @override
-  String get updateSaveHint => '读取此账号的新存档，覆盖本地旧存档，其他账号不受影响。';
+  String get updateSaveHint => '读取此游戏账号的最新存档，替换本机旧数据，其他游戏账号不受影响。';
 
   @override
   String get importToTeamBuilder => '导入配队';
 
   @override
-  String get importToTeamHint => '直接使用此存档的卡牌、照片、角色等级和乐队道具，预览后确认导入。';
+  String get importToTeamHint => '直接使用此游戏账号的成员卡、留影、角色等级和乐队道具，预览后确认导入。';
 
   @override
-  String get saveAccountMismatch => '读取到的存档属于其他账号或服务器，请选择当前账号的存档。';
+  String get saveAccountMismatch => '读取到的存档属于其他游戏账号或服务器，请选择此游戏账号的存档。';
 
   @override
-  String get saveUpdated => '存档已更新';
+  String get saveUpdated => '游戏账号已更新';
 
   @override
   String get cardSort => '卡牌排序';
@@ -581,7 +581,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get appTitle => 'Haneoka';
 
   @override
-  String get importTitle => '匯入存檔';
+  String get importTitle => '新增遊戲帳號';
 
   @override
   String get sourceShizuku => '本機 · Shizuku';
@@ -865,7 +865,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get sec_shop => '商店';
 
   @override
-  String get importHeadline => '匯入你的 Our Notes 存檔';
+  String get importHeadline => '讀取 Our Notes 遊戲帳號';
 
   @override
   String get importIntro =>
@@ -961,7 +961,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get readAgain => '重新讀取';
 
   @override
-  String get importedAccounts => '已匯入的帳號';
+  String get importedAccounts => '遊戲帳號';
 
   @override
   String savedOn(String time) {
@@ -983,11 +983,11 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get remove => '移除';
 
   @override
-  String get importMore => '匯入存檔';
+  String get importMore => '新增遊戲帳號';
 
   @override
   String foundAccounts(int count) {
-    return '找到 $count 個帳號';
+    return '找到 $count 個遊戲帳號';
   }
 
   @override
@@ -1049,13 +1049,13 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get tutorialDone => '開始遊戲';
 
   @override
-  String get noAccountsYet => '還沒有匯入帳號';
+  String get noAccountsYet => '還沒有遊戲帳號';
 
   @override
   String get haneokaAccount => 'Haneoka 帳號';
 
   @override
-  String get haneokaAccountSummary => '登入後可將匯入的玩家展示在公開個人頁面上。';
+  String get haneokaAccountSummary => '登入後可將遊戲帳號展示在公開個人頁面上。';
 
   @override
   String get signIn => '登入';
@@ -1111,25 +1111,25 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get openProfile => '開啟個人頁面';
 
   @override
-  String get teamBuilderNoSave => '請先在帳號中讀取此伺服器的遊戲資料。';
+  String get teamBuilderNoSave => '還沒有此伺服器的遊戲帳號。';
 
   @override
-  String get updateSave => '更新存檔';
+  String get updateSave => '重新讀取';
 
   @override
-  String get updateSaveHint => '讀取此帳號的新存檔，覆蓋本機舊存檔，其他帳號不受影響。';
+  String get updateSaveHint => '讀取此遊戲帳號的最新存檔，取代本機舊資料，其他遊戲帳號不受影響。';
 
   @override
   String get importToTeamBuilder => '匯入配隊';
 
   @override
-  String get importToTeamHint => '直接使用此存檔的卡牌、照片、角色等級和樂團道具，預覽後確認匯入。';
+  String get importToTeamHint => '直接使用此遊戲帳號的成員卡、留影、角色等級和樂團道具，預覽後確認匯入。';
 
   @override
-  String get saveAccountMismatch => '讀取到的存檔屬於其他帳號或伺服器，請選擇目前帳號的存檔。';
+  String get saveAccountMismatch => '讀取到的存檔屬於其他遊戲帳號或伺服器，請選擇此遊戲帳號的存檔。';
 
   @override
-  String get saveUpdated => '存檔已更新';
+  String get saveUpdated => '遊戲帳號已更新';
 
   @override
   String get cardSort => '卡牌排序';

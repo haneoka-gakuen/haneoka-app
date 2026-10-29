@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -9,6 +8,7 @@ import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:game_data_exporter/gacha_history_points.dart';
 
@@ -19,9 +19,11 @@ import '../core/storage.dart';
 import '../save/account_store.dart';
 import '../save/game_save.dart';
 import '../shell/links.dart';
+
+import 'package:material_symbols_icons/symbols.dart';
+
 import '../sources/files.dart';
-import '../ui/adb_sheet.dart';
-import '../ui/import_screen.dart';
+import '../ui/game_account_sheet.dart';
 import '../ui/game_release_picker.dart';
 import 'game_history_client.dart';
 import 'history_catalog.dart';
@@ -44,9 +46,15 @@ void openGameHistory(BuildContext context, GameSave save) =>
     );
 
 class HistoryPage extends StatefulWidget {
-  const HistoryPage({super.key, this.initialSave, this.readOnOpen = false});
+  const HistoryPage({
+    super.key,
+    this.initialSave,
+    this.readOnOpen = false,
+    this.initialTab,
+  });
   final GameSave? initialSave;
   final bool readOnOpen;
+  final String? initialTab;
   @override
   State<HistoryPage> createState() => _HistoryPageState();
 }
@@ -548,41 +556,26 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
-  void _source(GachaHistoryImportSource source) {
-    switch (source) {
-      case GachaHistoryImportSource.files:
-        unawaited(_files());
-      case GachaHistoryImportSource.saved:
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => AccountsScreen(onReadHistory: openGameHistory),
-          ),
-        );
-      case GachaHistoryImportSource.adb:
-        unawaited(
-          showAdbSheet(
-            context,
-            onRead: (read) async {
-              if (!mounted) return;
-              setState(() {
-                _importing = true;
-                _errorCode = null;
-              });
-              try {
-                final persists = <HistorySession>[];
-                final collector = _collector(persists);
-                await read(collector);
-                await _acceptSaves(collector.saves, persists: persists);
-              } on Exception {
-                if (mounted) {
-                  setState(() => _errorCode = 'history_import_invalid');
-                }
-              } finally {
-                if (mounted) setState(() => _importing = false);
-              }
-            },
-          ),
-        );
+  /// One entry for every way in: a stored game account, a new one read
+  /// from the game, or a history file.
+  Future<void> _import() async {
+    final choice = await chooseGameAccount(
+      context,
+      actions: [
+        GameAccountSheetAction(
+          'files',
+          Symbols.upload_file_rounded,
+          _t('filesSource'),
+        ),
+      ],
+    );
+    if (choice == null || !mounted) return;
+    if (choice.action == 'files') return _files();
+    setState(() => _errorCode = null);
+    try {
+      await _acceptSaves([choice.save!]);
+    } on FormatException {
+      if (mounted) setState(() => _errorCode = 'history_import_invalid');
     }
   }
 
@@ -802,9 +795,11 @@ class _HistoryPageState extends State<HistoryPage> {
                 serverLabel: _regionLabel(choice.region),
                 label:
                     choice.save?.name ??
-                    choice.record?.snapshot.queriedAt
-                        .toLocal()
-                        .toIso8601String() ??
+                    (choice.record == null
+                        ? null
+                        : DateFormat.yMMMd(state.text.locale).add_Hm().format(
+                            choice.record!.snapshot.queriedAt.toLocal(),
+                          )) ??
                     _t('account'),
               ),
           ],
@@ -860,13 +855,8 @@ class _HistoryPageState extends State<HistoryPage> {
           onRefresh: current?.save == null && current?.persist == null
               ? null
               : (key) => unawaited(_refresh(key)),
-          onImportSource: _source,
-          availableImportSources: [
-            GachaHistoryImportSource.saved,
-            GachaHistoryImportSource.files,
-            if (!Platform.isAndroid && !Platform.isIOS)
-              GachaHistoryImportSource.adb,
-          ],
+          onImport: _import,
+          initialTab: widget.initialTab,
           onExport: snapshot == null
               ? null
               : (value) => unawaited(_export(value)),

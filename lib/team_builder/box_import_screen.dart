@@ -15,6 +15,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../l10n/app_localizations.dart';
 import '../save/account_store.dart';
 import '../save/game_save.dart';
+import '../ui/game_account_sheet.dart';
 import 'box_import.dart';
 import 'controller.dart';
 import 'screenshot_import_screen.dart';
@@ -110,6 +111,29 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
         ],
       );
     });
+  }
+
+  /// Reads a new game account and continues with its Box.
+  Future<void> _addAccount() async {
+    final added = [
+      for (final save in await addGameAccounts(context))
+        if (save.release?.server == 'jp' || save.release?.server == 'intl')
+          save,
+    ];
+    if (!mounted || added.isEmpty) return;
+    setState(
+      () => _saves = [
+        ...added,
+        for (final save in _saves)
+          if (!added.any(
+            (row) =>
+                row.profileId == save.profileId &&
+                row.release?.server == save.release?.server,
+          ))
+            save,
+      ],
+    );
+    _readSave(added.first);
   }
 
   @override
@@ -703,8 +727,14 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
       ],
+      FilledButton.tonalIcon(
+        onPressed: _addAccount,
+        icon: const Icon(Symbols.person_add_rounded),
+        label: Text(AppLocalizations.of(context).importMore),
+      ),
+      const SizedBox(height: 8),
       OutlinedButton.icon(
         onPressed: _files,
         icon: const Icon(Symbols.upload_file_rounded),

@@ -18,11 +18,38 @@ class GachaHistoryPool {
     required this.name,
     required this.category,
     this.imageUrl,
+    this.bannerUrl,
+    this.startAt,
+    this.endAt,
+    this.rates,
+    this.featured = const [],
     this.exchangeTargets = const [],
   });
   final String id, name, category;
-  final String? imageUrl;
+  final String? imageUrl, bannerUrl;
+  final DateTime? startAt, endAt;
+
+  /// Official single-draw probabilities (`gachaPoolRates`).
+  final Map<String, Object?>? rates;
+  final List<GachaHistoryFeatured> featured;
   final List<Map<String, Object?>> exchangeTargets;
+}
+
+/// A pool's pickup card, as the banner features it.
+class GachaHistoryFeatured {
+  const GachaHistoryFeatured({
+    required this.key,
+    required this.kind,
+    required this.name,
+    required this.rarity,
+    this.imageUrl,
+    this.href,
+    this.attributeImageUrl,
+    this.rarityImageUrl,
+  });
+  final String key, kind, name;
+  final Object rarity;
+  final String? imageUrl, href, attributeImageUrl, rarityImageUrl;
 }
 
 class GachaHistoryPrize {
@@ -80,6 +107,34 @@ Map<String, Object?> historyAnalysis(
 Map<String, Object?> historyProgress(List<GachaHistoryBatch> batches) =>
     analysis.gachaHistoryProgress(_historyInput(batches));
 
+/// Hits per pool (`high` or `pickup`); each hit's `prize` is the view prize.
+List<Map<String, Object?>> historyHits(
+  List<GachaHistoryBatch> batches,
+  String target,
+) => [
+  for (final pool in analysis.gachaHistoryHits(_historyInput(batches), target))
+    {
+      ...pool,
+      'hits': [
+        for (final hit in pool['hits'] as List)
+          {
+            ...hit as Map<String, Object?>,
+            'prize': (hit['prize'] as Map)['_view'],
+          },
+      ],
+    },
+];
+
+Map<String, Object?>? historyLuck(
+  List<GachaHistoryBatch> batches,
+  String target,
+) => analysis.gachaHistoryLuck(_historyInput(batches), target);
+
+List<Map<String, Object?>> historyMonths(
+  List<GachaHistoryBatch> batches, [
+  int offsetMinutes = 480,
+]) => analysis.gachaHistoryMonths(_historyInput(batches), offsetMinutes);
+
 List<Map<String, Object?>> _historyInput(List<GachaHistoryBatch> batches) => [
   for (final batch in batches)
     <String, Object?>{
@@ -101,6 +156,7 @@ List<Map<String, Object?>> _historyInput(List<GachaHistoryBatch> batches) => [
             'quantity': prize.quantity,
             'pickup': prize.pickup,
             'converted': prize.converted,
+            '_view': prize,
           },
       ],
     },

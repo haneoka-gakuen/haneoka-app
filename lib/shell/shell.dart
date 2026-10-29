@@ -155,6 +155,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         host: 'haneoka.org',
         path: '/${uri.host}${uri.path}',
         query: uri.hasQuery ? uri.query : null,
+        fragment: uri.hasFragment ? uri.fragment : null,
       );
     }
     if (uri.scheme == 'file') {

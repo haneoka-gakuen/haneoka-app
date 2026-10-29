@@ -25,6 +25,7 @@ import '../sources/ios_backup.dart';
 import '../sources/ios_direct.dart';
 import 'adb_sheet.dart';
 import 'backup_sheet.dart';
+import 'game_release_picker.dart';
 import 'labels.dart';
 import 'save_screen.dart';
 import 'shapes.dart';
@@ -36,18 +37,24 @@ String releaseEmblem(GameRelease? release) => release == GameRelease.jp
     ? 'assets/settings/bushimo-circle.svg'
     : 'assets/settings/bilibili-circle.svg';
 
-/// Reading the game's save: what it is for, the version, and every way this
-/// platform can reach the save, each with what it needs and its steps.
+/// Adding a game account: every way this platform can reach the game's save,
+/// each with what it needs and its steps. The game version is asked only for
+/// files that do not name it.
+///
+/// With [returnResult] the screen pops with the accounts it read, so the page
+/// that asked (gacha history, team builder) continues with them.
 class ImportScreen extends StatefulWidget {
   const ImportScreen({
     super.key,
     this.initialPath,
     this.updateSave,
     this.onReadHistory,
+    this.returnResult = false,
   });
   final SaveHistoryAction? onReadHistory;
   final String? initialPath;
   final GameSave? updateSave;
+  final bool returnResult;
   @override
   State<ImportScreen> createState() => _ImportScreenState();
 }
@@ -59,7 +66,6 @@ class _ImportScreenState extends State<ImportScreen> {
   ShizukuStatus? _shizuku;
   bool _canGrant = false;
   IosDirectAccess? _iosAccess;
-  GameRelease? _release;
 
   @override
   void initState() {
@@ -74,21 +80,14 @@ class _ImportScreenState extends State<ImportScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _run(
-            (collector) =>
-                FileSaveSource(collector, release: release).addPath(path),
+            (collector) => FileSaveSource(
+              collector,
+              release: widget.updateSave?.release,
+            ).addPath(path),
           );
         }
       });
     }
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _release ??= widget.updateSave?.release;
-    _release ??= AppScope.maybeOf(context)?.server == 'jp'
-        ? GameRelease.jp
-        : GameRelease.intlStore;
   }
 
   Future<void> _refreshAndroid() async {
@@ -102,7 +101,32 @@ class _ImportScreenState extends State<ImportScreen> {
   }
 
   AppLocalizations get t => AppLocalizations.of(context);
-  GameRelease get release => _release ?? GameRelease.intlStore;
+  GameRelease get _defaultRelease =>
+      widget.updateSave?.release ??
+      (AppScope.maybeOf(context)?.server == 'jp'
+          ? GameRelease.jp
+          : GameRelease.intlStore);
+
+  /// Files that do not name their version take the one the player picks.
+  Future<List<GameSave>?> _withRelease(List<GameSave> saves) async {
+    if (saves.every((save) => save.release != null)) return saves;
+    final chosen =
+        widget.updateSave?.release ??
+        await chooseGameSaveRelease(context, initial: _defaultRelease);
+    if (chosen == null) return null;
+    return [
+      for (final save in saves)
+        if (save.release != null)
+          save
+        else
+          GameSave(
+            profileId: save.profileId,
+            name: save.name,
+            release: chosen,
+            source: save.source,
+          )..documents.addAll(save.documents),
+    ];
+  }
 
   void _say(String message) => ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
@@ -121,8 +145,10 @@ class _ImportScreenState extends State<ImportScreen> {
         _say(t.noSaves);
         return;
       }
+      final saves = await _withRelease(collector.saves);
+      if (saves == null || !mounted) return;
       if (widget.updateSave case final previous?) {
-        final replacement = collector.saves
+        final replacement = saves
             .where(
               (save) =>
                   save.profileId == previous.profileId &&
@@ -144,23 +170,24 @@ class _ImportScreenState extends State<ImportScreen> {
         if (mounted) Navigator.of(context).pop(updated);
         return;
       }
-      for (final save in collector.saves) {
+      for (final save in saves) {
         await AccountStore.instance.put(save);
         unawaited(HaneokaAccount.instance.syncIfLinked(save));
       }
       if (!mounted) return;
-      if (collector.saves.length == 1) {
+      if (widget.returnResult) {
+        if (saves.length > 1) _say(t.foundAccounts(saves.length));
+        Navigator.of(context).pop(saves);
+      } else if (saves.length == 1) {
         final historyAction = _historyAction;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute<void>(
-            builder: (_) => SaveScreen(
-              save: collector.saves.single,
-              onReadHistory: historyAction,
-            ),
+            builder: (_) =>
+                SaveScreen(save: saves.single, onReadHistory: historyAction),
           ),
         );
       } else {
-        _say(t.foundAccounts(collector.saves.length));
+        _say(t.foundAccounts(saves.length));
         Navigator.of(context).pop();
       }
     } on IosDirectAccessException {
@@ -208,6 +235,10 @@ class _ImportScreenState extends State<ImportScreen> {
   }
 
   Future<void> _grantFolder() async {
+    final release =
+        widget.updateSave?.release ??
+        await chooseGameSaveRelease(context, initial: _defaultRelease);
+    if (release == null || !mounted) return;
     final uri = await AndroidSaveSource.grantGameFolder(release);
     if (!mounted || uri == null) return;
     await _run(
@@ -227,15 +258,20 @@ class _ImportScreenState extends State<ImportScreen> {
       final path = await FilePicker.getDirectoryPath();
       if (!mounted || path == null) return;
       await _run(
-        (collector) =>
-            FileSaveSource(collector, release: release).addPath(path),
+        (collector) => FileSaveSource(
+          collector,
+          release: widget.updateSave?.release,
+        ).addPath(path),
       );
       return;
     }
     final picked = await FilePicker.pickFiles();
     if (!mounted || picked.isEmpty) return;
     await _run((collector) async {
-      final source = FileSaveSource(collector, release: release);
+      final source = FileSaveSource(
+        collector,
+        release: widget.updateSave?.release,
+      );
       for (final file in picked) {
         final path = file.path;
         if (path != null) {
@@ -590,48 +626,6 @@ class _ImportScreenState extends State<ImportScreen> {
                         ],
                       ),
                       const SizedBox(height: 24),
-                      Text(
-                        t.versionQuestion,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        t.versionHint,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final value in const [
-                            GameRelease.jp,
-                            GameRelease.intlStore,
-                            GameRelease.intlOfficial,
-                          ])
-                            ChoiceChip(
-                              showCheckmark: false,
-                              selected: release == value,
-                              avatar: SvgPicture.asset(
-                                releaseEmblem(value),
-                                width: 18,
-                                height: 18,
-                              ),
-                              label: Text(value.label(t)),
-                              onSelected:
-                                  widget.updateSave?.release != null &&
-                                      value.server !=
-                                          widget.updateSave!.release!.server
-                                  ? null
-                                  : (_) => setState(() => _release = value),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 28),
                       Text(
                         t.methodsTitle,
                         style: theme.textTheme.titleMedium?.copyWith(

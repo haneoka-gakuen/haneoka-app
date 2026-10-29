@@ -112,7 +112,7 @@ abstract class AppLocalizations {
   /// No description provided for @importTitle.
   ///
   /// In en, this message translates to:
-  /// **'Import save'**
+  /// **'Add game account'**
   String get importTitle;
 
   /// No description provided for @sourceShizuku.
@@ -676,7 +676,7 @@ abstract class AppLocalizations {
   /// No description provided for @importHeadline.
   ///
   /// In en, this message translates to:
-  /// **'Bring in your Our Notes save'**
+  /// **'Read your Our Notes game account'**
   String get importHeadline;
 
   /// No description provided for @importIntro.
@@ -850,7 +850,7 @@ abstract class AppLocalizations {
   /// No description provided for @importedAccounts.
   ///
   /// In en, this message translates to:
-  /// **'Imported accounts'**
+  /// **'Game accounts'**
   String get importedAccounts;
 
   /// No description provided for @savedOn.
@@ -886,13 +886,13 @@ abstract class AppLocalizations {
   /// No description provided for @importMore.
   ///
   /// In en, this message translates to:
-  /// **'Import a save'**
+  /// **'Add game account'**
   String get importMore;
 
   /// No description provided for @foundAccounts.
   ///
   /// In en, this message translates to:
-  /// **'{count} accounts found'**
+  /// **'{count} game accounts found'**
   String foundAccounts(int count);
 
   /// No description provided for @profileOverview.
@@ -1006,7 +1006,7 @@ abstract class AppLocalizations {
   /// No description provided for @noAccountsYet.
   ///
   /// In en, this message translates to:
-  /// **'No accounts yet'**
+  /// **'No game accounts yet'**
   String get noAccountsYet;
 
   /// No description provided for @haneokaAccount.
@@ -1018,7 +1018,7 @@ abstract class AppLocalizations {
   /// No description provided for @haneokaAccountSummary.
   ///
   /// In en, this message translates to:
-  /// **'Sign in to show imported players on your public profile.'**
+  /// **'Sign in to show your game accounts on your public profile.'**
   String get haneokaAccountSummary;
 
   /// No description provided for @signIn.
@@ -1126,19 +1126,19 @@ abstract class AppLocalizations {
   /// Team builder: importing cards needs a read save of the selected server.
   ///
   /// In en, this message translates to:
-  /// **'Read this server\'s game data in Accounts first.'**
+  /// **'No game account for this server yet.'**
   String get teamBuilderNoSave;
 
   /// No description provided for @updateSave.
   ///
   /// In en, this message translates to:
-  /// **'Update save'**
+  /// **'Read again'**
   String get updateSave;
 
   /// No description provided for @updateSaveHint.
   ///
   /// In en, this message translates to:
-  /// **'Read a new save for this player to replace the stored copy. Other players stay unchanged.'**
+  /// **'Reads this game account\'s latest save and replaces the stored copy. Other game accounts stay unchanged.'**
   String get updateSaveHint;
 
   /// No description provided for @importToTeamBuilder.
@@ -1156,13 +1156,13 @@ abstract class AppLocalizations {
   /// No description provided for @saveAccountMismatch.
   ///
   /// In en, this message translates to:
-  /// **'This save belongs to a different player or server. Choose a save for the player being updated.'**
+  /// **'This save belongs to another game account or server. Choose a save for this game account.'**
   String get saveAccountMismatch;
 
   /// No description provided for @saveUpdated.
   ///
   /// In en, this message translates to:
-  /// **'Save updated'**
+  /// **'Game account updated'**
   String get saveUpdated;
 
   /// No description provided for @cardSort.
