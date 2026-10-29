@@ -1331,6 +1331,9 @@ class _EngineCoordinator {
               target: target,
             ),
           GekisoGoal(
+            :final arena,
+            :final musicType,
+            :final missions,
             :final minComboBonus,
             :final opponents,
             :final criterion,
@@ -1339,6 +1342,9 @@ class _EngineCoordinator {
             :final seeds,
           ) =>
             GekisoGoal(
+              arena: arena,
+              musicType: musicType,
+              missions: missions,
               songs: [song],
               criterion: criterion,
               accuracy: accuracy,
@@ -1531,6 +1537,11 @@ class _EngineCoordinator {
             rewardPlan: resolved.resolvedRewardPlan,
           ),
         );
+      }
+      if (request.aggregation == 'mean' ||
+          request.goal is GekisoGoal &&
+              (request.goal as GekisoGoal).arena != null) {
+        return send(_idlest(), request);
       }
       // Plan shards keep their tuple bounds and lottery state throughout the proof.
       final eventGoal = request.goal;
@@ -1985,37 +1996,46 @@ class EvaluateRequest {
     required this.challengeEventId,
     required this.event,
     this.gekiso,
+    this.songRules,
+    this.eventEffects,
   });
-  factory EvaluateRequest.fromJson(Map<String, Object?> json) =>
-      EvaluateRequest(
-        members: [
-          for (final row in json['members'] as List)
-            MemberInput.fromJson(objectRow(row)),
-        ],
-        snaps: [
-          for (final row in json['snaps'] as List)
-            SnapInput.fromJson(objectRow(row)),
-        ],
-        player: PlayerInput.fromJson(objectRow(json['player'])),
-        unknownPolicy: UnknownPolicy.values.byName('${json['unknownPolicy']}'),
-        team: TeamSpec.fromJson(objectRow(json['team'])),
-        songs: [
-          for (final row in json['songs'] as List)
-            SongRef.fromJson(objectRow(row)),
-        ],
-        play: PlayModel.fromJson(objectRow(json['play'])),
-        challengeEventId: (json['challengeEventId'] as num?)?.toInt(),
-        gekiso: json['gekiso'] is Map ? objectRow(json['gekiso']) : null,
-        event: json['event'] is Map
-            ? (
-                eventId: intOf(objectRow(json['event'])['eventId']),
-                route: RouteKind.values.byName(
-                  '${objectRow(json['event'])['route']}',
-                ),
-                consumption: intOf(objectRow(json['event'])['consumption']),
-              )
-            : null,
-      );
+  factory EvaluateRequest.fromJson(
+    Map<String, Object?> json,
+  ) => EvaluateRequest(
+    members: [
+      for (final row in json['members'] as List)
+        MemberInput.fromJson(objectRow(row)),
+    ],
+    snaps: [
+      for (final row in json['snaps'] as List)
+        SnapInput.fromJson(objectRow(row)),
+    ],
+    player: PlayerInput.fromJson(objectRow(json['player'])),
+    unknownPolicy: UnknownPolicy.values.byName('${json['unknownPolicy']}'),
+    team: TeamSpec.fromJson(objectRow(json['team'])),
+    songs: [
+      for (final row in json['songs'] as List) SongRef.fromJson(objectRow(row)),
+    ],
+    play: PlayModel.fromJson(objectRow(json['play'])),
+    challengeEventId: (json['challengeEventId'] as num?)?.toInt(),
+    gekiso: json['gekiso'] is Map ? objectRow(json['gekiso']) : null,
+    songRules: json['songRules'] is Map ? objectRow(json['songRules']) : null,
+    eventEffects: objectRow(json['event'])['eventEffects'] is List
+        ? [
+            for (final row in objectRow(json['event'])['eventEffects'] as List)
+              objectRow(row),
+          ]
+        : null,
+    event: json['event'] is Map
+        ? (
+            eventId: intOf(objectRow(json['event'])['eventId']),
+            route: RouteKind.values.byName(
+              '${objectRow(json['event'])['route']}',
+            ),
+            consumption: intOf(objectRow(json['event'])['consumption']),
+          )
+        : null,
+  );
   Map<String, Object?> toJson() => {
     'members': [for (final r in members) r.toJson()],
     'snaps': [for (final r in snaps) r.toJson()],
@@ -2025,6 +2045,7 @@ class EvaluateRequest {
     'songs': [for (final r in songs) r.toJson()],
     'play': play.toJson(),
     'gekiso': ?gekiso,
+    'songRules': ?songRules,
     'challengeEventId': challengeEventId,
     'event': event == null
         ? null
@@ -2032,6 +2053,7 @@ class EvaluateRequest {
             'eventId': event!.eventId,
             'route': event!.route.name,
             'consumption': event!.consumption,
+            'eventEffects': ?eventEffects,
           },
   };
   final List<MemberInput> members;
@@ -2043,6 +2065,8 @@ class EvaluateRequest {
   final PlayModel play;
   final int? challengeEventId;
   final Doc? gekiso;
+  final Doc? songRules;
+  final List<Doc>? eventEffects;
   final ({int eventId, RouteKind route, int consumption})? event;
 }
 

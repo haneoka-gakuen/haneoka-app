@@ -8,6 +8,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../catalog/catalog_screen.dart' show cardRarityName;
 import '../ui/app_image.dart';
 import 'controller.dart';
+import 'manual_event_view.dart';
 import 'engine/api.dart';
 import 'pickers.dart';
 import 'results_view.dart';
@@ -124,6 +125,9 @@ class _BuildTabState extends State<BuildTab> {
     final stamp = (
       c.settings,
       c.activity,
+      c.arenaActive,
+      c.arenaDraft,
+      c.arenaActive ? c.arena.regulation : null,
       c.catalog,
       c.view,
       Theme.of(context),
@@ -144,7 +148,7 @@ class _BuildTabState extends State<BuildTab> {
     return TeamToolLayout(
       controller: c,
       summary:
-          '${c.settings.theoretical ? c.tb('scopeAll', 'All cards') : c.tb('scopeBox', 'My cards')} · ${c.tb('chartCount', '{count} charts', {'count': c.searchSettings.songs.length})}',
+          '${c.searchSettings.theoretical ? c.tb('scopeAll', 'All cards') : c.tb('scopeBox', 'My cards')} · ${c.tb('chartCount', '{count} charts', {'count': c.searchSettings.songs.length})}',
       conditions: (context) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -231,9 +235,13 @@ class _BuildTabState extends State<BuildTab> {
           !(c.activity && s.goal == GoalKind.event && s.rewardPlan != null))
         ToolSection(
           icon: Symbols.flag_rounded,
-          title: c.activity ? goalText(c, s.goal) : c.tb('goal', 'Goal'),
+          title: c.arenaActive
+              ? c.tb('arena.objective', 'Team objective')
+              : c.activity
+              ? goalText(c, s.goal)
+              : c.tb('goal', 'Goal'),
           children: [
-            if (!c.activity)
+            if (!c.activity && !c.arenaActive)
               _GoalGrid(
                 goals: [
                   for (final (goal, icon) in _goals)
@@ -249,7 +257,23 @@ class _BuildTabState extends State<BuildTab> {
                 title: Text(c.tb('fullRanking', 'Full reward ranking')),
                 onChanged: (value) => set({'fullRanking': value == true}),
               ),
-            if (scored) ...[
+            if (!c.arenaActive &&
+                (scored || s.goal == GoalKind.event && s.route != 'skip'))
+              Segmented<String>(
+                value: s.shared ? 'mean' : 'individual',
+                options: [
+                  Choice(
+                    'individual',
+                    c.tb('arena.individual', 'A team for each song'),
+                  ),
+                  Choice(
+                    'mean',
+                    c.tb('multiSong.mean', 'Best average across songs'),
+                  ),
+                ],
+                onSelected: (value) => set({'aggregation': value}),
+              ),
+            if (scored && !s.shared && !(c.arenaActive && c.arena.shared)) ...[
               DropdownButtonFormField<String>(
                 key: ValueKey((
                   'criterion',
@@ -322,14 +346,18 @@ class _BuildTabState extends State<BuildTab> {
                 value: s.gekisoSeeds,
                 onChanged: (value) => set({'gekisoSeeds': value}),
               ),
-              _WrappingSegments(
-                value: s.opponentsMode ? 'opponents' : 'rank',
-                options: [
-                  ('rank', c.tb('placementRank', 'Specified placement')),
-                  ('opponents', c.tb('placementOpponents', 'Opponent scores')),
-                ],
-                onSelected: (value) => set({'gekisoPlacementMode': value}),
-              ),
+              if (!s.shared && !(c.arenaActive && c.arena.shared))
+                _WrappingSegments(
+                  value: s.opponentsMode ? 'opponents' : 'rank',
+                  options: [
+                    ('rank', c.tb('placementRank', 'Specified placement')),
+                    (
+                      'opponents',
+                      c.tb('placementOpponents', 'Opponent scores'),
+                    ),
+                  ],
+                  onSelected: (value) => set({'gekisoPlacementMode': value}),
+                ),
               if (s.opponentsMode)
                 for (var range = 0; range < 3; range++)
                   TextFormField(
@@ -385,6 +413,24 @@ class _BuildTabState extends State<BuildTab> {
             ],
           ],
         ),
+      if (!c.arenaActive &&
+          (s.goal == GoalKind.gekiso ||
+              s.goal == GoalKind.score ||
+              s.goal == GoalKind.power ||
+              s.goal == GoalKind.event)) ...[
+        const SizedBox(height: 16),
+        ToolSection(
+          icon: Symbols.tune_rounded,
+          title: c.tb('songRules', 'Song rules'),
+          children: [
+            SongRulesEditor(
+              controller: c,
+              rules: s.songRulesOverride,
+              onChanged: (value) => set({'songRules': value}),
+            ),
+          ],
+        ),
+      ],
       if (s.goal == GoalKind.event) ...[
         const SizedBox(height: 16),
         ToolSection(
@@ -392,6 +438,7 @@ class _BuildTabState extends State<BuildTab> {
           title: c.tb('eventSetup', 'Event'),
           children: [
             ..._eventSection(context),
+            ManualEventControls(controller: c),
             Segmented<String>(
               value: s.route,
               options: [
@@ -749,6 +796,7 @@ class _BuildTabState extends State<BuildTab> {
                 songs,
                 single: single,
                 allowed: allowed,
+                allowedCharts: c.arenaActive ? c.arena.charts : null,
               );
               if (picked != null) onChanged(picked);
             },
@@ -1219,6 +1267,115 @@ class _WrappingSegments<T> extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Per-song rules of an Arena period: the attribute a song is treated as and
+/// the three range types (`lit/team-builder/song-rules.ts`).
+class SongRulesEditor extends StatelessWidget {
+  const SongRulesEditor({
+    super.key,
+    required this.controller,
+    required this.rules,
+    required this.onChanged,
+  });
+  final TeamBuilderController controller;
+  final ({int musicType, List<int> missions})? rules;
+  final ValueChanged<Map<String, Object?>?> onChanged;
+
+  void _write({int? musicType, int? mission, int? index}) {
+    final current = rules;
+    final nextMusic = musicType ?? current?.musicType ?? 0;
+    final nextMissions = [
+      for (var i = 0; i < 3; i++)
+        index == i ? mission ?? 0 : (current?.missions[i] ?? 0),
+    ];
+    onChanged({'musicType': nextMusic, 'missions': nextMissions});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller;
+    final catalog = c.catalog!;
+    const missionNames = ['—', 'COMBO', 'LUCK', 'JUST'];
+    Widget field(String label, Widget child) => Padding(
+      padding: const EdgeInsets.only(right: 8, bottom: 8),
+      child: InputDecorator(
+        decoration: InputDecoration(isDense: true, labelText: label),
+        child: child,
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        field(
+          c.tb('songRule.attribute', 'Song attribute'),
+          DropdownButton<int>(
+            value: rules?.musicType ?? -1,
+            isExpanded: true,
+            underline: const SizedBox.shrink(),
+            items: [
+              DropdownMenuItem(
+                value: -1,
+                child: Text(c.tb('songRule.master', 'From data')),
+              ),
+              DropdownMenuItem(
+                value: 0,
+                child: Text(c.tb('arena.original', 'Original song')),
+              ),
+              for (final id in [1, 2, 3, 4, 5])
+                DropdownMenuItem(
+                  value: id,
+                  child: Text(catalog.attributeName(id)),
+                ),
+              DropdownMenuItem(
+                value: 99,
+                child: Text(c.tb('arena.any', 'Any attribute')),
+              ),
+            ],
+            onChanged: (value) => value == null || value < 0
+                ? onChanged(null)
+                : _write(musicType: value),
+          ),
+        ),
+        Row(
+          children: [
+            for (var index = 0; index < 3; index++)
+              Expanded(
+                child: field(
+                  c.tb('arena.range', 'Range {count}', {'count': index + 1}),
+                  DropdownButton<int>(
+                    value: rules?.missions[index] ?? 0,
+                    isExpanded: true,
+                    underline: const SizedBox.shrink(),
+                    items: [
+                      for (var value = 0; value < 4; value++)
+                        DropdownMenuItem(
+                          value: value,
+                          child: Text(
+                            value == 0
+                                ? c.tb('arena.original', 'Original song')
+                                : missionNames[value],
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) =>
+                        _write(index: index, mission: value ?? 0),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: rules == null ? null : () => onChanged(null),
+            icon: const Icon(Symbols.restart_alt_rounded, size: 18),
+            label: Text(c.tb('songRule.clear', 'Use data values')),
+          ),
+        ),
+      ],
     );
   }
 }

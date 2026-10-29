@@ -541,6 +541,51 @@ ChartMap copyChartSelection(ChartProject project, Set<String> ids) {
   });
 }
 
+ChartMap copyChartSegments(ChartProject project, Set<String> selection) {
+  final clipboard = copyChartSelection(project, selection),
+      entities = chartMap(copyChartSelection(project, selection)['entities']);
+  final lines = <ChartMap>[];
+  for (final line in chartRows(entities['lines'])) {
+    if (selection.contains(line['id'])) {
+      lines.add(line);
+      continue;
+    }
+    final points = chartRows(line['points'])
+        .where((point) => selection.contains(point['id']))
+        .toList();
+    if (points.length < 2) continue;
+    final source = chartRows(
+      project.lines.firstWhere((row) => row['id'] == line['id'])['points'],
+    );
+    for (final point in [points.first, points.last]) {
+      if (point['lane'] != 'auto') continue;
+      final shape = resolveChartPoint(
+        source,
+        source.indexWhere((row) => row['id'] == point['id']),
+      );
+      point.addAll({'lane': shape.$1, 'size': shape.$2});
+      point.remove('autoSize');
+      point.remove('resolvedLane');
+      point.remove('resolvedSize');
+    }
+    lines.add({...line, 'points': points});
+  }
+  entities['lines'] = lines;
+  clipboard['entities'] = entities;
+  final ids = <String>{
+    for (final key in ['singles', 'tempos', 'meters', 'timeScales'])
+      for (final row in chartRows(entities[key])) '${row['id']}',
+    for (final line in lines) ...[
+      '${line['id']}',
+      for (final point in chartRows(line['points'])) '${point['id']}',
+    ],
+  };
+  (clipboard['sourceOrder'] as List).removeWhere((id) => !ids.contains(id));
+  chartMap(chartMap(clipboard['collections'])['members'])
+      .removeWhere((id, _) => !ids.contains(id));
+  return clipboard;
+}
+
 Set<String> pasteChartSelection(
   ChartProject project,
   ChartMap clipboard,

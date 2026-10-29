@@ -198,6 +198,46 @@ class TeamCatalog extends ChangeNotifier {
     return key.isEmpty ? '' : t('catalog.songs.liveTypes.$key', key);
   }
 
+  /// Skill type names a card carries in one role (`skillName` of
+  /// `catalogMetadata.resolvedSkills`), the website's `skillFacetValues`.
+  /// Only the canonical (first non-empty) name counts, so the localised
+  /// variants of one skill do not turn into separate filter options.
+  List<String> skillTypes(bool members, int id, String role) {
+    final meta = objectRow(card(members, id)['catalogMetadata']);
+    final value = objectRow(
+      meta['resolvedSkills'],
+    )[role == 'gekiso' ? 'gekisou' : role];
+    final rows = value is List
+        ? value.map(objectRow)
+        : value is Map
+        ? [objectRow(value)]
+        : const <Doc>[];
+    return {
+      for (final entry in rows)
+        if (entry['skillName'] case final List names)
+          if (names
+                  .whereType<String>()
+                  .where((name) => name.trim().isNotEmpty)
+                  .firstOrNull
+              case final name?)
+            name.trim(),
+    }.toList();
+  }
+
+  /// Every distinct skill type of the given role across the loaded cards.
+  List<String> skillTypeOptions(bool members, String role) {
+    final ids = [
+      for (final key in objectRow(data[members ? 'members' : 'snapshots']).keys)
+        ?int.tryParse(key),
+    ];
+    final seen = <String>{};
+    for (final id in ids) {
+      seen.addAll(skillTypes(members, id, role));
+    }
+    final sorted = seen.toList()..sort();
+    return sorted;
+  }
+
   String? attributeIcon(int attribute) => visuals?.cardTypeMark(attribute);
   String? rarityIcon(int rarity) =>
       visuals?.mark('RarityIconCenter_${cardRarityName(rarity)}.png');

@@ -25,11 +25,17 @@ import 'widgets.dart';
 enum _Show { owned, all, unowned }
 
 class BoxTab extends StatefulWidget {
-  const BoxTab({super.key, required this.controller, required this.query});
+  const BoxTab({
+    super.key,
+    required this.controller,
+    required this.query,
+    this.quickAdd = false,
+  });
   final TeamBuilderController controller;
 
   /// The app-bar search.
   final String query;
+  final bool quickAdd;
 
   @override
   State<BoxTab> createState() => _BoxTabState();
@@ -40,6 +46,8 @@ class _BoxTabState extends State<BoxTab> {
   _Show _show = _Show.owned;
   CardFilters _filters = const CardFilters();
   bool _filtersOpen = false;
+
+  bool get _quickAdd => widget.quickAdd;
 
   TeamBuilderController get c => widget.controller;
 
@@ -219,8 +227,11 @@ class _BoxTabState extends State<BoxTab> {
                 ),
               ],
               selected: {_members},
-              onSelectionChanged: (value) =>
-                  setState(() => _members = value.single),
+              onSelectionChanged: (value) => setState(() {
+                _members = value.single;
+                // Skill facets differ between members and snapshots.
+                _filters = _filters.copyWith(skills: const {});
+              }),
             ),
             SegmentedButton<_Show>(
               showSelectedIcon: false,
@@ -258,6 +269,7 @@ class _BoxTabState extends State<BoxTab> {
           CardFilterPanel(
             catalog: catalog,
             filters: _filters,
+            members: _members,
             onChanged: (value) => setState(() => _filters = value),
           ),
         const Divider(height: 1),
@@ -467,7 +479,21 @@ class _BoxTabState extends State<BoxTab> {
         if (owned == null)
           TileMark.text(MarkAt.bottomStart, c.tb('notOwned', 'Not owned')),
       ],
-      onTap: () => showCardEditor(context, c, members: _members, id: id),
+      onTap: () {
+        if (!_quickAdd) {
+          showCardEditor(context, c, members: _members, id: id);
+          return;
+        }
+        final name = catalog.cardName(_members, id);
+        _bulk(
+          owned == null
+              ? c.tb('quickAddOwned', 'Quick added {name}', {'name': name})
+              : c.tb('quickAddDropped', 'Quick dropped {name}', {'name': name}),
+          owned == null
+              ? [('$p.$id.own', true), ('$p.$id.use', true)]
+              : [('$p.$id.own', false)],
+        );
+      },
       action: Material(
         color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
         shape: const CircleBorder(),

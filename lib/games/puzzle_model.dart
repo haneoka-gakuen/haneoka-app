@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import 'puzzle_constructive.dart';
+
 /// A port of the website's `lib/song-puzzle/model.ts` and `solver.ts`: a
 /// sliding puzzle whose blank is tile 0, and an IDA* solver with Manhattan
 /// distance and linear conflicts.
@@ -127,6 +129,9 @@ SolveResult solvePuzzle(
       SolveResult(status, path, nodes, bound, clock.elapsedMilliseconds);
   if (!validPosition(size, tiles, goal)) return result('invalid');
   if (!solvable(size, tiles, goal)) return result('unsolvable');
+  if (size >= 5) {
+    return constructPuzzle(size, tiles, goal, budgetMs.clamp(100, 120000));
+  }
   final board = [...tiles];
   final cells = board.length;
   final cellRows = [for (var i = 0; i < cells; i++) i ~/ size];

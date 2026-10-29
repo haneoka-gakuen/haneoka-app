@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import 'box_tab.dart' show showCardEditor;
+import 'manual_event_view.dart';
 import 'build_tab.dart' show BuildTab;
 import 'controller.dart';
 import 'engine/api.dart';
@@ -258,6 +259,7 @@ class _PtTabState extends State<PtTab> {
               ],
             ),
           ),
+          ManualEventControls(controller: c),
           field(
             'consumption',
             DropdownMenu<int>(

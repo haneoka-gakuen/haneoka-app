@@ -62,6 +62,25 @@ class CatalogProfile {
 
 /// The catalogue, in the website's drawer order.
 const catalogProfiles = <CatalogProfile>[
+  CatalogProfile(resource: 'circle', label: 'navigation.circle', icon: Symbols.groups_rounded, presentation: Presentation.system, document: 'entries'),
+  CatalogProfile(resource: 'challenge', label: 'navigation.challenge', icon: Symbols.swords_rounded, presentation: Presentation.system, document: 'entries'),
+  CatalogProfile(
+    resource: 'arena',
+    label: 'navigation.arena',
+    icon: Symbols.swords_rounded,
+    presentation: Presentation.system,
+    document: 'entries',
+    title: ['title'],
+    defaultSort: 'release',
+  ),
+  CatalogProfile(
+    resource: 'chat-customizations',
+    label: 'navigation.chatCustomizations',
+    icon: Symbols.chat_rounded,
+    presentation: Presentation.item,
+    document: 'entries',
+    detail: ['kind', 'initialOwnership'],
+  ),
   CatalogProfile(
     resource: 'songs',
     label: 'navigation.songs',

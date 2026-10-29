@@ -8,6 +8,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../ui/theme.dart';
 import 'box.dart';
 import 'controller.dart';
+import 'build_tab.dart' show SongRulesEditor;
 import 'engine/api.dart';
 import 'engine/box.dart';
 import 'engine/execution.dart';
@@ -97,6 +98,8 @@ class _TeamsTabState extends State<TeamsTab> {
           team: _spec,
           songs: c.manualSongs,
           play: c.play,
+          songRules: c.songRulesFor(s, gekiso: s.manualScoreMode == 'gekiso'),
+          eventEffects: c.manualEventEffects(s),
           gekiso: c.settings.manualScoreMode == 'gekiso'
               ? {
                   'accuracy': {
@@ -647,6 +650,16 @@ class _TeamsTabState extends State<TeamsTab> {
               ],
               onSelected: (value) =>
                   c.updateSettings({'manualScoreMode': value}),
+            ),
+            ExpansionTile(
+              title: Text(c.tb('songRules', 'Song rules')),
+              children: [
+                SongRulesEditor(
+                  controller: c,
+                  rules: s.songRulesOverride,
+                  onChanged: (value) => c.updateSettings({'songRules': value}),
+                ),
+              ],
             ),
             FilledButton.tonalIcon(
               icon: const Icon(Symbols.library_music_rounded),

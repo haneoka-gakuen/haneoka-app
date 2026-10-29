@@ -86,6 +86,7 @@ class ChartProject {
       ...chartRows(data[name]).map((row) => row['tick'] as int),
     for (final line in lines)
       ...chartRows(line['points']).map((row) => row['tick'] as int),
+    ...chartRows(data['waypoints'] ?? []).map((row) => row['tick'] as int),
     ...(markers['skill'] as List).cast<int>(),
     for (final pair in markers['fever'] as List) ...(pair as List).cast<int>(),
     ...chartRows(markers['call']).map((row) => row['tick'] as int),

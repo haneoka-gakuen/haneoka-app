@@ -138,6 +138,12 @@ final navSections = <NavSection>[
       Symbols.monitoring_rounded,
     ),
     NavItem('/catalog/events', 'navigation.events', Symbols.event_rounded),
+    NavItem('/catalog/arena', 'navigation.arena', Symbols.swords_rounded),
+    NavItem(
+      '/catalog/chat-customizations',
+      'navigation.chatCustomizations',
+      Symbols.chat_rounded,
+    ),
     NavItem(
       '/catalog/events/tracker',
       'tools.eventTracker.title',
@@ -419,14 +425,14 @@ final navDestinations = <NavDestination>[
   ),
   NavDestination(
     'tools',
-    '/team-builder',
+    '/tools',
     'navigation.tools',
     Symbols.construction_rounded,
     [_section('tools')],
   ),
   NavDestination(
     'games',
-    '/sonolus',
+    '/games',
     'navigation.games',
     Symbols.sports_esports_rounded,
     [_section('games')],

@@ -176,6 +176,9 @@ sealed class Goal {
                 intOf(objectRow(json['cpExchange'])['denominator'], 1),
               )
             : null,
+        eventEffects: json['eventEffects'] is List
+            ? [for (final row in json['eventEffects'] as List) objectRow(row)]
+            : null,
         gekiso: json['gekiso'] is Map
             ? (
                 just: numOf(objectRow(json['gekiso'])['just']),
@@ -184,6 +187,7 @@ sealed class Goal {
             : null,
       ),
       'gekiso' => GekisoGoal(
+        arena: json['arena'] is Map ? objectRow(json['arena']) : null,
         songs: songs(json['songs']),
         criterion: criterion(),
         accuracy: Accuracy(
@@ -256,6 +260,7 @@ class EventGoal extends Goal {
     this.minComboBonus = 1,
     this.cpExchange,
     this.gekiso,
+    this.eventEffects,
   });
 
   /// Strict reward recommendation: exact inputs, AP solo/challenge lives,
@@ -272,6 +277,10 @@ class EventGoal extends Goal {
 
   /// Non-challenge Gekisou rewards, using per-outcome settlement.
   final ({double just, int luckSamples})? gekiso;
+
+  /// Manual event effects (`event.rs` `ManualEffect`): replaces the bonus rows
+  /// the template event would contribute. Null keeps the recorded ones.
+  final List<Doc>? eventEffects;
 
   EventGoal copyWith({
     String? measure,
@@ -295,6 +304,7 @@ class EventGoal extends Goal {
     minComboBonus: minComboBonus,
     cpExchange: cpExchange ?? this.cpExchange,
     gekiso: dropGekiso ? null : gekiso,
+    eventEffects: eventEffects,
   );
 
   Map<String, Object?> toJson() => {
@@ -308,6 +318,7 @@ class EventGoal extends Goal {
     if (weights != null) 'weights': weights,
     if (rewardPlan != null) 'rewardPlan': rewardPlan,
     if (primaryOnly) 'ranking': ptOnly ? 'pt-only' : ranking,
+    if (eventEffects != null) 'eventEffects': eventEffects,
     if (cpExchange case final cp?)
       'cpExchange': {'numerator': cp.numerator, 'denominator': cp.denominator},
     if (gekiso case final g?)
@@ -339,6 +350,9 @@ class GekisoGoal extends Goal {
     this.seeds = 0,
     this.minComboBonus = 1,
     this.opponents,
+    this.musicType,
+    this.missions,
+    this.arena,
   });
   final List<SongRef> songs;
   final Criterion criterion;
@@ -354,6 +368,12 @@ class GekisoGoal extends Goal {
   final int seeds;
   final int minComboBonus;
   final List<List<double>>? opponents;
+
+  /// Song rules override (`arena.ts` SongRules): the attribute a song is
+  /// treated as and the three range types. Null keeps the master values.
+  final int? musicType;
+  final List<int>? missions;
+  final Doc? arena;
 }
 
 class PotentialGoal extends Goal {
@@ -407,6 +427,7 @@ Map<String, Object?> goalJson(Goal goal) => switch (goal) {
       'challengeEventId': challengeEventId,
     },
   GekisoGoal(
+    :final arena,
     :final minComboBonus,
     :final opponents,
     :final songs,
@@ -417,6 +438,7 @@ Map<String, Object?> goalJson(Goal goal) => switch (goal) {
   ) =>
     {
       'kind': 'gekiso',
+      'arena': ?arena,
       'minComboBonus': minComboBonus,
       'opponents': ?opponents,
       'songs': [for (final song in songs) song.toJson()],
@@ -482,6 +504,8 @@ class EngineRequest {
     this.seeded = false,
     this.rewardPhase,
     this.resolveRewardPlan = false,
+    this.aggregation,
+    this.songRules,
   });
   factory EngineRequest.fromJson(Map<String, Object?> json) => EngineRequest(
     members: [
@@ -497,6 +521,8 @@ class EngineRequest {
       '${json['unknownPolicy'] ?? 'max'}',
     ),
     goal: Goal.fromJson(objectRow(json['goal'])),
+    aggregation: json['aggregation'] as String?,
+    songRules: json['songRules'] is Map ? objectRow(json['songRules']) : null,
     constraints: ConstraintInput.fromJson(objectRow(json['constraints'])),
     k: (json['k'] as num?)?.toInt() ?? 1,
     timeLimitMs: (json['timeLimitMs'] as num?)?.toDouble(),
@@ -570,6 +596,8 @@ class EngineRequest {
   final bool seeded;
   final Doc? rewardPhase;
   final bool resolveRewardPlan;
+  final String? aggregation;
+  final Doc? songRules;
 
   /// The same request for one shard, a time limit, other floors or songs.
   EngineRequest copyWith({
@@ -589,6 +617,8 @@ class EngineRequest {
     bool? seeded,
     Doc? rewardPhase,
     bool? resolveRewardPlan,
+    String? aggregation,
+    Doc? songRules,
   }) => EngineRequest(
     members: members,
     snaps: snaps,
@@ -612,6 +642,8 @@ class EngineRequest {
     seeded: seeded ?? this.seeded,
     rewardPhase: rewardPhase ?? this.rewardPhase,
     resolveRewardPlan: resolveRewardPlan ?? this.resolveRewardPlan,
+    aggregation: aggregation ?? this.aggregation,
+    songRules: songRules ?? this.songRules,
   );
 
   EngineRequest withGoal(
@@ -624,6 +656,8 @@ class EngineRequest {
     player: player,
     unknownPolicy: unknownPolicy,
     goal: goal,
+    songRules: songRules,
+    aggregation: aggregation,
     constraints: constraints,
     k: k,
     timeLimitMs: timeLimitMs,
@@ -637,6 +671,8 @@ class EngineRequest {
     'player': player.toJson(),
     'unknownPolicy': unknownPolicy.name,
     'goal': goalJson(goal),
+    'aggregation': ?aggregation,
+    if (songRules != null) 'songRules': songRules,
     'constraints': constraints.toJson(),
     'k': k,
     'timeLimitMs': timeLimitMs?.isFinite == true ? timeLimitMs : null,
@@ -822,7 +858,13 @@ class EngineHit {
                   objectRow(value),
               ]
             : null
-        ..gekiso = json['gekiso'] is Map ? objectRow(json['gekiso']) : null;
+        ..gekiso = json['gekiso'] is Map ? objectRow(json['gekiso']) : null
+        ..aggregate = json['aggregate'] is Map
+            ? [
+                for (final row in objectRow(json['aggregate'])['songs'] as List)
+                  EngineHit.fromJson(objectRow(row)),
+              ]
+            : null;
   final SongRef? song;
 
   /// Leader first.
@@ -831,6 +873,7 @@ class EngineHit {
   final int power;
   final List<int> slotPowers;
   final double key;
+  List<EngineHit>? aggregate;
   List<Doc>? rewardRanking;
   HitScore? score;
   int? skipScore;
@@ -850,6 +893,11 @@ class EngineHit {
     'score': score?.toJson(),
     'skipScore': skipScore,
     'event': event?.toJson(),
+    if (aggregate != null)
+      'aggregate': {
+        'kind': 'mean',
+        'songs': [for (final hit in aggregate!) hit.toJson()],
+      },
     if (gekiso != null) 'gekiso': gekiso,
     if (rewardRanking != null) 'rewardRanking': rewardRanking,
     'potential': potential == null
@@ -1050,9 +1098,16 @@ class ChartCache {
   }
 
   /// The Gekisou chart of a song at a stated accuracy and assumed range rank.
-  Future<GekisoChart> gekiso(SongRef ref, Accuracy accuracy, int rank) {
+  /// [missions] overlays the three range types of an Arena period.
+  Future<GekisoChart> gekiso(
+    SongRef ref,
+    Accuracy accuracy,
+    int rank, {
+    List<int>? missions,
+  }) {
     final key =
-        '${ref.key}:${accuracy.great}:${accuracy.just}:${accuracy.missEvery}:$rank';
+        '${ref.key}:${accuracy.great}:${accuracy.just}:${accuracy.missEvery}:$rank'
+        '${missions == null ? '' : ':${missions.join('-')}'}';
     var value = _gekiso.remove(key);
     if (value == null) {
       final song = master.songs[ref.songId];
@@ -1067,7 +1122,12 @@ class ChartCache {
           master,
           source,
           difficulty.playLevel,
-          song.gekisoMissions,
+          [
+            for (var i = 0; i < 3; i++)
+              missions?.elementAtOrNull(i) != null && missions![i] != 0
+                  ? missions[i]
+                  : song.gekisoMissions.elementAtOrNull(i) ?? 0,
+          ],
           accuracy,
           rank,
         ),
@@ -1141,7 +1201,13 @@ PlayerState playerState(EngineMaster master, PlayerInput input) {
 }
 
 /// Song view of a chart; a challenge song uses its own nonzero music type.
-MusicView musicView(EngineMaster master, int songId, int? challengeEventId) {
+/// [musicTypeOverride] applies the song rules of an Arena period on top.
+MusicView musicView(
+  EngineMaster master,
+  int songId,
+  int? challengeEventId, {
+  int? musicTypeOverride,
+}) {
   final song = master.songs[songId]!;
   var musicType = song.musicType;
   if (challengeEventId != null) {
@@ -1151,6 +1217,9 @@ MusicView musicView(EngineMaster master, int songId, int? challengeEventId) {
         )
         .firstOrNull;
     if ((challenge?.musicType ?? 0) != 0) musicType = challenge!.musicType;
+  }
+  if (musicTypeOverride != null && musicTypeOverride != 0) {
+    musicType = musicTypeOverride;
   }
   return MusicView(musicType, song.bestTags, songId);
 }
@@ -1688,7 +1757,12 @@ Future<EngineResponse> runEngine(
       _ => null,
     };
     final music = song != null
-        ? musicView(master, song.songId, challengeId)
+        ? musicView(
+            master,
+            song.songId,
+            challengeId,
+            musicTypeOverride: goal is GekisoGoal ? goal.musicType : null,
+          )
         : null;
     final powerEffects = challengeId != null
         ? master.events[challengeId]?.effects ?? const <EventEffectRow>[]
@@ -2184,7 +2258,12 @@ Future<EngineResponse> runEngine(
           ),
         );
       case GekisoGoal():
-        final gekiso = await charts.gekiso(song!, goal.accuracy, goal.rank);
+        final gekiso = await charts.gekiso(
+          song!,
+          goal.accuracy,
+          goal.rank,
+          missions: goal.missions,
+        );
         final exactRanking =
             !gekiso.luck && goal.seeds <= 1 && !request.seedOnly;
         double margin(double key) => math.max(1, key.abs()) * 3e-5;

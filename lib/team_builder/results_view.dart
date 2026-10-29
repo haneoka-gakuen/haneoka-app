@@ -173,6 +173,33 @@ List<(String, String)> resultConditions(
       ),
     ),
     (c.tb('goal', 'Goal'), metric.label),
+    if (hit.aggregate != null)
+      (
+        c.tb('arena.objective', 'Team objective'),
+        c.tb('multiSong.mean', 'Best average across songs'),
+      ),
+    if (settings.arena case final arena?)
+      (
+        c.tb('arena.league', 'League'),
+        c.catalog!.bandName(intOf(arena['bandId'])),
+      ),
+    if ((settings.arena ?? input.songRules) case final rules?) ...[
+      (
+        c.tb('arena.attribute', 'Song Type'),
+        intOf(rules['musicType']) == 0
+            ? c.tb('arena.original', 'Original song')
+            : intOf(rules['musicType']) == 99
+            ? c.tb('arena.any', 'Any attribute')
+            : c.catalog!.attributeName(intOf(rules['musicType'])),
+      ),
+      for (final (index, mission) in intListOf(rules['missions']).indexed)
+        (
+          c.tb('arena.range', 'Range {count}', {'count': index + 1}),
+          mission == 0
+              ? c.tb('arena.original', 'Original song')
+              : ['', 'COMBO', 'LUCK', 'JUST'][mission],
+        ),
+    ],
     if (goal is EventGoal || goal is PlanGoal)
       (
         c.tb('farm.memory', 'Character / song memory bonuses'),
@@ -1243,12 +1270,49 @@ class _HitCardState extends State<_HitCard> {
                   ),
                 ],
               ),
-              if (hit.score != null) _Distribution(controller: c, hit: hit),
-              TeamRankTargets(
-                controller: c,
-                hit: hit,
-                settings: widget.settings,
-              ),
+              if (hit.aggregate case final parts?)
+                ExpansionTile(
+                  title: Text(c.tb('arena.scoreDetails', 'Scores by song')),
+                  children: [
+                    for (final part in parts)
+                      if (part.song case final song?)
+                        ListTile(
+                          title: Text(
+                            '${catalog.songTitle(song.songId)} · ${catalog.difficultyLabel(song.songId, song.difficulty)}',
+                          ),
+                          subtitle: Text(
+                            '${c.tb('power', 'Power')} ${formatNumber(c.state.text.locale, part.power)}',
+                          ),
+                          trailing: Text(
+                            formatNumber(c.state.text.locale, part.key),
+                          ),
+                          onTap: () => showModalBottomSheet<void>(
+                            context: context,
+                            isScrollControlled: true,
+                            builder: (context) => SafeArea(
+                              child: SingleChildScrollView(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _Distribution(controller: c, hit: part),
+                                    _SkillOrders(controller: c, hit: part),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                  ],
+                ),
+              if (hit.score != null && hit.aggregate == null)
+                _Distribution(controller: c, hit: hit),
+              if (hit.aggregate == null)
+                TeamRankTargets(
+                  controller: c,
+                  hit: hit,
+                  settings: widget.settings,
+                ),
               if (hit.song != null &&
                   (hit.score?.orders.isNotEmpty ?? false)) ...[
                 const SizedBox(height: 16),

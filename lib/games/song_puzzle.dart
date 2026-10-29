@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:isolate';
 
 import 'package:flutter/material.dart';
 import 'package:material_new_shapes/material_new_shapes.dart';
@@ -14,13 +13,9 @@ import '../ui/shapes.dart';
 import '../ui/theme.dart';
 import '../ui/tile.dart';
 import 'puzzle_model.dart';
-
-Future<SolveResult> _solveInBackground(
-  int size,
-  List<int> start,
-  List<int> goal,
-  int budget,
-) => Isolate.run(() => solvePuzzle(size, start, goal, budget));
+import 'puzzle_solver.dart';
+import 'puzzle_import.dart';
+import 'puzzle_recognition.dart';
 
 class _Song {
   const _Song(
@@ -75,6 +70,7 @@ class _SongPuzzleScreenState extends State<SongPuzzleScreen> {
   final _history = <({List<int> tiles, int moves})>[];
   int _revision = 0;
   bool _busy = false;
+  PuzzleSolveTask? _solver;
   _Solution? _solution;
   int _replayIndex = 0;
   Timer? _replay;
@@ -96,6 +92,7 @@ class _SongPuzzleScreenState extends State<SongPuzzleScreen> {
 
   @override
   void dispose() {
+    _solver?.cancel();
     _replay?.cancel();
     super.dispose();
   }
@@ -152,6 +149,8 @@ class _SongPuzzleScreenState extends State<SongPuzzleScreen> {
   }
 
   void _invalidate() {
+    _solver?.cancel();
+    _solver = null;
     _replay?.cancel();
     _replay = null;
     _revision++;
@@ -222,6 +221,25 @@ class _SongPuzzleScreenState extends State<SongPuzzleScreen> {
     });
   }
 
+  Future<void> _importImage() async {
+    final song = _songs.where((song) => song.id == _song).firstOrNull;
+    if (song == null) return;
+    final result = await Navigator.of(context).push<PuzzleRecognition>(
+      MaterialPageRoute(
+        builder: (_) => PuzzleImportScreen(size: _size, cover: song.cover),
+      ),
+    );
+    if (!mounted || result == null) return;
+    await _change(() {
+      _invalidate();
+      _goalBlank = result.goalBlank;
+      _tiles = result.tiles;
+      _mode = 'edit';
+      _moves = 0;
+      _history.clear();
+    });
+  }
+
   void _undo() => setState(() {
     if (_history.isEmpty) return;
     final previous = _history.removeLast();
@@ -240,12 +258,14 @@ class _SongPuzzleScreenState extends State<SongPuzzleScreen> {
       _busy = true;
     });
     final revision = _revision;
-    final result = await _solveInBackground(size, start, goal, budget);
+    final task = _solver = PuzzleSolveTask(size, start, goal, budget);
+    final result = await task.result;
+    if (identical(_solver, task)) _solver = null;
     if (!mounted || revision != _revision) return;
     setState(() {
       _busy = false;
       _message = result.status;
-      if (result.status != 'optimal') return;
+      if (result.status != 'optimal' && result.status != 'found') return;
       var board = start;
       final directions = <String>[];
       for (final tile in result.path) {
@@ -334,8 +354,8 @@ class _SongPuzzleScreenState extends State<SongPuzzleScreen> {
     final valid = solvable(_size, _tiles, _goal);
     final status = _busy
         ? _text('searching')
-        : _message == 'optimal' && _solution != null
-        ? _text('optimal', {'moves': _solution!.path.length})
+        : (_message == 'optimal' || _message == 'found') && _solution != null
+        ? _text(_message, {'moves': _solution!.path.length})
         : _message.isNotEmpty
         ? _text(_message)
         : !valid
@@ -439,6 +459,12 @@ class _SongPuzzleScreenState extends State<SongPuzzleScreen> {
             ),
           );
           final settings = [
+            FilledButton.tonalIcon(
+              onPressed: _loaded && !_busy ? _importImage : null,
+              icon: const Icon(Symbols.image_search_rounded),
+              label: Text(_text('imageImport')),
+            ),
+            const SizedBox(height: 12),
             surface(
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
