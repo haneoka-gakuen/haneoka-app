@@ -296,10 +296,17 @@ class TeamBuilderController extends ChangeNotifier {
       );
 
   /// A range type is active when the song rules override says so, otherwise
-  /// when any selected song carries that mission in the master data.
+  /// when any selected song carries that mission in the master data. Missions
+  /// are numbered 1..3 (COMBO/LUCK/JUST) but stored by range, so the index is
+  /// one lower.
   bool _missionEnabled(BuildSettings s, int mission) {
     final rules = s.songRulesOverride;
-    if (rules != null) return rules.missions[mission] != 0;
+    if (rules != null) {
+      final index = mission - 1;
+      return index >= 0 && index < rules.missions.length
+          ? rules.missions[index] != 0
+          : false;
+    }
     return hasMission(mission, s.songs);
   }
 
@@ -458,7 +465,7 @@ class TeamBuilderController extends ChangeNotifier {
   Goal? manualGoal() {
     final rules = settings.songRulesOverride;
     bool mission(int index) => rules != null
-        ? rules.missions[index] != 0
+        ? (index - 1 < rules.missions.length ? rules.missions[index - 1] != 0 : false)
         : hasMission(index, manualSongs);
     if (settings.manualScoreMode != 'gekiso') {
       return ScoreGoal(
