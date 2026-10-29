@@ -4,6 +4,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../catalog/catalog_screen.dart' show cardRarityName;
@@ -26,6 +27,7 @@ class CardFilters {
     this.totalMin,
     this.totalMax,
     this.artOnly = false,
+    this.noArt = false,
     this.releaseFrom,
     this.releaseTo,
     this.skill = '',
@@ -43,6 +45,7 @@ class CardFilters {
 
   /// Only cards that actually ship a card image.
   final bool artOnly;
+  final bool noArt;
 
   /// Release window, in epoch milliseconds (`catalogMetadata.releasedAt`).
   final int? releaseFrom;
@@ -61,7 +64,7 @@ class CardFilters {
       attributes.length +
       rarities.length +
       (totalMin != null || totalMax != null ? 1 : 0) +
-      (artOnly ? 1 : 0) +
+      (artOnly || noArt ? 1 : 0) +
       (releaseFrom != null || releaseTo != null ? 1 : 0) +
       (skill.trim().isEmpty ? 0 : 1) +
       skills.values.fold<int>(0, (sum, set) => sum + set.length);
@@ -75,10 +78,15 @@ class CardFilters {
     int? totalMin,
     int? totalMax,
     bool resetTotal = false,
+    bool clearTotalMin = false,
+    bool clearTotalMax = false,
     bool? artOnly,
+    bool? noArt,
     int? releaseFrom,
     int? releaseTo,
     bool resetRelease = false,
+    bool clearReleaseFrom = false,
+    bool clearReleaseTo = false,
     String? skill,
     Map<String, Set<String>>? skills,
   }) => CardFilters(
@@ -87,11 +95,16 @@ class CardFilters {
     characters: characters ?? this.characters,
     attributes: attributes ?? this.attributes,
     rarities: rarities ?? this.rarities,
-    totalMin: resetTotal ? null : (totalMin ?? this.totalMin),
-    totalMax: resetTotal ? null : (totalMax ?? this.totalMax),
+    totalMin: resetTotal || clearTotalMin ? null : (totalMin ?? this.totalMin),
+    totalMax: resetTotal || clearTotalMax ? null : (totalMax ?? this.totalMax),
     artOnly: artOnly ?? this.artOnly,
-    releaseFrom: resetRelease ? null : (releaseFrom ?? this.releaseFrom),
-    releaseTo: resetRelease ? null : (releaseTo ?? this.releaseTo),
+    noArt: noArt ?? this.noArt,
+    releaseFrom: resetRelease || clearReleaseFrom
+        ? null
+        : (releaseFrom ?? this.releaseFrom),
+    releaseTo: resetRelease || clearReleaseTo
+        ? null
+        : (releaseTo ?? this.releaseTo),
     skill: skill ?? this.skill,
     skills: skills ?? this.skills,
   );
@@ -115,6 +128,7 @@ class CardFilters {
       return false;
     }
     if (artOnly && catalog.cardImage(members, id).isEmpty) return false;
+    if (noArt && catalog.cardImage(members, id).isNotEmpty) return false;
     if (totalMin != null || totalMax != null) {
       final stat = objectRow(catalog.card(members, id)['statMax']);
       final total =
@@ -148,9 +162,9 @@ class CardFilters {
       final resolved = objectRow(meta['resolvedSkills']);
       final names = <String>[];
       for (final role in resolved.values) {
-        final names_ = objectRow(role)['skillName'];
-        if (names_ is List) {
-          names.addAll(names_.whereType<String>());
+        for (final row in role is List ? role : [role]) {
+          final values = objectRow(row)['skillName'];
+          if (values is List) names.addAll(values.whereType<String>());
         }
       }
       if (!names.any((name) => name.toLowerCase().contains(skillQuery))) {
@@ -259,7 +273,7 @@ class CardFilterPanel extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         ToolField(
-          label: t('catalog.fields.rarity', 'Rarity'),
+          label: t.label('rarity'),
           child: chips([
             for (final id in [1, 2, 3, 4])
               FilterChip(
@@ -274,55 +288,80 @@ class CardFilterPanel extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         ToolField(
-          label: t('catalog.cards.fields.total', 'Total stat'),
-          child: RangeSlider(
-            values: RangeValues(
-              (filters.totalMin ?? 0).toDouble(),
-              (filters.totalMax ?? 60000).toDouble(),
-            ),
-            max: 60000,
-            divisions: 60,
-            labels: RangeLabels(
-              '${filters.totalMin ?? 0}',
-              filters.totalMax == null ? 'max' : '${filters.totalMax}',
-            ),
-            onChanged: (value) {
-              final low = value.start <= 0 ? null : value.start.round();
-              final high = value.end >= 60000 ? null : value.end.round();
-              onChanged(
-                filters.copyWith(
-                  totalMin: low,
-                  totalMax: high,
-                  resetTotal: low == null && high == null,
+          label: t.label('total'),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  key: ValueKey((members, 'total-min', filters.active == 0)),
+                  initialValue: filters.totalMin?.toString() ?? '',
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(labelText: t.label('minimum')),
+                  onChanged: (value) => onChanged(
+                    filters.copyWith(
+                      totalMin: int.tryParse(value),
+                      clearTotalMin: value.isEmpty,
+                    ),
+                  ),
                 ),
-              );
-            },
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextFormField(
+                  key: ValueKey((members, 'total-max', filters.active == 0)),
+                  initialValue: filters.totalMax?.toString() ?? '',
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(labelText: t.label('maximum')),
+                  onChanged: (value) => onChanged(
+                    filters.copyWith(
+                      totalMax: int.tryParse(value),
+                      clearTotalMax: value.isEmpty,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 12),
         ToolField(
-          label: t('catalog.cards.fields.image', 'Card image'),
+          label: t.label('availableImage'),
           child: chips([
             FilterChip(
-              label: Text(t('catalog.cards.fields.hasImage', 'Has artwork')),
+              label: Text(t.label('yes')),
               selected: filters.artOnly,
-              onSelected: (value) => onChanged(filters.copyWith(artOnly: value)),
+              onSelected: (value) =>
+                  onChanged(filters.copyWith(artOnly: value, noArt: false)),
+            ),
+            FilterChip(
+              label: Text(t.label('no')),
+              selected: filters.noArt,
+              onSelected: (value) =>
+                  onChanged(filters.copyWith(noArt: value, artOnly: false)),
             ),
           ]),
         ),
-        for (final (role, label) in (members
-            ? const [
-                ('leader', 'Leader skill'),
-                ('live', 'Live skill'),
-                ('gekiso', 'Gekiso skill'),
-              ]
-            : const [
-                ('support', 'Support skill'),
-                ('gekisouSupport', 'Gekiso support skill'),
-              ])) ...[
+        for (final (role, label)
+            in (members
+                ? const [
+                    ('leader', 'Leader skill'),
+                    ('live', 'Live skill'),
+                    ('gekiso', 'Gekiso skill'),
+                  ]
+                : const [
+                    ('support', 'Support skill'),
+                    ('gekisouSupport', 'Gekiso support skill'),
+                  ])) ...[
           const SizedBox(height: 12),
           ToolField(
-            label: t('catalog.skills.$role', label),
+            label: t.label(
+              role == 'gekiso'
+                  ? 'gekisouSkill'
+                  : role == 'gekisouSupport'
+                  ? 'gekisouSupportSkill'
+                  : '${role}Skill',
+              label,
+            ),
             child: chips([
               for (final name in catalog.skillTypeOptions(members, role))
                 FilterChip(
@@ -343,40 +382,53 @@ class CardFilterPanel extends StatelessWidget {
         ],
         const SizedBox(height: 12),
         ToolField(
-          label: t('catalog.fields.release', 'Release'),
-          child: Builder(
-            builder: (context) {
-              final nowYear = DateTime.now().year;
-              final start = _yearOf(filters.releaseFrom) ?? 2019;
-              final end = _yearOf(filters.releaseTo) ?? nowYear;
-              return RangeSlider(
-                values: RangeValues(
-                  start.toDouble().clamp(2019, nowYear.toDouble()),
-                  end.toDouble().clamp(2019, nowYear.toDouble()),
+          label: t.label('release'),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final lower in [true, false])
+                InputChip(
+                  label: Text(
+                    '${t.label(lower ? 'minimum' : 'maximum')}: ${(lower ? filters.releaseFrom : filters.releaseTo) == null ? t('common.states.all', 'All') : DateFormat.yMd(t.locale).format(DateTime.fromMillisecondsSinceEpoch((lower ? filters.releaseFrom : filters.releaseTo)!))}',
+                  ),
+                  onPressed: () async {
+                    final value = lower
+                        ? filters.releaseFrom
+                        : filters.releaseTo;
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: value == null
+                          ? DateTime.now()
+                          : DateTime.fromMillisecondsSinceEpoch(value),
+                      firstDate: DateTime(2010),
+                      lastDate: DateTime(2100),
+                    );
+                    if (date != null) {
+                      onChanged(
+                        lower
+                            ? filters.copyWith(
+                                releaseFrom: date.millisecondsSinceEpoch,
+                              )
+                            : filters.copyWith(
+                                releaseTo:
+                                    DateTime(
+                                      date.year,
+                                      date.month,
+                                      date.day + 1,
+                                    ).millisecondsSinceEpoch -
+                                    1,
+                              ),
+                      );
+                    }
+                  },
+                  onDeleted: () => onChanged(
+                    lower
+                        ? filters.copyWith(clearReleaseFrom: true)
+                        : filters.copyWith(clearReleaseTo: true),
+                  ),
                 ),
-                min: 2019,
-                max: nowYear.toDouble(),
-                divisions: nowYear - 2019,
-                labels: RangeLabels('$start', '$end'),
-                onChanged: (value) {
-                  final from = value.start <= 2019
-                      ? null
-                      : DateTime(value.start.round()).millisecondsSinceEpoch;
-                  final to = value.end >= nowYear
-                      ? null
-                      : DateTime(value.end.round() + 1, 1, 1)
-                            .millisecondsSinceEpoch -
-                            1;
-                  onChanged(
-                    filters.copyWith(
-                      releaseFrom: from,
-                      releaseTo: to,
-                      resetRelease: from == null && to == null,
-                    ),
-                  );
-                },
-              );
-            },
+            ],
           ),
         ),
         const SizedBox(height: 12),
@@ -394,10 +446,6 @@ class CardFilterPanel extends StatelessWidget {
     );
   }
 }
-
-int? _yearOf(int? millis) => millis == null
-    ? null
-    : DateTime.fromMillisecondsSinceEpoch(millis).year;
 
 Widget? _emblem(String url, {bool round = false}) {
   if (url.isEmpty) return null;
@@ -552,6 +600,7 @@ Future<List<SongRef>?> pickSongs(
   List<SongRef> songs, {
   bool single = false,
   List<int>? allowed,
+  List<SongRef>? allowedCharts,
 }) => Navigator.of(context).push<List<SongRef>>(
   MaterialPageRoute(
     fullscreenDialog: true,
@@ -560,6 +609,7 @@ Future<List<SongRef>?> pickSongs(
       initial: songs,
       single: single,
       allowed: allowed,
+      allowedCharts: allowedCharts,
     ),
   ),
 );
@@ -570,11 +620,13 @@ class _SongPicker extends StatefulWidget {
     required this.initial,
     required this.single,
     this.allowed,
+    this.allowedCharts,
   });
   final TeamCatalog catalog;
   final List<SongRef> initial;
   final bool single;
   final List<int>? allowed;
+  final List<SongRef>? allowedCharts;
 
   @override
   State<_SongPicker> createState() => _SongPickerState();
@@ -616,6 +668,8 @@ class _SongPickerState extends State<_SongPicker> {
         if (int.tryParse(key) case final id?)
           if ((widget.allowed == null || widget.allowed!.contains(id)) &&
               catalog.difficultyRow(id, _difficulty) != null &&
+              (widget.allowedCharts == null ||
+                  widget.allowedCharts!.contains(SongRef(id, _difficulty))) &&
               (_bands.isEmpty || catalog.songBands(id).any(_bands.contains)) &&
               (_attributes.isEmpty ||
                   _attributes.contains(intOf(catalog.song(id)['musicType']))) &&
@@ -821,6 +875,30 @@ class _SongPickerState extends State<_SongPicker> {
                   }),
                   child: Text(
                     tb('selectMatchingSongs', 'Select all shown songs'),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => setState(() {
+                    _songs = {
+                      ..._songs,
+                      for (final id in ids)
+                        for (final row in catalog.difficultyRows(id))
+                          if (widget.allowedCharts == null ||
+                              widget.allowedCharts!.contains(
+                                SongRef(id, intOf(row['difficulty'])),
+                              ))
+                            SongRef(id, intOf(row['difficulty'])),
+                    }.toList();
+                  }),
+                  child: Text(tb('selectAllCharts', 'Select all difficulties')),
+                ),
+                TextButton(
+                  onPressed: () => setState(
+                    () =>
+                        _songs.removeWhere((song) => ids.contains(song.songId)),
+                  ),
+                  child: Text(
+                    tb('deselectAllCharts', 'Deselect all difficulties'),
                   ),
                 ),
                 TextButton(

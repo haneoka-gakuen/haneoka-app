@@ -19,6 +19,7 @@ import '../records/records.dart';
 import '../ui/app_image.dart';
 import '../ui/detail.dart';
 import 'card_growth.dart';
+import 'arena_detail.dart';
 import 'character_detail.dart';
 import 'cross_server.dart';
 import 'source_picker.dart';
@@ -457,11 +458,14 @@ class _Page {
                   },
                 ).toString(),
               ),
-              builder: (_) => CatalogSourceScope(api: kit.api, child: NativeChartPlayerScreen(
-                song: canonicalRecord,
+              builder: (_) => CatalogSourceScope(
                 api: kit.api,
-                difficulty: chosen!,
-              )),
+                child: NativeChartPlayerScreen(
+                  song: canonicalRecord,
+                  api: kit.api,
+                  difficulty: chosen!,
+                ),
+              ),
             ),
           ),
         ),
@@ -1003,7 +1007,8 @@ class _Page {
       if (kind == Presentation.item)
         if ((page?['document'] as Map?)?['itemRelations'] case final Map data)
           ItemRelations(data: data),
-      if (kind == Presentation.system)
+      if (resource == 'arena') ArenaDetail(season: record),
+      if (kind == Presentation.system && resource != 'arena')
         SystemDetail(
           key: ValueKey('$resource:${kit.id(record)}'),
           resource: resource,

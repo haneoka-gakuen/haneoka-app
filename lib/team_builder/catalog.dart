@@ -204,13 +204,24 @@ class TeamCatalog extends ChangeNotifier {
   /// variants of one skill do not turn into separate filter options.
   List<String> skillTypes(bool members, int id, String role) {
     final meta = objectRow(card(members, id)['catalogMetadata']);
-    final entry = objectRow(objectRow(meta['resolvedSkills'])[role]);
-    final names = entry['skillName'];
-    if (names is! List) return const [];
-    for (final value in names) {
-      if (value is String && value.trim().isNotEmpty) return [value.trim()];
-    }
-    return const [];
+    final value = objectRow(
+      meta['resolvedSkills'],
+    )[role == 'gekiso' ? 'gekisou' : role];
+    final rows = value is List
+        ? value.map(objectRow)
+        : value is Map
+        ? [objectRow(value)]
+        : const <Doc>[];
+    return {
+      for (final entry in rows)
+        if (entry['skillName'] case final List names)
+          if (names
+                  .whereType<String>()
+                  .where((name) => name.trim().isNotEmpty)
+                  .firstOrNull
+              case final name?)
+            name.trim(),
+    }.toList();
   }
 
   /// Every distinct skill type of the given role across the loaded cards.

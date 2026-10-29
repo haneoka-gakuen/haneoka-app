@@ -8,6 +8,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../catalog/catalog_screen.dart' show cardRarityName;
 import '../ui/app_image.dart';
 import 'controller.dart';
+import 'manual_event_view.dart';
 import 'engine/api.dart';
 import 'pickers.dart';
 import 'results_view.dart';
@@ -124,6 +125,9 @@ class _BuildTabState extends State<BuildTab> {
     final stamp = (
       c.settings,
       c.activity,
+      c.arenaActive,
+      c.arenaDraft,
+      c.arenaActive ? c.arena.regulation : null,
       c.catalog,
       c.view,
       Theme.of(context),
@@ -144,7 +148,7 @@ class _BuildTabState extends State<BuildTab> {
     return TeamToolLayout(
       controller: c,
       summary:
-          '${c.settings.theoretical ? c.tb('scopeAll', 'All cards') : c.tb('scopeBox', 'My cards')} · ${c.tb('chartCount', '{count} charts', {'count': c.searchSettings.songs.length})}',
+          '${c.searchSettings.theoretical ? c.tb('scopeAll', 'All cards') : c.tb('scopeBox', 'My cards')} · ${c.tb('chartCount', '{count} charts', {'count': c.searchSettings.songs.length})}',
       conditions: (context) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -231,9 +235,13 @@ class _BuildTabState extends State<BuildTab> {
           !(c.activity && s.goal == GoalKind.event && s.rewardPlan != null))
         ToolSection(
           icon: Symbols.flag_rounded,
-          title: c.activity ? goalText(c, s.goal) : c.tb('goal', 'Goal'),
+          title: c.arenaActive
+              ? c.tb('arena.objective', 'Team objective')
+              : c.activity
+              ? goalText(c, s.goal)
+              : c.tb('goal', 'Goal'),
           children: [
-            if (!c.activity)
+            if (!c.activity && !c.arenaActive)
               _GoalGrid(
                 goals: [
                   for (final (goal, icon) in _goals)
@@ -249,7 +257,23 @@ class _BuildTabState extends State<BuildTab> {
                 title: Text(c.tb('fullRanking', 'Full reward ranking')),
                 onChanged: (value) => set({'fullRanking': value == true}),
               ),
-            if (scored) ...[
+            if (!c.arenaActive &&
+                (scored || s.goal == GoalKind.event && s.route != 'skip'))
+              Segmented<String>(
+                value: s.shared ? 'mean' : 'individual',
+                options: [
+                  Choice(
+                    'individual',
+                    c.tb('arena.individual', 'A team for each song'),
+                  ),
+                  Choice(
+                    'mean',
+                    c.tb('multiSong.mean', 'Best average across songs'),
+                  ),
+                ],
+                onSelected: (value) => set({'aggregation': value}),
+              ),
+            if (scored && !s.shared && !(c.arenaActive && c.arena.shared)) ...[
               DropdownButtonFormField<String>(
                 key: ValueKey((
                   'criterion',
@@ -322,14 +346,18 @@ class _BuildTabState extends State<BuildTab> {
                 value: s.gekisoSeeds,
                 onChanged: (value) => set({'gekisoSeeds': value}),
               ),
-              _WrappingSegments(
-                value: s.opponentsMode ? 'opponents' : 'rank',
-                options: [
-                  ('rank', c.tb('placementRank', 'Specified placement')),
-                  ('opponents', c.tb('placementOpponents', 'Opponent scores')),
-                ],
-                onSelected: (value) => set({'gekisoPlacementMode': value}),
-              ),
+              if (!s.shared && !(c.arenaActive && c.arena.shared))
+                _WrappingSegments(
+                  value: s.opponentsMode ? 'opponents' : 'rank',
+                  options: [
+                    ('rank', c.tb('placementRank', 'Specified placement')),
+                    (
+                      'opponents',
+                      c.tb('placementOpponents', 'Opponent scores'),
+                    ),
+                  ],
+                  onSelected: (value) => set({'gekisoPlacementMode': value}),
+                ),
               if (s.opponentsMode)
                 for (var range = 0; range < 3; range++)
                   TextFormField(
@@ -385,13 +413,17 @@ class _BuildTabState extends State<BuildTab> {
             ],
           ],
         ),
-      if (s.goal == GoalKind.gekiso) ...[
+      if (!c.arenaActive &&
+          (s.goal == GoalKind.gekiso ||
+              s.goal == GoalKind.score ||
+              s.goal == GoalKind.power ||
+              s.goal == GoalKind.event)) ...[
         const SizedBox(height: 16),
         ToolSection(
           icon: Symbols.tune_rounded,
           title: c.tb('songRules', 'Song rules'),
           children: [
-            _SongRulesEditor(
+            SongRulesEditor(
               controller: c,
               rules: s.songRulesOverride,
               onChanged: (value) => set({'songRules': value}),
@@ -406,11 +438,7 @@ class _BuildTabState extends State<BuildTab> {
           title: c.tb('eventSetup', 'Event'),
           children: [
             ..._eventSection(context),
-            ManualEventControls(
-              controller: c,
-              value: s.manualEvent,
-              onChanged: (value) => set({'manualEvent': value}),
-            ),
+            ManualEventControls(controller: c),
             Segmented<String>(
               value: s.route,
               options: [
@@ -768,6 +796,7 @@ class _BuildTabState extends State<BuildTab> {
                 songs,
                 single: single,
                 allowed: allowed,
+                allowedCharts: c.arenaActive ? c.arena.charts : null,
               );
               if (picked != null) onChanged(picked);
             },
@@ -1244,8 +1273,9 @@ class _WrappingSegments<T> extends StatelessWidget {
 
 /// Per-song rules of an Arena period: the attribute a song is treated as and
 /// the three range types (`lit/team-builder/song-rules.ts`).
-class _SongRulesEditor extends StatelessWidget {
-  const _SongRulesEditor({
+class SongRulesEditor extends StatelessWidget {
+  const SongRulesEditor({
+    super.key,
     required this.controller,
     required this.rules,
     required this.onChanged,
@@ -1325,7 +1355,7 @@ class _SongRulesEditor extends StatelessWidget {
                           value: value,
                           child: Text(
                             value == 0
-                                ? c.tb('songRule.none', '—')
+                                ? c.tb('arena.original', 'Original song')
                                 : missionNames[value],
                           ),
                         ),
@@ -1345,97 +1375,6 @@ class _SongRulesEditor extends StatelessWidget {
             label: Text(c.tb('songRule.clear', 'Use data values')),
           ),
         ),
-      ],
-    );
-  }
-}
-
-/// Manual event bonus: one percentage for every bonus type of one attribute
-/// (`lit/team-builder/manual-event.ts`, simplified to the attribute knob).
-class ManualEventControls extends StatelessWidget {
-  const ManualEventControls({
-    super.key,
-    required this.controller,
-    required this.value,
-    required this.onChanged,
-  });
-  final TeamBuilderController controller;
-  final ({int attribute, double percent})? value;
-  final ValueChanged<Map<String, Object?>?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = controller;
-    final catalog = c.catalog!;
-    final enabled = value != null;
-    final attribute = value?.attribute ?? 1;
-    final percent = value?.percent ?? 0;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        CheckboxListTile(
-          contentPadding: EdgeInsets.zero,
-          value: enabled,
-          title: Text(c.tb('manualEvent.enable', 'Set the bonus by hand')),
-          subtitle: Text(
-            c.tb('manualEvent.hint', 'Ignores the recorded event effects'),
-          ),
-          onChanged: (on) => onChanged(
-            on == true
-                ? {'attribute': attribute, 'percent': percent}
-                : null,
-          ),
-        ),
-        if (enabled) ...[
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: InputDecorator(
-              decoration: InputDecoration(
-                isDense: true,
-                labelText: c.tb('manualEvent.attribute', 'Bonus attribute'),
-              ),
-              child: DropdownButton<int>(
-                value: attribute,
-                isExpanded: true,
-                underline: const SizedBox.shrink(),
-                items: [
-                  for (final id in [1, 2, 3, 4, 5])
-                    DropdownMenuItem(
-                      value: id,
-                      child: Text(catalog.attributeName(id)),
-                    ),
-                ],
-                onChanged: (v) => onChanged({
-                  'attribute': v ?? attribute,
-                  'percent': percent,
-                }),
-              ),
-            ),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: Slider(
-                  value: percent.clamp(0, 300).toDouble(),
-                  max: 300,
-                  divisions: 60,
-                  label: '${percent.round()}%',
-                  onChanged: (v) => onChanged({
-                    'attribute': attribute,
-                    'percent': v,
-                  }),
-                ),
-              ),
-              SizedBox(
-                width: 64,
-                child: Text(
-                  '${percent.round()}%',
-                  textAlign: TextAlign.end,
-                ),
-              ),
-            ],
-          ),
-        ],
       ],
     );
   }

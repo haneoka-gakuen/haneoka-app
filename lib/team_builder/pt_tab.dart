@@ -7,7 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import 'box_tab.dart' show showCardEditor;
-import 'build_tab.dart' show BuildTab, ManualEventControls;
+import 'manual_event_view.dart';
+import 'build_tab.dart' show BuildTab;
 import 'controller.dart';
 import 'engine/api.dart';
 import 'engine/num.dart';
@@ -258,11 +259,7 @@ class _PtTabState extends State<PtTab> {
               ],
             ),
           ),
-          ManualEventControls(
-            controller: c,
-            value: s.manualEvent,
-            onChanged: (value) => c.updateSettings({'manualEvent': value}),
-          ),
+          ManualEventControls(controller: c),
           field(
             'consumption',
             DropdownMenu<int>(

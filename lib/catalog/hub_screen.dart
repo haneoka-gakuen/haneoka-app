@@ -33,8 +33,13 @@ const _counted = {
 /// The catalogue destination's own page (`CatalogIndexPage`): the library
 /// section as a grid of hub links with each collection's size.
 class CatalogHubScreen extends StatefulWidget {
-  const CatalogHubScreen({super.key, required this.navigate});
+  const CatalogHubScreen({
+    super.key,
+    required this.navigate,
+    this.section = 'library',
+  });
   final ValueChanged<String> navigate;
+  final String section;
   @override
   State<CatalogHubScreen> createState() => _CatalogHubScreenState();
 }
@@ -60,9 +65,14 @@ class _CatalogHubScreenState extends State<CatalogHubScreen> {
     final t = AppScope.of(context).text;
     final theme = Theme.of(context);
     final number = NumberFormat.decimalPattern(t.locale);
-    final library = navSections.firstWhere((s) => s.id == 'library');
+    final library = navSections.firstWhere((s) => s.id == widget.section);
     return ShellPage(
-      title: t('navigation.catalog', 'Catalog'),
+      title: t(
+        widget.section == 'library'
+            ? 'navigation.catalog'
+            : 'navigation.${widget.section}',
+        'Catalog',
+      ),
       body: FutureBuilder(
         future: _summary,
         builder: (context, snapshot) {

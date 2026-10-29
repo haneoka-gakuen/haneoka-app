@@ -12,6 +12,8 @@ import '../catalog/visuals.dart';
 import '../catalog/catalog_query.dart';
 import '../core/app_state.dart';
 import 'box.dart';
+import 'arena_state.dart';
+import 'manual_event.dart';
 import 'catalog.dart';
 import 'data.dart';
 import 'engine/api.dart';
@@ -84,13 +86,56 @@ class TeamBuilderController extends ChangeNotifier {
   BuildSettings? resultSettings;
   EngineRequest? resultInputs;
   bool _activity = false;
+  bool _arenaActive = false;
+  Doc arenaDraft = arenaDefaults();
+  Timer? _arenaTimer;
+  bool get arenaActive => _arenaActive;
+  ArenaState get arena => ArenaState(catalog!, server, arenaDraft);
   bool get activity => _activity;
-  set activity(bool value) {
-    if (_activity == value) return;
+  set activity(bool value) => activate(value ? 'pt' : 'build');
+  void activate(String task) {
+    final nextActivity = task == 'pt', nextArena = task == 'arena';
+    if (_activity == nextActivity && _arenaActive == nextArena) return;
     _saveTaskResults();
-    _activity = value;
+    _activity = nextActivity;
+    _arenaActive = nextArena;
     _restoreTaskResults();
     _checkActiveContext();
+  }
+
+  void updateArena(Doc patch) {
+    if (patch['automatic'] == false &&
+        arenaDraft['automatic'] != false &&
+        arenaDraft['customized'] != true &&
+        !patch.containsKey('rule')) {
+      patch = {...patch, 'rule': arena.rule};
+    }
+    arenaDraft = {...arenaDraft, ...patch};
+    write([('pref.arena', arenaDraft)]);
+    _scheduleArena();
+    _checkActiveContext();
+    notifyListeners();
+  }
+
+  void _scheduleArena() {
+    _arenaTimer?.cancel();
+    if (catalog == null) return;
+    final next = arena.nextAt;
+    if (next == null) return;
+    _arenaTimer = Timer(
+      Duration(
+        milliseconds: (next - DateTime.now().millisecondsSinceEpoch + 50).clamp(
+          1,
+          2147483647,
+        ),
+      ),
+      () {
+        _contextStamp = null;
+        _checkActiveContext();
+        _scheduleArena();
+        notifyListeners();
+      },
+    );
   }
 
   String resultSession = '';
@@ -99,7 +144,9 @@ class TeamBuilderController extends ChangeNotifier {
   String ptComparisonSession = '';
   int comparisonCandidate = 1;
   final _taskResults = <String, _TaskResults>{};
-  String get _taskKey => !activity
+  String get _taskKey => arenaActive
+      ? 'arena'
+      : !activity
       ? 'build'
       : settings.rewardMode == 'plan'
       ? 'plan'
@@ -260,7 +307,9 @@ class TeamBuilderController extends ChangeNotifier {
     ];
   }
 
-  BuildSettings get _contextSettings => !activity
+  BuildSettings get _contextSettings => arenaActive && catalog != null
+      ? arena.settings
+      : !activity
       ? settings
       : settings.rewardMode == 'plan'
       ? settings.forGoal(GoalKind.plan)
@@ -268,6 +317,7 @@ class TeamBuilderController extends ChangeNotifier {
 
   List<int>? get allowedSongIds {
     final s = _contextSettings, catalog = this.catalog;
+    if (arenaActive && catalog != null) return arena.songIds;
     if (catalog == null || s.eventId == null) return null;
     final goal = activity ? settings.rewardMode : s.goal.name;
     final challenge = goal == 'event'
@@ -287,56 +337,58 @@ class TeamBuilderController extends ChangeNotifier {
   }
 
   bool hasMission(int mission, [List<SongRef>? selected]) =>
-      (selected ?? settings.songs).any(
-        (song) =>
-            catalog?.master.songs[song.songId]?.gekisoMissions.contains(
-              mission,
-            ) ==
-            true,
-      );
-
-  /// A range type is active when the song rules override says so, otherwise
-  /// when any selected song carries that mission in the master data. Missions
-  /// are numbered 1..3 (COMBO/LUCK/JUST) but stored by range, so the index is
-  /// one lower.
-  bool _missionEnabled(BuildSettings s, int mission) {
-    final rules = s.songRulesOverride;
-    if (rules != null) {
-      final index = mission - 1;
-      return index >= 0 && index < rules.missions.length
-          ? rules.missions[index] != 0
-          : false;
-    }
-    return hasMission(mission, s.songs);
+      _missionEnabled(_contextSettings, mission, selected);
+  bool _missionEnabled(
+    BuildSettings s,
+    int mission, [
+    List<SongRef>? selected,
+  ]) {
+    final rules =
+        s.arena ??
+        (s.songRulesOverride == null
+            ? null
+            : {
+                'musicType': s.songRulesOverride!.musicType,
+                'missions': s.songRulesOverride!.missions,
+              });
+    final overrides = intListOf(rules?['missions']);
+    return (selected ?? s.songs).any((song) {
+      final original =
+          catalog?.master.songs[song.songId]?.gekisoMissions ?? const <int>[];
+      return [
+        for (var i = 0; i < 3; i++)
+          overrides.elementAtOrNull(i) != null && overrides[i] != 0
+              ? overrides[i]
+              : original.elementAtOrNull(i) ?? 0,
+      ].contains(mission);
+    });
   }
 
-  /// Bonus rows for a manually stated event: the same percentage for every
-  /// bonus type, scoped to one attribute (`event.rs` `ManualEffect`).
-  List<Doc>? _manualEventEffects(BuildSettings s) {
-    final manual = s.manualEvent;
-    if (manual == null) return null;
-    final perRank = [
-      for (var rank = 0; rank < 5; rank++) (manual.percent * 100).round(),
-    ];
-    return [
-      for (final resourceType in [2, 3])
-        for (final bonusType in [0, 1, 2])
-          {
-            'resourceType': resourceType,
-            'characterId': 0,
-            'bandId': 0,
-            'cardType': manual.attribute,
-            'tagId': 0,
-            'memberCardId': 0,
-            'supportCardId': 0,
-            'bonusType': bonusType,
-            'perRank': perRank,
-          },
-    ];
+  Doc? songRulesFor(BuildSettings s, {bool gekiso = true}) {
+    final rule = s.songRulesOverride;
+    if (rule == null) return null;
+    final missions = gekiso ? rule.missions : [0, 0, 0];
+    return rule.musicType != 0 || missions.any((value) => value != 0)
+        ? {'musicType': rule.musicType, 'missions': missions}
+        : null;
   }
+
+  List<Doc>? manualEventEffects(BuildSettings s) => s.manualEventEnabled
+      ? resolveManualEvent(catalog!.master, s.manualEvent).effects
+      : null;
 
   BuildSettings get searchSettings {
-    final s = _contextSettings, catalog = this.catalog;
+    var s = _contextSettings;
+    final catalog = this.catalog;
+    if (s.shared &&
+        !arenaActive &&
+        (s.goal == GoalKind.score || s.goal == GoalKind.gekiso)) {
+      s = s.copyWith({
+        'criterion': 'mean',
+        'scoreTarget': 'none',
+        'gekisoPlacementMode': 'rank',
+      });
+    }
     if (catalog == null || s.eventId == null) return s;
     final allowed = allowedSongIds?.toSet();
     final challenges = {
@@ -404,6 +456,7 @@ class TeamBuilderController extends ChangeNotifier {
       selected.snaps.map((row) => row.toJson()).toList(),
       selected.player.toJson(),
       goalJson(manualGoal()!),
+      songRulesFor(settings, gekiso: settings.manualScoreMode == 'gekiso'),
     ]);
   }
 
@@ -464,9 +517,7 @@ class TeamBuilderController extends ChangeNotifier {
 
   Goal? manualGoal() {
     final rules = settings.songRulesOverride;
-    bool mission(int index) => rules != null
-        ? (index - 1 < rules.missions.length ? rules.missions[index - 1] != 0 : false)
-        : hasMission(index, manualSongs);
+    bool mission(int index) => _missionEnabled(settings, index, manualSongs);
     if (settings.manualScoreMode != 'gekiso') {
       return ScoreGoal(
         manualSongs,
@@ -550,6 +601,9 @@ class TeamBuilderController extends ChangeNotifier {
     if (version != _boxVersion) {
       _boxVersion = version;
       view = BoxView.read(box.entries);
+      arenaDraft = {...arenaDefaults(), ...objectRow(view!.prefs['arena'])};
+      _contextStamp = null;
+      _scheduleArena();
       final stored = view!.prefs['build'];
       if (stored is Map) {
         settings = BuildSettings(stored.cast<String, Object?>());
@@ -563,6 +617,7 @@ class TeamBuilderController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _arenaTimer?.cancel();
     catalog?.dispose();
     _disposed = true;
     _server = '';
@@ -589,6 +644,12 @@ class TeamBuilderController extends ChangeNotifier {
   }
 
   void updateSettings(Doc patch) {
+    if (arenaActive) {
+      updateArena({
+        'build': {...objectRow(arenaDraft['build']), ...patch},
+      });
+      return;
+    }
     final task = _taskKey;
     _saveTaskResults(task);
     if (activity &&
@@ -637,6 +698,13 @@ class TeamBuilderController extends ChangeNotifier {
     bool memberOk(int id) {
       final card = master.members[id];
       return card != null &&
+          (!arenaActive ||
+              card.bandId == arena.bandId &&
+                  catalog.available('members', id) &&
+                  arenaReleased(
+                    objectRow(catalog.card(true, id)['catalogMetadata']),
+                    DateTime.now().millisecondsSinceEpoch,
+                  )) &&
           (fixedMembers.contains(id) ||
               (s.attributes.isEmpty || s.attributes.contains(card.cardType)) &&
                   (s.bands.isEmpty || s.bands.contains(card.bandId)) &&
@@ -646,6 +714,12 @@ class TeamBuilderController extends ChangeNotifier {
     bool snapOk(int id) {
       final card = master.snaps[id];
       return card != null &&
+          (!arenaActive ||
+              catalog.available('snapshots', id) &&
+                  arenaReleased(
+                    objectRow(catalog.card(false, id)['catalogMetadata']),
+                    DateTime.now().millisecondsSinceEpoch,
+                  )) &&
           (fixedSnaps.contains(id) ||
               (s.attributes.isEmpty || s.attributes.contains(card.cardType)) &&
                   card.rarity >= s.minRarity);
@@ -676,7 +750,27 @@ class TeamBuilderController extends ChangeNotifier {
   }
 
   String? get inputIssue {
+    if (catalog == null || view == null) {
+      return tb('loadingData', 'Loading card data');
+    }
     final s = searchSettings;
+    if (arenaActive && arena.automatic && arena.regulation == null) {
+      return tb('arena.needRules', 'Choose custom rules or an active league');
+    }
+    if (s.goal == GoalKind.event && s.manualEventEnabled) {
+      if (objectRow(
+            objectRow(
+              objectRow(catalog!.data['crossServer'])['owners'],
+            )['events'],
+          )['${s.eventId}'] !=
+          server) {
+        return tb('manualEvent.need.rules', 'Choose complete reference rules');
+      }
+      final issue = resolveManualEvent(catalog!.master, s.manualEvent).issue;
+      if (issue != null) {
+        return tb('manualEvent.need.$issue', 'Complete the event bonus');
+      }
+    }
     if (s.goal == GoalKind.power && s.powerSong && s.songs.isEmpty) {
       return tb('needSongs', 'Choose at least one song.');
     }
@@ -851,6 +945,7 @@ class TeamBuilderController extends ChangeNotifier {
                 opponents: s.opponents,
                 musicType: s.songRulesOverride?.musicType,
                 missions: s.songRulesOverride?.missions,
+                arena: s.arena,
               );
       case GoalKind.event:
         if (s.eventId == null) return null;
@@ -876,7 +971,7 @@ class TeamBuilderController extends ChangeNotifier {
             gekiso: s.ptGekiso && s.route == 'live'
                 ? (just: s.ptJust / 100, luckSamples: s.ptLuckSamples)
                 : null,
-            eventEffects: _manualEventEffects(s),
+            eventEffects: manualEventEffects(s),
           );
         }
         return EventGoal(
@@ -894,7 +989,7 @@ class TeamBuilderController extends ChangeNotifier {
           songs: s.route == 'skip' ? const [] : s.songs,
           consumption: s.route == 'challenge' ? s.challengePoints : s.boosts,
           play: play,
-          eventEffects: _manualEventEffects(s),
+          eventEffects: manualEventEffects(s),
         );
       case GoalKind.potential:
         return PotentialGoal(s.window.toDouble());
@@ -958,6 +1053,18 @@ class TeamBuilderController extends ChangeNotifier {
           ? UnknownPolicy.max
           : UnknownPolicy.min,
       goal: goal,
+      songRules: songRulesFor(
+        s,
+        gekiso: goal is GekisoGoal || goal is EventGoal && goal.gekiso != null,
+      ),
+      aggregation:
+          s.shared &&
+              !arenaActive &&
+              (goal is ScoreGoal ||
+                  goal is GekisoGoal ||
+                  goal is EventGoal && goal.route != RouteKind.skip)
+          ? 'mean'
+          : null,
       constraints: ConstraintInput(
         requiredMembers: [
           for (final key in locked(true))
@@ -1036,17 +1143,32 @@ class TeamBuilderController extends ChangeNotifier {
 
   /// What the request depends on, to tell stale results.
   String _fingerprint() {
-    final stamp = (settings, catalog, view, store?.owner, server, activity);
+    final stamp = (
+      settings,
+      arenaDraft,
+      arenaActive,
+      arenaActive && catalog != null ? (arena.regulation?['id']) : null,
+      catalog,
+      view,
+      store?.owner,
+      server,
+      activity,
+    );
     if (stamp == _contextStamp) return _contextValue;
     _contextStamp = stamp;
     final request = this.request();
     if (request == null) return _contextValue = '';
+    final input = request.toJson()
+      ..remove('timeLimitMs')
+      ..remove('deadline')
+      ..remove('contextKey')
+      ..remove('requestId');
     return _contextValue = jsonEncode([
       store?.owner,
       server,
       catalog?.data['identity'],
       objectRow(catalog?.data['crossServer'])['identities'],
-      request.toJson(),
+      input,
     ]);
   }
 
@@ -1122,9 +1244,11 @@ class TeamBuilderController extends ChangeNotifier {
     } on EngineCancelled {
       // Cancelled by the reader.
     } catch (failure) {
-      error = tb('searchFailed', 'The search failed: {reason}', {
-        'reason': '$failure',
-      });
+      if (generation == runGeneration && !_disposed) {
+        error = tb('searchFailed', 'The search failed: {reason}', {
+          'reason': '$failure',
+        });
+      }
     } finally {
       if (generation == runGeneration) {
         running = false;
@@ -1173,13 +1297,17 @@ class TeamBuilderController extends ChangeNotifier {
   }
 
   void cancel() {
-    if (manualBusy) running = false;
+    ++runGeneration;
+    _activeContext = null;
+    running = growthRunning = false;
+    progress = null;
     ++manualGeneration;
     manualBusy = false;
     activeManualContext = null;
     comparison.stop();
     pt.stop();
     engine?.cancel();
+    if (!_disposed) notifyListeners();
   }
 
   /// Repaints after a change made outside the controller's own methods.

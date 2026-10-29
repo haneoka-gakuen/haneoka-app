@@ -67,8 +67,8 @@ Future<Doc> _fetch(String server) async {
   final release = await api.release();
   final data = objectRow(
     await api.json(
-      '/api/v1/team-builder/${Uri.encodeComponent(server)}'
-      '${release == 'offline' ? '' : '?release=${Uri.encodeComponent(release)}'}',
+      '/api/v1/team-builder/${Uri.encodeComponent(server)}?projection=4'
+      '${release == 'offline' ? '' : '&release=${Uri.encodeComponent(release)}'}',
     ),
   );
   if (data['schema'] != 'haneoka-team-builder-data-v1' ||
@@ -83,6 +83,9 @@ Future<Doc> _fetch(String server) async {
 Doc mergeTeamData(List<Doc> sources, [List<String> unavailable = const []]) {
   final result = _clone(sources.first) as Doc;
   final identities = <String, Object?>{};
+  result['arena'] = {
+    for (final source in sources) ...objectRow(source['arena']),
+  };
   final owners = <String, Map<String, String>>{};
   final availability = <String, Map<String, List<String>>>{};
   final challengeMusics = <Doc>[];

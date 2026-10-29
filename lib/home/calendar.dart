@@ -35,6 +35,8 @@ const calendarFacets = [
   'pass',
   'game-live',
   'external-live',
+  'arena',
+  'arena-rotation',
 ];
 const _facetLabels = {
   'our-notes:character': 'ourNotesCharacterBirthday',
@@ -47,6 +49,8 @@ const _facetLabels = {
   'pass': 'pass',
   'game-live': 'game-live',
   'external-live': 'externalLive',
+  'arena': 'arena',
+  'arena-rotation': 'arena-rotation',
 };
 
 /// One dated thing on the calendar (`CalendarOccurrence`).

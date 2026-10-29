@@ -16,6 +16,8 @@ import 'editing.dart';
 import 'formats.dart';
 import 'project.dart';
 import 'storage.dart';
+import 'shortcuts.dart';
+import 'feedback.dart';
 
 typedef ChartEditorImport = ({
   ChartImport? chart,
@@ -29,6 +31,8 @@ class ChartEditorController extends ChangeNotifier {
     audio.addListener(changed);
   }
   final store = ChartCreationStore();
+  final shortcuts = ChartShortcuts();
+  EditorAudioFeedback? feedback;
   final history = ChartHistory(ChartProject.empty());
   final audio = PageAudio();
   NativeChartAudio? media;
@@ -118,6 +122,7 @@ class ChartEditorController extends ChangeNotifier {
 
   Future<void> initialize({bool openLast = true}) => perform(() async {
     await store.open();
+    await shortcuts.load();
     documents = await store.list();
     if (!openLast) return;
     if (documents.isNotEmpty) {
@@ -550,10 +555,16 @@ class ChartEditorController extends ChangeNotifier {
     );
   }
 
-  Future<void> copy({bool cut = false}) async {
+  Future<void> copy({bool cut = false, bool segments = false}) async {
     if (selection.isEmpty) return;
     await Clipboard.setData(
-      ClipboardData(text: jsonEncode(copyChartSelection(project, selection))),
+      ClipboardData(
+        text: jsonEncode(
+          segments
+              ? copyChartSegments(project, selection)
+              : copyChartSelection(project, selection),
+        ),
+      ),
     );
     if (cut) deleteSelection();
   }
@@ -637,12 +648,14 @@ class ChartEditorController extends ChangeNotifier {
   Future<void> close() => _closing ??= _close();
   Future<void> _close() async {
     if (_closed) return;
+    shortcuts.dispose();
     _autosave?.cancel();
     await _operation;
     await save();
     await _writes;
     _closed = true;
     audio.removeListener(changed);
+    await feedback?.close();
     await audio.close();
     await media?.close();
     await store.close();

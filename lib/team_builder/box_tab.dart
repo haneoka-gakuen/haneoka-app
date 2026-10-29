@@ -25,11 +25,17 @@ import 'widgets.dart';
 enum _Show { owned, all, unowned }
 
 class BoxTab extends StatefulWidget {
-  const BoxTab({super.key, required this.controller, required this.query});
+  const BoxTab({
+    super.key,
+    required this.controller,
+    required this.query,
+    this.quickAdd = false,
+  });
   final TeamBuilderController controller;
 
   /// The app-bar search.
   final String query;
+  final bool quickAdd;
 
   @override
   State<BoxTab> createState() => _BoxTabState();
@@ -41,9 +47,7 @@ class _BoxTabState extends State<BoxTab> {
   CardFilters _filters = const CardFilters();
   bool _filtersOpen = false;
 
-  /// Quick add: tapping a card marks it owned (or drops it) instead of
-  /// opening the growth editor (`box-tab.ts` Quick add).
-  bool _quickAdd = false;
+  bool get _quickAdd => widget.quickAdd;
 
   TeamBuilderController get c => widget.controller;
 
@@ -259,23 +263,6 @@ class _BoxTabState extends State<BoxTab> {
                 child: const Icon(Symbols.filter_list_rounded),
               ),
             ),
-            IconButton.filledTonal(
-              tooltip: _quickAdd
-                  ? c.tb('quickAddDone', 'Finish quick add')
-                  : c.tb('quickAdd', 'Quick add'),
-              isSelected: _quickAdd,
-              onPressed: () => setState(() => _quickAdd = !_quickAdd),
-              icon: Icon(
-                _quickAdd
-                    ? Symbols.check_circle_rounded
-                    : Symbols.add_circle_outline_rounded,
-              ),
-            ),
-            if (_quickAdd)
-              Chip(
-                avatar: const Icon(Symbols.touch_app_rounded, size: 18),
-                label: Text(c.tb('quickAddHint', 'Tap to add or remove')),
-              ),
           ],
         ),
         if (_filtersOpen)

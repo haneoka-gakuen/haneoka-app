@@ -15,6 +15,10 @@ import '../catalog/source_route.dart';
 /// The website's entity kinds (`RESOURCE_KINDS`) and the API resource each
 /// browses, for addresses like `/intl/ja/events/1/`.
 const _kindResources = {
+  'circle': 'circle',
+  'challenge': 'challenge',
+  'arena': 'arena',
+  'chat-customizations': 'chat-customizations',
   'songs': 'songs',
   'events': 'events',
   'characters': 'characters',

@@ -18,14 +18,20 @@ import '../rendering/native_chart_player_screen.dart';
 import '../shell/page.dart';
 import 'canvas.dart';
 import 'controller.dart';
+import 'authoring_actions.dart';
+import 'connectors.dart';
 import 'community_source.dart';
 import 'formats.dart';
 import 'inspector.dart';
 import 'library.dart';
 import 'project.dart';
+import 'editing.dart';
 import 'publication.dart';
 import 'usc.dart';
 import 'native_compile.dart';
+import 'mmws.dart';
+import 'sus_export.dart';
+import 'feedback.dart';
 import 'diagnostics.dart';
 
 class ChartEditorScreen extends StatefulWidget {
@@ -69,6 +75,7 @@ class _ChartEditorScreenState extends State<ChartEditorScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    c.feedback ??= EditorAudioFeedback(c, AppScope.of(context))..initialize();
     final current = ModalRoute.of(context)?.isCurrent ?? true;
     if (_routeCurrent && !current) unawaited(c.audio.pause());
     _routeCurrent = current;
@@ -143,7 +150,7 @@ class _ChartEditorScreenState extends State<ChartEditorScreen> {
       type: FileType.custom,
       allowedExtensions: backup
           ? const ['zip']
-          : const ['json', 'ss', 'sus', 'usc'],
+          : const ['json', 'ss', 'sus', 'usc', 'mmws', 'ccmmws', 'ucmmws'],
     );
     if (file == null || !mounted) return;
     if (!backup &&
@@ -155,7 +162,14 @@ class _ChartEditorScreenState extends State<ChartEditorScreen> {
     if (backup) {
       await c.importBackup(bytes);
     } else {
-      await c.importText(utf8.decode(bytes), name: file.name);
+      if (isMmws(bytes)) {
+        await c.importProject(
+          importMmws(bytes),
+          source: {'name': file.name, 'bytes': base64Encode(bytes)},
+        );
+      } else {
+        await c.importText(utf8.decode(bytes), name: file.name);
+      }
     }
   }
 
@@ -234,6 +248,20 @@ class _ChartEditorScreenState extends State<ChartEditorScreen> {
       await FilePicker.saveFile(fileName: '$base.zip', bytes: bytes);
       return;
     }
+    if (format == 'sus') {
+      await FilePicker.saveFile(
+        fileName: '$base.sus',
+        bytes: Uint8List.fromList(utf8.encode(serializeSus(captured))),
+      );
+      return;
+    }
+    if (format == 'mmws') {
+      await FilePicker.saveFile(
+        fileName: '$base.ccmmws',
+        bytes: serializeMmws(captured),
+      );
+      return;
+    }
     final text = switch (format) {
       'ss' => serializeSsChart(captured),
       'usc' => serializeUscChart(captured, wrapped: true),
@@ -264,6 +292,8 @@ class _ChartEditorScreenState extends State<ChartEditorScreen> {
             ('project', 'formatProject'),
             ('ss', 'formatSs'),
             ('usc', 'formatUsc'),
+            ('mmws', 'formatMmws'),
+            ('sus', 'formatSus'),
             ('export-backup', 'creation.open_backup'),
             ('delete', 'creation.delete_project'),
           ])
@@ -299,7 +329,7 @@ class _ChartEditorScreenState extends State<ChartEditorScreen> {
         await c.saveCopy();
       case 'restore':
         await c.restoreOriginal();
-      case 'project' || 'ss' || 'usc':
+      case 'project' || 'ss' || 'usc' || 'mmws' || 'sus':
         await _export(selected!);
       case 'export-backup':
         await _export('backup');
@@ -484,56 +514,174 @@ class _ChartEditorScreenState extends State<ChartEditorScreen> {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
-    final keys = HardwareKeyboard.instance,
-        command = keys.isControlPressed || keys.isMetaPressed,
-        key = event.logicalKey;
-    if (command && key == LogicalKeyboardKey.keyS) {
-      unawaited(c.save());
-      return KeyEventResult.handled;
-    }
     if (FocusManager.instance.primaryFocus?.context
             ?.findAncestorWidgetOfExactType<EditableText>() !=
         null) {
       return KeyEventResult.ignored;
     }
-    if (command) {
-      if (key == LogicalKeyboardKey.keyZ) {
-        keys.isShiftPressed ? c.redo() : c.undo();
-      } else if (key == LogicalKeyboardKey.keyY) {
-        c.redo();
-      } else if (key == LogicalKeyboardKey.keyC) {
-        unawaited(c.copy());
-      } else if (key == LogicalKeyboardKey.keyX) {
-        unawaited(c.copy(cut: true));
-      } else if (key == LogicalKeyboardKey.keyV) {
-        unawaited(c.paste());
-      } else if (key == LogicalKeyboardKey.keyA) {
-        c.select(
-          c.project.nodes.where((n) => c.scope.contains(n.id)).map((n) => n.id),
-        );
-      } else {
-        return KeyEventResult.ignored;
-      }
-    } else if (key == LogicalKeyboardKey.delete ||
-        key == LogicalKeyboardKey.backspace) {
-      c.deleteSelection();
-    } else if (key == LogicalKeyboardKey.escape) {
-      c.cancelGesture();
-      c.select([]);
-    } else if (key == LogicalKeyboardKey.space) {
-      unawaited(c.togglePlayback());
-    } else if (key == LogicalKeyboardKey.arrowUp) {
-      c.nudge(1);
-    } else if (key == LogicalKeyboardKey.arrowDown) {
-      c.nudge(-1);
-    } else if (key == LogicalKeyboardKey.arrowLeft) {
-      c.nudge(-1, horizontal: true);
-    } else if (key == LogicalKeyboardKey.arrowRight) {
-      c.nudge(1, horizontal: true);
-    } else {
-      return KeyEventResult.ignored;
-    }
+    final command = c.shortcuts.match(event);
+    if (command == null) return KeyEventResult.ignored;
+    _command(command);
     return KeyEventResult.handled;
+  }
+
+  void _command(String command) {
+    if (command.startsWith('tool:')) {
+      c.tool = command.substring(5);
+      c.cancelGesture();
+      return;
+    }
+    if (command.startsWith('grid:')) {
+      c.division = int.parse(command.substring(5));
+      c.changed();
+      return;
+    }
+    switch (command) {
+      case 'save':
+        unawaited(c.save());
+      case 'undo':
+        c.undo();
+      case 'redo':
+        c.redo();
+      case 'play':
+        unawaited(c.togglePlayback());
+      case 'cancel':
+        c.cancelGesture();
+        c.select([]);
+      case 'confirm':
+        c.insertControl(c.positionTick);
+      case 'select_all':
+        c.select(
+          c.project.nodes
+              .where((node) => c.scope.contains(node.id))
+              .map((node) => node.id),
+        );
+      case 'copy':
+        unawaited(c.copy());
+      case 'copy_segments':
+        unawaited(c.copy(segments: true));
+      case 'cut':
+        unawaited(c.copy(cut: true));
+      case 'paste':
+        unawaited(c.paste());
+      case 'paste_mirrored':
+        unawaited(
+          Clipboard.getData(Clipboard.kTextPlain).then((data) {
+            if (data?.text != null) {
+              c.applyPattern(chartMap(jsonDecode(data!.text!)), mirrored: true);
+            }
+          }),
+        );
+      case 'duplicate':
+        c.duplicateSelection();
+      case 'duplicate_mirrored':
+        c.duplicateSelection(mirrored: true);
+      case 'delete':
+        c.deleteSelection();
+      case 'flip':
+        c.flip();
+      case 'join':
+        c.joinConnectors();
+      case 'split':
+        c.splitConnector();
+      case 'repeat':
+        c.repeatConnector();
+      case 'generate_nodes':
+        c.generatePoints();
+      case 'remove_nodes':
+        c.deleteSelection(controlsOnly: true);
+      case 'generate_traces':
+        c.connectorTraces();
+      case 'convert_traces':
+        c.connectorTraces(keepLines: false);
+      case 'compress_first':
+        c.compressSelection(false);
+      case 'compress_last':
+        c.compressSelection(true);
+      case 'nudge_up':
+        c.nudge(1);
+      case 'nudge_down':
+        c.nudge(-1);
+      case 'tick_up' || 'tick_down':
+        c.edit(
+          (p) => moveChartSelection(
+            p,
+            c.selection,
+            command == 'tick_up' ? 1 : -1,
+            0,
+          ),
+        );
+      case 'width_up' || 'width_down' || 'width_up_large' || 'width_down_large':
+        final node = c.renderNodesById[c.primary],
+            delta = command.endsWith('large') ? 1.0 : .25;
+        if (node != null) {
+          c.brush({
+            'size': math.max(
+              0,
+              node.size + (command.startsWith('width_up') ? delta : -delta),
+            ),
+          });
+        }
+      case 'zoom_in' || 'zoom_out':
+        c.secondsPerScreen =
+            (c.secondsPerScreen * (command == 'zoom_in' ? 0.8 : 1.25)).clamp(
+              .5,
+              120,
+            );
+        c.changed();
+      case 'pan_up' || 'pan_down' || 'page_up' || 'page_down':
+        c.windowStart = math.max(
+          0,
+          c.windowStart +
+              (command.endsWith('up') ? 1 : -1) *
+                  c.secondsPerScreen *
+                  (command.startsWith('page') ? 0.9 : 0.1),
+        );
+        c.changed();
+      case 'pan_left' || 'pan_right':
+        c.laneStart += command == 'pan_left' ? -1 : 1;
+        c.changed();
+      case 'home':
+        unawaited(c.seek(0));
+        c.windowStart = 0;
+        c.changed();
+      case 'end':
+        unawaited(c.seek(c.duration));
+        c.windowStart = math.max(0, c.duration - c.secondsPerScreen);
+        c.changed();
+      case 'audio_settings':
+        unawaited(_properties());
+      case 'note_sounds':
+        unawaited(
+          c.feedback?.configure(noteSounds: !(c.feedback?.notes ?? false)) ??
+              Future<void>.value(),
+        );
+      case 'metronome':
+        unawaited(
+          c.feedback?.configure(beat: !(c.feedback?.metronome ?? false)) ??
+              Future<void>.value(),
+        );
+      case 'previous_waypoint' || 'next_waypoint':
+        final points =
+            chartRows(c.project.data['waypoints'] ?? [])
+                .map((row) => row['tick'] as int)
+                .where(
+                  (tick) => command == 'next_waypoint'
+                      ? tick > c.positionTick
+                      : tick < c.positionTick,
+                )
+                .toList()
+              ..sort();
+        if (points.isNotEmpty) {
+          unawaited(
+            c.seek(
+              c.tempoMap.secondsAt(
+                command == 'next_waypoint' ? points.first : points.last,
+              ),
+            ),
+          );
+        }
+    }
   }
 
   @override

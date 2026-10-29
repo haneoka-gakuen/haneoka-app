@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 import 'formats.dart';
 import 'project.dart';
+import 'sus_export.dart';
+import 'mmws.dart';
 
 typedef ChartExportValidation = ({
   List<ChartIssue> errors,
@@ -106,6 +108,8 @@ List<ChartIssue> chartExportWarnings(ChartProject project, String format) {
 ChartExportValidation validateChartExport(ChartProject project, String format) {
   final errors = project.validate().where((issue) => !issue.warning).toList();
   if (errors.isNotEmpty) return (errors: errors, warnings: []);
+  if (format == 'sus') return susExportDiagnostics(project);
+  if (format == 'mmws') return mmwsExportDiagnostics(project);
   final warnings = chartExportWarnings(project, format);
   if (format != 'ss') return (errors: errors, warnings: warnings);
   final document = projectToSs(project),

@@ -5,6 +5,8 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../core/app_state.dart';
 import 'controller.dart';
+import 'authoring_tools.dart';
+import 'shortcuts.dart';
 import 'editing.dart';
 import 'project.dart';
 
@@ -88,6 +90,7 @@ class ChartEditorInspector extends StatelessWidget {
                 'guide',
                 'erase',
                 'creation.brush',
+                'node',
               ])
                 (key == 'creation.brush' ? 'brush' : key, label(key)),
             ],
@@ -431,6 +434,42 @@ class ChartEditorInspector extends StatelessWidget {
           ],
         ]),
         ChartCollectionsPanel(controller: c),
+        if (c.feedback case final feedback?)
+          section('audio.title', [
+            SwitchListTile(
+              title: Text(label('labels.noteSound')),
+              value: feedback.notes,
+              onChanged: (value) => feedback.configure(noteSounds: value),
+            ),
+            SwitchListTile(
+              title: Text(label('audio.metronome')),
+              value: feedback.metronome,
+              onChanged: (value) => feedback.configure(beat: value),
+            ),
+            for (final (name, value) in [
+              ('bgm_volume', feedback.bgmVolume),
+              ('note_volume', feedback.noteVolume),
+              ('metronome_volume', feedback.metronomeVolume),
+            ])
+              Column(
+                children: [
+                  Text(label('audio.$name')),
+                  Slider(
+                    value: value,
+                    onChanged: (v) => feedback.configure(
+                      bgm: name == 'bgm_volume' ? v : null,
+                      note: name == 'note_volume' ? v : null,
+                      click: name == 'metronome_volume' ? v : null,
+                    ),
+                  ),
+                ],
+              ),
+            choose('audio.sound_group', '${feedback.group}', [
+              for (final id in [1, 2, 3, 4]) ('$id', '$id'),
+            ], (value) => feedback.configure(soundGroup: int.parse(value))),
+          ]),
+        ChartAuthoringTools(controller: c),
+        ChartShortcutSettings(shortcuts: c.shortcuts),
       ],
     );
   }
@@ -791,7 +830,12 @@ class ChartCollectionsPanel extends StatelessWidget {
                   ChartEditorField(
                     key: ValueKey('speed:${item['id']}'),
                     label: label('force_speed'),
-                    enabled: !c.busy && const {'ss', 'authored'}.contains(c.project.meta['source'] ?? 'authored'),
+                    enabled:
+                        !c.busy &&
+                        const {
+                          'ss',
+                          'authored',
+                        }.contains(c.project.meta['source'] ?? 'authored'),
                     value: '${item['forceNoteSpeed'] ?? ''}',
                     numeric: true,
                     onCommit: (value) => c.edit((p) {

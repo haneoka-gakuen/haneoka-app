@@ -14,6 +14,8 @@ import '../ui/shapes.dart';
 import '../ui/theme.dart';
 import '../ui/tile.dart';
 import 'puzzle_model.dart';
+import 'puzzle_import.dart';
+import 'puzzle_recognition.dart';
 
 Future<SolveResult> _solveInBackground(
   int size,
@@ -222,6 +224,25 @@ class _SongPuzzleScreenState extends State<SongPuzzleScreen> {
     });
   }
 
+  Future<void> _importImage() async {
+    final song = _songs.where((song) => song.id == _song).firstOrNull;
+    if (song == null) return;
+    final result = await Navigator.of(context).push<PuzzleRecognition>(
+      MaterialPageRoute(
+        builder: (_) => PuzzleImportScreen(size: _size, cover: song.cover),
+      ),
+    );
+    if (!mounted || result == null) return;
+    await _change(() {
+      _invalidate();
+      _goalBlank = result.goalBlank;
+      _tiles = result.tiles;
+      _mode = 'edit';
+      _moves = 0;
+      _history.clear();
+    });
+  }
+
   void _undo() => setState(() {
     if (_history.isEmpty) return;
     final previous = _history.removeLast();
@@ -334,8 +355,8 @@ class _SongPuzzleScreenState extends State<SongPuzzleScreen> {
     final valid = solvable(_size, _tiles, _goal);
     final status = _busy
         ? _text('searching')
-        : _message == 'optimal' && _solution != null
-        ? _text('optimal', {'moves': _solution!.path.length})
+        : (_message == 'optimal' || _message == 'found') && _solution != null
+        ? _text(_message, {'moves': _solution!.path.length})
         : _message.isNotEmpty
         ? _text(_message)
         : !valid
@@ -439,6 +460,12 @@ class _SongPuzzleScreenState extends State<SongPuzzleScreen> {
             ),
           );
           final settings = [
+            FilledButton.tonalIcon(
+              onPressed: _loaded && !_busy ? _importImage : null,
+              icon: const Icon(Symbols.image_search_rounded),
+              label: Text(_text('imageImport')),
+            ),
+            const SizedBox(height: 12),
             surface(
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,

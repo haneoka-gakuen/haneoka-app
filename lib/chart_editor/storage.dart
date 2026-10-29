@@ -76,6 +76,9 @@ class ChartCreationStore {
     await Directory(p.join(root.path, 'audio')).create(recursive: true);
     final db = _database = sqlite3.open(p.join(root.path, 'projects.sqlite'));
     db.execute('PRAGMA journal_mode=WAL');
+    db.execute(
+      'CREATE TABLE IF NOT EXISTS patterns (id TEXT PRIMARY KEY, updated_at INTEGER NOT NULL, body TEXT NOT NULL)',
+    );
     db.execute('PRAGMA busy_timeout=5000');
     db.execute(
       'CREATE TABLE IF NOT EXISTS documents (id TEXT PRIMARY KEY, head INTEGER NOT NULL, updated_at INTEGER NOT NULL, body TEXT NOT NULL)',
@@ -87,6 +90,33 @@ class ChartCreationStore {
       'CREATE TABLE IF NOT EXISTS publications (project_id TEXT NOT NULL, owner TEXT NOT NULL, body TEXT NOT NULL, PRIMARY KEY(project_id, owner))',
     );
   }();
+  Future<List<ChartMap>> patterns() async {
+    await open();
+    return [
+      for (final row in _database!.select(
+        'SELECT body FROM patterns ORDER BY updated_at DESC',
+      ))
+        chartMap(jsonDecode(row['body'] as String)),
+    ];
+  }
+
+  Future<void> savePattern(ChartMap pattern) async {
+    await open();
+    _database!.execute(
+      'INSERT INTO patterns (id, updated_at, body) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET updated_at=excluded.updated_at, body=excluded.body',
+      [
+        pattern['id'],
+        DateTime.now().millisecondsSinceEpoch,
+        jsonEncode(pattern),
+      ],
+    );
+  }
+
+  Future<void> deletePattern(String id) async {
+    await open();
+    _database!.execute('DELETE FROM patterns WHERE id = ?', [id]);
+  }
+
   File audioFile(ChartAudioRef ref) =>
       File(p.join(_root!.path, 'audio', ref.sha));
   Future<ChartAudioRef> importAudio(

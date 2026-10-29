@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:haneoka_render_profile_flutter/haneoka_render_profile_flutter.dart';
 
 import 'controller.dart';
+import 'authoring_actions.dart';
 import 'project.dart';
 
 class ChartCanvasSkin {
@@ -298,6 +299,9 @@ class _ChartEditorCanvasState extends State<ChartEditorCanvas> {
           _drag = 'resize-right';
         }
       }
+    } else if (c.tool == 'node') {
+      c.insertControl(_tick, lane: _lane - c.noteWidth / 2);
+      _drag = null;
     } else if (c.tool == 'hold' || c.tool == 'guide') {
       if (_lineStart != null) {
         c.addLine(_lineStart!.$1, _lineStart!.$2, _tick, _lane);

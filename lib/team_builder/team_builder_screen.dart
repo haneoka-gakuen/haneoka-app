@@ -20,6 +20,7 @@ import 'box_import_screen.dart';
 import 'box_tab.dart';
 import 'build_tab.dart';
 import 'controller.dart';
+import 'engine/num.dart';
 import 'pt_tab.dart';
 import 'teams_tab.dart';
 import 'song_comparison_view.dart';
@@ -34,8 +35,10 @@ class TeamBuilderScreen extends StatefulWidget {
     this.importSave,
     this.initialTab,
     this.returnTab,
+    this.initialLeague,
   });
   final String? initialTab, returnTab;
+  final int? initialLeague;
   final GameSave? importSave;
 
   @override
@@ -47,16 +50,33 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
   _Tab _tab = _Tab.build;
   _Tab _returnTab = _Tab.build;
   bool _manualBuild = false;
+  bool _quickAdd = false;
+  bool _arenaApplied = false;
   void _selectTab(_Tab tab) {
     if (const [_Tab.box, _Tab.account, _Tab.teams].contains(tab) &&
-        const [_Tab.build, _Tab.pt, _Tab.comparison, _Tab.arena].contains(
-          _tab,
-        )) {
+        const [
+          _Tab.build,
+          _Tab.pt,
+          _Tab.comparison,
+          _Tab.arena,
+        ].contains(_tab)) {
       _returnTab = _tab;
     }
     setState(() {
       _tab = tab;
-      _controller?.activity = tab == _Tab.pt;
+      _controller?.activate(
+        tab == _Tab.pt
+            ? 'pt'
+            : tab == _Tab.arena
+            ? 'arena'
+            : const [_Tab.box, _Tab.account, _Tab.teams].contains(tab)
+            ? (_returnTab == _Tab.arena
+                  ? 'arena'
+                  : _returnTab == _Tab.pt
+                  ? 'pt'
+                  : 'build')
+            : 'build',
+      );
     });
   }
 
@@ -68,7 +88,14 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
   void initState() {
     super.initState();
     _tab =
-        _Tab.values.where((tab) => tab.name == widget.initialTab).firstOrNull ??
+        _Tab.values
+            .where(
+              (tab) =>
+                  (tab == _Tab.comparison ? 'song-comparison' : tab.name) ==
+                      widget.initialTab ||
+                  tab.name == widget.initialTab,
+            )
+            .firstOrNull ??
         _Tab.build;
     _returnTab =
         _Tab.values.where((tab) => tab.name == widget.returnTab).firstOrNull ??
@@ -83,6 +110,13 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
       state,
       serverOverride: widget.importSave?.release?.server,
     )..addListener(_changed);
+    controller.activate(
+      _tab == _Tab.arena
+          ? 'arena'
+          : _tab == _Tab.pt
+          ? 'pt'
+          : 'build',
+    );
     controller.load();
   }
 
@@ -102,6 +136,16 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
             initialSave: widget.importSave,
           );
         }
+      });
+    }
+    if (!_arenaApplied &&
+        c?.catalog != null &&
+        c?.view != null &&
+        widget.initialLeague != null) {
+      _arenaApplied = true;
+      c!.updateArena({
+        'leagueId': widget.initialLeague,
+        'build': {...objectRow(c.arenaDraft['build']), 'songs': []},
       });
     }
     final error = _controller?.error;
@@ -206,8 +250,12 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
       body = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (const [_Tab.build, _Tab.pt, _Tab.comparison, _Tab.arena]
-              .contains(_tab))
+          if (const [
+            _Tab.build,
+            _Tab.pt,
+            _Tab.comparison,
+            _Tab.arena,
+          ].contains(_tab))
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: PillTabs<_Tab>(
@@ -247,16 +295,17 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
                 ],
               ),
               _Tab.comparison => SongComparisonTab(controller: c),
-              _Tab.arena => ArenaTab(
-                controller: c,
-                onSearch: () => _selectTab(_Tab.build),
-              ),
+              _Tab.arena => ArenaTab(controller: c),
               _Tab.pt => PtTab(
                 controller: c,
                 openTab: (name) =>
                     _selectTab(name == 'account' ? _Tab.account : _Tab.box),
               ),
-              _Tab.box => BoxTab(controller: c, query: _query),
+              _Tab.box => BoxTab(
+                controller: c,
+                query: _query,
+                quickAdd: _quickAdd,
+              ),
               _Tab.account => AccountTab(controller: c),
               _Tab.teams => TeamsTab(
                 controller: c,
@@ -303,7 +352,19 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
           : null,
       actions: [
         if (ready) ...[
-          if (_tab == _Tab.build || _tab == _Tab.pt)
+          if (_tab == _Tab.box)
+            BarAction(
+              icon: _quickAdd
+                  ? Symbols.check_rounded
+                  : Symbols.add_circle_rounded,
+              label: _quickAdd
+                  ? c.tb('finishQuickEntry', 'Finish adding')
+                  : c.tb('quickEntry', 'Quick add'),
+              selected: _quickAdd,
+              showLabel: true,
+              onPressed: () => setState(() => _quickAdd = !_quickAdd),
+            ),
+          if (_tab == _Tab.build || _tab == _Tab.pt || _tab == _Tab.arena)
             BarAction(
               icon: Symbols.compare_arrows_rounded,
               label: c.tb('compareTeams', 'Compare teams'),

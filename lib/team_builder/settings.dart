@@ -5,6 +5,7 @@ library;
 
 import 'engine/api.dart';
 import 'reward_plan.dart';
+import 'manual_event.dart';
 import 'engine/num.dart';
 
 enum GoalKind { score, gekiso, event, plan, power, potential }
@@ -55,6 +56,7 @@ class BuildSettings {
       BuildSettings._search({..._json}, goal);
 
   static const farmingDefaults = <String, Object?>{
+    'aggregation': 'individual',
     'play': 'solo',
     'playMode': 'ap',
     'great': 3,
@@ -82,23 +84,14 @@ class BuildSettings {
   ({int musicType, List<int> missions})? get songRulesOverride {
     final row = objectRow(_json['songRules']);
     if (row.isEmpty) return null;
-    final missions = [
-      for (final value in (row['missions'] as List? ?? const []))
-        if (value is num) value.toInt(),
-    ];
-    return (
-      musicType: intOf(row['musicType']),
-      missions: [for (var i = 0; i < 3; i++) i < missions.length ? missions[i] : 0],
-    );
+    return normalizeSongRules(row);
   }
 
-  /// Manual event bonus: one percentage applied to every bonus type of one
-  /// attribute. Null keeps the recorded event effects.
-  ({int attribute, double percent})? get manualEvent {
-    final row = objectRow(_json['manualEvent']);
-    if (row.isEmpty) return null;
-    return (attribute: intOf(row['attribute']), percent: numOf(row['percent']));
-  }
+  bool get manualEventEnabled => _json['manualEventEnabled'] == true;
+  Doc get manualEvent => {
+    ...emptyManualEvent(),
+    ...objectRow(_json['manualEvent']),
+  };
 
   Doc get farmingConditions {
     final draft = farming;
@@ -129,7 +122,8 @@ class BuildSettings {
 
   String get farmingMode {
     final s = farmingConditions;
-    return s['rewardPlan'] == null &&
+    return !manualEventEnabled &&
+            s['rewardPlan'] == null &&
             const ['solo', 'gekiso'].contains(s['play']) &&
             s['playMode'] == 'ap' &&
             s['requireGrowth'] == true &&
@@ -159,6 +153,7 @@ class BuildSettings {
   }
 
   static const _defaults = <String, Object?>{
+    'aggregation': 'individual',
     'rewardMode': 'recommendation',
     'fullRanking': false,
     'ptCycle': false,
@@ -181,6 +176,7 @@ class BuildSettings {
     'gekisoOpponents': <Object?>['', '', ''],
     'minComboBonus': 1,
     'songRules': null,
+    'manualEventEnabled': false,
     'manualEvent': null,
     'playMode': 'ap',
     'great': 3,
@@ -264,13 +260,17 @@ class BuildSettings {
             ],
         ]
       : null;
+  bool get shared => _json['aggregation'] == 'mean';
+  Doc? get arena => _json['arena'] is Map ? objectRow(_json['arena']) : null;
   String get criterion => '${_json['criterion']}';
   bool get allPerfect => _json['playMode'] != 'custom';
   int get great => _int('great');
   int get good => _int('good');
   int get miss => _int('miss');
   int get missEvery => _int('missEvery');
-  int? get eventId => _nullableInt('eventId');
+  int? get eventId => manualEventEnabled && goal == GoalKind.event
+      ? (manualEvent['templateId'] as num?)?.toInt()
+      : _nullableInt('eventId');
   String get measure => '${_json['measure']}';
   String get route => '${_json['route']}';
   int get boosts => _int('boosts');
@@ -309,4 +309,16 @@ class BuildSettings {
   int get ptLuckSamples => _int('ptLuckSamples');
   int get just => _int('just');
   int get gekisoRank => _int('gekisoRank');
+}
+
+({int musicType, List<int> missions}) normalizeSongRules(Object? value) {
+  final row = objectRow(value), type = intOf(objectRow(value)['musicType']);
+  final values = row['missions'] is List ? row['missions'] as List : const [];
+  return (
+    musicType: [0, 1, 2, 3, 4, 5, 99].contains(type) ? type : 0,
+    missions: [
+      for (var i = 0; i < 3; i++)
+        [0, 1, 2, 3].contains(values.elementAtOrNull(i)) ? intOf(values[i]) : 0,
+    ],
+  );
 }

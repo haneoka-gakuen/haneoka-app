@@ -59,6 +59,10 @@ import 'settings_screen.dart';
 
 /// The website's catalogue routes and the API resource each one browses.
 const catalogRoutes = {
+  '/catalog/circle': 'circle',
+  '/catalog/challenge': 'challenge',
+  '/catalog/arena': 'arena',
+  '/catalog/chat-customizations': 'chat-customizations',
   '/catalog/songs': 'songs',
   '/catalog/events': 'events',
   '/catalog/characters': 'characters',
@@ -170,7 +174,7 @@ Widget? screenFor(String route, {required ValueChanged<String> navigate}) {
       draft: uri.queryParameters['draft'] == '1',
     );
   }
-  if (uri.path.startsWith('/chart-editor/')) {
+  if (uri.path == '/chart-editor' || uri.path.startsWith('/chart-editor/')) {
     return ChartEditorScreen(
       key: ValueKey(uri.toString()),
       initialQuery: uri.queryParameters,
@@ -184,9 +188,14 @@ Widget? screenFor(String route, {required ValueChanged<String> navigate}) {
     );
   }
   route = canonicalAppPath(uri.path);
+  if (route == '/tools/song-puzzle') route = '/song-puzzle';
+  if (route == '/tools/stamp-maker') route = '/stamp-maker';
   if (route == '/') return HomeScreen(onBrowse: navigate);
   if (route == '/settings') return const SettingsScreen();
   if (route == '/catalog') return CatalogHubScreen(navigate: navigate);
+  if (route == '/tools' || route == '/games') {
+    return CatalogHubScreen(navigate: navigate, section: route.substring(1));
+  }
   final progression = route.split('/').last;
   if (route.startsWith('/catalog/') &&
       progressionPages.containsKey(progression)) {
@@ -244,6 +253,7 @@ Widget? screenFor(String route, {required ValueChanged<String> navigate}) {
     return TeamBuilderScreen(
       initialTab: uri.queryParameters['tab'],
       returnTab: uri.queryParameters['return'],
+      initialLeague: int.tryParse(uri.queryParameters['league'] ?? ''),
     );
   }
   if (route == '/catalog/stories') {
