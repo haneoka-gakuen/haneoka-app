@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../core/system_proxy.dart';
 import '../save/game_save.dart';
 import 'game_history_client.dart';
 import 'history_snapshot.dart';
@@ -52,7 +53,9 @@ class StoredHistory {
 class HistoryRepository extends ChangeNotifier {
   HistoryRepository._();
   static final instance = HistoryRepository._();
-  final _client = GameHistoryClient();
+  final _client = GameHistoryClient(
+    proxyFor: (uri) => systemProxyFor(uri).httpProxy,
+  );
   final _records = <String, StoredHistory>{};
   final _pending = <String, Future<StoredHistory>>{};
   Future<void>? _loading;

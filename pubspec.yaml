@@ -10,7 +10,7 @@ dependencies:
   game_data_exporter:
     git:
       url: https://github.com/haneoka-gakuen/game-data-exporter.git
-      ref: 33a62d7f242a808f5f602938de9fd670bb313d39
+      ref: 66feb0cdd9a75a8e894a6c726456bb761e10b29e
       path: dart
   vega_runtime_ffi:
     git:

@@ -502,8 +502,8 @@ packages:
     dependency: "direct main"
     description:
       path: dart
-      ref: "33a62d7f242a808f5f602938de9fd670bb313d39"
-      resolved-ref: "33a62d7f242a808f5f602938de9fd670bb313d39"
+      ref: "66feb0cdd9a75a8e894a6c726456bb761e10b29e"
+      resolved-ref: "66feb0cdd9a75a8e894a6c726456bb761e10b29e"
       url: "https://github.com/haneoka-gakuen/game-data-exporter.git"
     source: git
     version: "0.1.0"
