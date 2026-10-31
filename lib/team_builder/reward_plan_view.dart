@@ -142,7 +142,7 @@ class RewardPlanControls extends StatelessWidget {
           FilledButton.tonalIcon(
             icon: const Icon(Symbols.swords_rounded),
             label: Text(
-              '${c.tb('planChallengeSongs', 'Challenge songs')} · ${s.planChallengeSongs.length}',
+              '${c.tb('planChallengeSongs', 'Challenge songs')} / ${s.planChallengeSongs.length}',
             ),
             onPressed: () async {
               final picked = await pickSongs(
@@ -195,15 +195,17 @@ class RewardPlanControls extends StatelessWidget {
             },
           ),
           LuckSamplingField(
-                label: c.tb('pt.luckSampling', 'LUCK calculation'),
-                autoLabel: c.tb('rewardPlan.auto', 'Automatic'),
-                customLabel: c.tb('arena.custom', 'Custom'),
-                samplesLabel: c.tb('pt.luckSamples', 'Luck samples'),
-                manual: s.ptSamplingManual,
-                samples: s.ptLuckSamples,
-                onMode: (manual) => c.updateSettings({'ptSamplingMode': manual ? 'manual' : 'auto'}),
-                onSamples: (value) => c.updateSettings({'ptLuckSamples': value}),
-              ),
+            label: c.tb('pt.luckSampling', 'LUCK calculation'),
+            autoLabel: c.tb('rewardPlan.auto', 'Automatic'),
+            customLabel: c.tb('arena.custom', 'Custom'),
+            samplesLabel: c.tb('pt.luckSamples', 'Luck samples'),
+            manual: s.ptSamplingManual,
+            samples: s.ptLuckSamples,
+            onMode: (manual) => c.updateSettings({
+              'ptSamplingMode': manual ? 'manual' : 'auto',
+            }),
+            onSamples: (value) => c.updateSettings({'ptLuckSamples': value}),
+          ),
           TextFormField(
             key: const ValueKey('reward-combo'),
             initialValue: '${s.minComboBonus}',

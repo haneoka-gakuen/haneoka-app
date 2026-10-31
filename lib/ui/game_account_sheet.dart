@@ -79,7 +79,7 @@ Future<GameAccountChoice?> chooseGameAccount(
                     overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(
-                    [?save.regionName, 'ID ${save.profileId}'].join(' · '),
+                    [?save.regionName, 'ID ${save.profileId}'].join(' / '),
                   ),
                   trailing: const Icon(Symbols.chevron_right_rounded),
                   onTap: () => Navigator.pop(context, save),

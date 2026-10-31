@@ -173,7 +173,7 @@ const _languageNames = {
               language;
           out.add((
             '$id:$language',
-            GalleryImage(asset(variant), '$label · $name', localized: false),
+            GalleryImage(asset(variant), '$label / $name', localized: false),
           ));
         }
       }

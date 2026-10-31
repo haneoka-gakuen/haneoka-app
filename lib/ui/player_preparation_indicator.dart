@@ -29,7 +29,7 @@ class PlayerPreparationIndicator extends StatelessWidget {
               LinearProgressIndicator(
                 value: progress,
                 borderRadius: BorderRadius.circular(100),
-                semanticsLabel: detail == null ? label : '$label · $detail',
+                semanticsLabel: detail == null ? label : '$label / $detail',
               ),
               const SizedBox(height: 12),
               ExcludeSemantics(

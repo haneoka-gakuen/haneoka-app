@@ -510,7 +510,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           )
                           case final time?)
                         time.text,
-                    ].where((s) => s.isNotEmpty).join(' · '),
+                    ].where((s) => s.isNotEmpty).join(' / '),
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -545,7 +545,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return [
         date,
         '${entry['venue'] ?? ''}',
-      ].where((s) => s.isNotEmpty).join(' · ');
+      ].where((s) => s.isNotEmpty).join(' / ');
     }
     return '${entry['summary'] ?? ''}'.isNotEmpty
         ? '${entry['summary']}'
@@ -2474,7 +2474,7 @@ class _BirthdaysState extends State<_Birthdays> {
                                       : '';
                                   return Tooltip(
                                     message:
-                                        '${item.name} · ${countdown(item)}',
+                                        '${item.name} / ${countdown(item)}',
                                     child: InkWell(
                                       onTap: () => open(item),
                                       child: Column(

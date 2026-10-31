@@ -1080,7 +1080,7 @@ class _ComposerState extends State<CommentComposer> {
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
-                '${communityLabel(context, 'replyingTo', 'Replying to')} · ${widget.replyName}',
+                '${communityLabel(context, 'replyingTo', 'Replying to')} / ${widget.replyName}',
                 style: theme.textTheme.labelLarge,
               ),
             ),

@@ -608,7 +608,7 @@ class _ImportScreenState extends State<ImportScreen> {
                                 Text(
                                   widget.updateSave == null
                                       ? t.importIntro
-                                      : '${widget.updateSave!.name ?? widget.updateSave!.profileId} · ${widget.updateSave!.profileId}\n${t.updateSaveHint}',
+                                      : '${widget.updateSave!.name ?? widget.updateSave!.profileId} / ${widget.updateSave!.profileId}\n${t.updateSaveHint}',
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     color: scheme.onSurfaceVariant,
                                   ),
@@ -1043,7 +1043,7 @@ class AccountCard extends StatelessWidget {
                       ],
                     ),
                     Text(
-                      [?save.regionName, 'ID ${save.profileId}'].join(' · '),
+                      [?save.regionName, 'ID ${save.profileId}'].join(' / '),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),

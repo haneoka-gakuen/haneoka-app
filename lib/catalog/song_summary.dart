@@ -124,7 +124,7 @@ List<(String, String)> songMetrics(
     ),
     if (estimate != null)
       (
-        t.label('difficultyEstimateBeta', 'Estimated difficulty · Beta'),
+        t.label('difficultyEstimateBeta', 'Estimated difficulty / Beta'),
         estimate,
       ),
     (t.label('metaTime', 'Song Duration'), duration(meta['time'])),
@@ -390,7 +390,7 @@ class SkillTimeline extends StatelessWidget {
                         ),
                         child: Tooltip(
                           message:
-                              '${i + 1} · ${(window.startMs / 1000).toStringAsFixed(1)}s–${(window.endMs / 1000).toStringAsFixed(1)}s',
+                              '${i + 1} / ${(window.startMs / 1000).toStringAsFixed(1)}s–${(window.endMs / 1000).toStringAsFixed(1)}s',
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 4),
                             alignment: Alignment.centerLeft,
@@ -623,7 +623,7 @@ class SongSkillPoints extends StatelessWidget {
                   start + _skillMs,
                   '$notesLabel ${covered[index]}',
                   value:
-                      '${share.format(covered[index] / (notes.isEmpty ? 1 : notes.length))} · #${ranked.indexOf(covered[index]) + 1}',
+                      '${share.format(covered[index] / (notes.isEmpty ? 1 : notes.length))} / #${ranked.indexOf(covered[index]) + 1}',
                 ),
             ],
           ),

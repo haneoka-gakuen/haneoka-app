@@ -601,7 +601,7 @@ class _SearchScreenState extends State<SearchScreen> {
                               .replaceAll(RegExp(r'\s+'), ' ')
                               .trim(),
                           '${post['authorName'] ?? ''}',
-                        ].where((s) => s.isNotEmpty).join(' · '),
+                        ].where((s) => s.isNotEmpty).join(' / '),
                         () => openLink(
                           context,
                           '/${t.locale}/community/posts/${post['id']}/',

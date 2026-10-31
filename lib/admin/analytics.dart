@@ -385,7 +385,7 @@ class _TrendState extends State<_Trend> {
             child: Text(
               selected == null
                   ? widget.label
-                  : '${selected['bucket']} · ${NumberFormat.decimalPattern(AppScope.of(context).text.locale).format(selected['count'])}',
+                  : '${selected['bucket']} / ${NumberFormat.decimalPattern(AppScope.of(context).text.locale).format(selected['count'])}',
             ),
           ),
         ),
@@ -584,7 +584,7 @@ class _Partition extends StatelessWidget {
                   color: colors[i % colors.length],
                   size: 14,
                 ),
-                label: Text('${label(rows[i].key)} · ${count(rows[i].value)}'),
+                label: Text('${label(rows[i].key)} / ${count(rows[i].value)}'),
               ),
           ],
         ),

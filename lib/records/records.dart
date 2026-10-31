@@ -404,7 +404,7 @@ class RankingListState extends State<RankingList> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                 child: Text(
-                  '${rankingLabel(t, ranking['provider'] == 'official' ? 'observed' : 'updated')} · ${SiteDate.day(t.locale).withTime(seconds: true).format(DateTime.fromMillisecondsSinceEpoch(fetched.toInt()))}',
+                  '${rankingLabel(t, ranking['provider'] == 'official' ? 'observed' : 'updated')} / ${SiteDate.day(t.locale).withTime(seconds: true).format(DateTime.fromMillisecondsSinceEpoch(fetched.toInt()))}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),

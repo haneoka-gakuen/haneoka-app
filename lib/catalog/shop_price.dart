@@ -80,7 +80,7 @@ String shopPriceLine(String locale, Map<String, num> prices) {
     if (available.isNotEmpty) {
       return available
           .map((code) => formatMoney(prices[code]!, code, locale))
-          .join(' · ');
+          .join(' / ');
     }
   }
   return '';

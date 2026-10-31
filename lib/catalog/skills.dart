@@ -31,7 +31,7 @@ String _family(SiteText t, Object? family) =>
 String _effects(SiteText t, Entry skill) => [
   for (final effect in (skill['effects'] as List? ?? const []).whereType<Map>())
     t.text(effect['name']).isEmpty ? '${effect['id']}' : t.text(effect['name']),
-].join(' · ');
+].join(' / ');
 
 String _levels(Entry skill) {
   final levels = [
@@ -190,7 +190,7 @@ class _SkillsScreenState extends State<SkillsScreen> {
               [
                 _family(t, skill['family']),
                 _effects(t, skill),
-              ].where((s) => s.isNotEmpty).join(' · '),
+              ].where((s) => s.isNotEmpty).join(' / '),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),

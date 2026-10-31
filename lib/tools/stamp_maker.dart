@@ -583,7 +583,7 @@ class _StampMakerScreenState extends State<StampMakerScreen>
                                   DropdownMenuEntry(
                                     value: index,
                                     label:
-                                        '${index + 1} · ${l.image != null ? _t('imageLayer', 'Stamp image') : (l.settings.text.trim().isEmpty ? _t('text', 'Text') : l.settings.text.split('\n').first)}',
+                                        '${index + 1} / ${l.image != null ? _t('imageLayer', 'Stamp image') : (l.settings.text.trim().isEmpty ? _t('text', 'Text') : l.settings.text.split('\n').first)}',
                                   ),
                               ],
                             ),

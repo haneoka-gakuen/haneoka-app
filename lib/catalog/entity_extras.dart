@@ -375,7 +375,7 @@ class ItemRelations extends StatelessWidget {
       final entity = (entry['entity'] as Map?) ?? const {};
       final occurrences = _rows(entry['occurrences']);
       final single = occurrences.length == 1 ? occurrences.first : null;
-      final supporting = single == null ? '' : conditions(single).join(' · ');
+      final supporting = single == null ? '' : conditions(single).join(' / ');
       final image = entity['image'];
       return InkWell(
         onTap: open(entry),
@@ -411,7 +411,7 @@ class ItemRelations extends StatelessWidget {
                                 child: Text(
                                   conditions(row).isEmpty
                                       ? '—'
-                                      : conditions(row).join(' · '),
+                                      : conditions(row).join(' / '),
                                   style: copy,
                                 ),
                               ),
@@ -648,7 +648,7 @@ class ItemRelations extends StatelessWidget {
                                       )) {
                                         final List<String> phrases
                                             when phrases.isNotEmpty =>
-                                          phrases.join(' · '),
+                                          phrases.join(' / '),
                                         _ => '—',
                                       }),
                                     ),

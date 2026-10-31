@@ -140,7 +140,7 @@ class _AdminCommentsPanelState extends State<AdminCommentsPanel> {
       SnackBar(
         content: Text(
           failed > 0
-              ? _t('partial', '{done} updated · {failed} failed', {
+              ? _t('partial', '{done} updated / {failed} failed', {
                   'done': done,
                   'failed': failed,
                 })

@@ -153,8 +153,9 @@ class _BuildTabState extends State<BuildTab> {
     final c = controller;
     return TeamToolLayout(
       controller: c,
+      onRun: widget.leading == null ? c.run : null,
       summary:
-          '${c.searchSettings.theoretical ? c.tb('scopeAll', 'All cards') : c.tb('scopeBox', 'My cards')} · ${c.tb('chartCount', '{count} charts', {'count': c.searchSettings.songs.length})}',
+          '${c.searchSettings.theoretical ? c.tb('scopeAll', 'All cards') : c.tb('scopeBox', 'My cards')} / ${c.tb('chartCount', '{count} charts', {'count': c.searchSettings.songs.length})}',
       conditions: (context) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -360,7 +361,8 @@ class _BuildTabState extends State<BuildTab> {
                 samplesLabel: c.tb('pt.luckSamples', 'Luck samples'),
                 manual: s.gekisoSamplingManual,
                 samples: s.gekisoSeeds,
-                onMode: (manual) => set({'gekisoSamplingMode': manual ? 'manual' : 'auto'}),
+                onMode: (manual) =>
+                    set({'gekisoSamplingMode': manual ? 'manual' : 'auto'}),
                 onSamples: (value) => set({'gekisoSeeds': value}),
               ),
               if (!s.shared && !(c.arenaActive && c.arena.shared))
@@ -982,8 +984,8 @@ class _Candidates extends StatelessWidget {
         leading: const Icon(Symbols.tune_rounded),
         title: Text(c.tb('candidates', 'Cards and limits')),
         subtitle: Text(
-          '${c.tb('candidateSummary', '{members} members · {snaps} snaps', {'members': cards.members.length, 'snaps': cards.snaps.length})}'
-          '${required > 0 ? ' · ${c.tb('requiredCount', '{count} required', {'count': required})}' : ''}',
+          '${c.tb('candidateSummary', '{members} members / {snaps} snaps', {'members': cards.members.length, 'snaps': cards.snaps.length})}'
+          '${required > 0 ? ' / ${c.tb('requiredCount', '{count} required', {'count': required})}' : ''}',
         ),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1092,7 +1094,7 @@ class _Candidates extends StatelessWidget {
                 DropdownMenuEntry(
                   value: id,
                   label:
-                      '${catalog.cardName(true, id)} · ${catalog.cardSubtitle(true, id)}',
+                      '${catalog.cardName(true, id)} / ${catalog.cardSubtitle(true, id)}',
                 ),
             ],
           ),

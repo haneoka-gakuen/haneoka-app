@@ -77,11 +77,11 @@ class _DownloadScreenState extends State<DownloadScreen> {
   String _format(String name) {
     if (name.endsWith('.pkg.tar.zst')) return 'Arch';
     if (name.endsWith('.tar.gz')) return 'tar.gz';
-    if (name.endsWith('.tipa')) return 'TrollStore · TIPA';
+    if (name.endsWith('.tipa')) return 'TrollStore / TIPA';
     if (name.endsWith('.ipa')) return 'IPA';
-    if (name.endsWith('.exe')) return 'EXE · ${t('installer')}';
-    if (name.endsWith('.zip')) return 'ZIP · ${t('portable')}';
-    if (name.endsWith('.aab')) return 'AAB · ${t('bundle')}';
+    if (name.endsWith('.exe')) return 'EXE / ${t('installer')}';
+    if (name.endsWith('.zip')) return 'ZIP / ${t('portable')}';
+    if (name.endsWith('.aab')) return 'AAB / ${t('bundle')}';
     return name.split('.').last;
   }
 
@@ -115,7 +115,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
         Widget file(Map asset) => ListTile(
           contentPadding: EdgeInsets.zero,
           title: Text(_format('${asset['name']}')),
-          subtitle: Text('${asset['name']} · ${size(asset)}'),
+          subtitle: Text('${asset['name']} / ${size(asset)}'),
           trailing: _downloading == asset['name']
               ? const SizedBox.square(
                   dimension: 24,
@@ -226,7 +226,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
                                     arch == 'universal'
                                         ? t('universal')
                                         : arch == 'arm64-v8a'
-                                        ? 'ARM64 · arm64-v8a'
+                                        ? 'ARM64 / arm64-v8a'
                                         : arch.toUpperCase(),
                                     style: theme.textTheme.titleSmall,
                                   ),

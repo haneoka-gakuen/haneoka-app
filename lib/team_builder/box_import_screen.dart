@@ -425,7 +425,7 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
         '${_sourceLabel(row.defaultSource)}${row.defaultValue == null ? '' : ': ${row.defaultValue}'}';
     if (row.values.isEmpty) {
       return Text(
-        '${_fieldName(row.field)} · ${_sourceLabel(row.source)}${row.value == null ? '' : ': ${row.value}'}',
+        '${_fieldName(row.field)} / ${_sourceLabel(row.source)}${row.value == null ? '' : ': ${row.value}'}',
         style: Theme.of(context).textTheme.bodySmall,
       );
     }
@@ -646,8 +646,8 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
             'listRowCheck',
             'Check the card ID, name, type and training values in this row.',
           )
-        : '${_fieldName(issue.field)} · ${_t('review', 'Needs review')}';
-    return '$subject · $detail';
+        : '${_fieldName(issue.field)} / ${_t('review', 'Needs review')}';
+    return '$subject / $detail';
   }
 
   String _noticeText(BoxImportNotice notice) {
@@ -673,10 +673,10 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
       final name = c.catalog!.has(members, id)
           ? c.catalog!.cardName(members, id)
           : '${_t(members ? 'members' : 'snapshots', 'Card')} #$id';
-      subject = '$name · $fieldLabel';
+      subject = '$name / $fieldLabel';
     } else if (row != null) {
       subject =
-          '${_t('listRow', 'Row {row}', {'row': int.parse(row.group(1)!) + 1})} · $fieldLabel';
+          '${_t('listRow', 'Row {row}', {'row': int.parse(row.group(1)!) + 1})} / $fieldLabel';
     } else if (entity != null) {
       subject = _mapName(
         entity.group(1) == 'characterRanks',
@@ -695,7 +695,7 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
         _ => _t('accountGrowth', 'Account growth'),
       };
     }
-    return '$subject · ${_t('notice.${notice.code}', 'Needs review')}';
+    return '$subject / ${_t('notice.${notice.code}', 'Needs review')}';
   }
 
   /// The import start, as the website lists it: every source grouped by what
@@ -896,7 +896,7 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
                     Text(
                       _t(
                         'replaceScope',
-                        'Replace all member and snapshot ownership with selected cards · {count} marked not owned. Account bonuses, teams and preferences stay saved.',
+                        'Replace all member and snapshot ownership with selected cards / {count} marked not owned. Account bonuses, teams and preferences stay saved.',
                         {
                           'count':
                               (c.view!.members.keys
@@ -1086,7 +1086,7 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
                         : FilledButton(
                             onPressed: canConfirm ? _confirm : null,
                             child: Text(
-                              '${_t('confirm', 'Confirm import')} · ${_t('selectedEntries', '{count} selected', {'count': selected})}',
+                              '${_t('confirm', 'Confirm import')} / ${_t('selectedEntries', '{count} selected', {'count': selected})}',
                             ),
                           ),
                   ),

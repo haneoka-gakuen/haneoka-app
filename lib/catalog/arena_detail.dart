@@ -426,7 +426,7 @@ class _ArenaDetailState extends State<ArenaDetail> with WidgetsBindingObserver {
   Widget _ruleMarks(Doc? rule, {double size = 24}) {
     if (rule == null) return const Text('—');
     return Tooltip(
-      message: '${_attribute(intOf(rule['musicType']))} · ${_ruleText(rule)}',
+      message: '${_attribute(intOf(rule['musicType']))} / ${_ruleText(rule)}',
       child: Row(
         mainAxisSize: MainAxisSize.min,
         spacing: 4,
@@ -706,15 +706,11 @@ class _ArenaDetailState extends State<ArenaDetail> with WidgetsBindingObserver {
               ],
             ),
             Text(
-              '${_attribute(intOf(shown['musicType']))} · ${_ruleText(shown)}',
-              style: theme.textTheme.titleSmall,
-            ),
-            Text(
               [
                 _range(intOf(shown['startAt']), intOf(shown['endAt'])),
                 if (state.rule != null)
                   _remaining(intOf(state.rule!['endAt']) + 1000),
-              ].join(' · '),
+              ].join(' / '),
               style: theme.textTheme.bodyMedium,
             ),
           ],
@@ -843,7 +839,7 @@ class _ArenaDetailState extends State<ArenaDetail> with WidgetsBindingObserver {
       icon: Symbols.groups_rounded,
       title: total == null
           ? _text('population')
-          : '${_text('population')} · ${_number(total)}',
+          : '${_text('population')} / ${_number(total)}',
       child: _population == 'error'
           ? Text(_text('unavailable'))
           : Column(
@@ -883,7 +879,7 @@ class _ArenaDetailState extends State<ArenaDetail> with WidgetsBindingObserver {
                                   locale: _locale,
                                   decimalDigits: 1,
                                 ).format(sum / total),
-                            ].join(' · '),
+                            ].join(' / '),
                           }, style: theme.textTheme.labelLarge),
                         ],
                       ),
@@ -1425,7 +1421,7 @@ class _ArenaDetailState extends State<ArenaDetail> with WidgetsBindingObserver {
                       '${_text('resetPoints')} ${intOf(rank['resetPoints']) == 0 ? _text('resetKept') : '−${NumberFormat.percentPattern(_locale).format(intOf(rank['resetPoints']) / 10000)}'}',
                       if (intOf(rank['startAt']) > _now)
                         '${_text('opens')} ${_short(intOf(rank['startAt']))}',
-                    ].join(' · '),
+                    ].join(' / '),
                   ),
                   children: [
                     _rewards(

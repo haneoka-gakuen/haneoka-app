@@ -103,7 +103,7 @@ Widget _goal(SiteText t, Map mission) {
   return Text.rich(
     TextSpan(
       children: [
-        TextSpan(text: '${t('catalog.missions.goal', 'Goal')} · '),
+        TextSpan(text: '${t('catalog.missions.goal', 'Goal')} / '),
         TextSpan(
           text: NumberFormat.decimalPattern(t.locale).format(goal),
           style: const TextStyle(fontWeight: FontWeight.w700),
@@ -316,11 +316,11 @@ class _MissionsScreenState extends State<MissionsScreen> {
               groups.where((g) => g.category == 1 && !g.timed).toList(),
             ),
             (
-              '${_label(t, 'limitedMission', 'Limited missions')} · ${_statusLabel(t, 'ongoing')}',
+              '${_label(t, 'limitedMission', 'Limited missions')} / ${_statusLabel(t, 'ongoing')}',
               timed('ongoing'),
             ),
             (
-              '${_label(t, 'limitedMission', 'Limited missions')} · ${_statusLabel(t, 'upcoming')}',
+              '${_label(t, 'limitedMission', 'Limited missions')} / ${_statusLabel(t, 'upcoming')}',
               timed('upcoming'),
             ),
             (
@@ -328,7 +328,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
               groups.where((g) => !g.timed && g.category != 1).toList(),
             ),
             (
-              '${_label(t, 'limitedMission', 'Limited missions')} · ${_statusLabel(t, 'ended')}',
+              '${_label(t, 'limitedMission', 'Limited missions')} / ${_statusLabel(t, 'ended')}',
               timed('ended'),
             ),
           ].where((s) => s.$2.isNotEmpty);

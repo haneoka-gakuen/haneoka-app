@@ -1,4 +1,5 @@
 import '../core/site_date.dart';
+
 import 'dart:math' as math;
 
 import 'package:game_data_exporter/gacha_history_analysis.dart'
@@ -360,7 +361,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
                                 for (final option in _options(axis))
                                   FilterChip(
                                     label: Text(
-                                      '${option.$2} · ${_number(option.$3)}',
+                                      '${option.$2} / ${_number(option.$3)}',
                                     ),
                                     selected: _filters[axis]!.contains(
                                       option.$1,
@@ -547,12 +548,12 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
                     ),
                 if (_from != null)
                   InputChip(
-                    label: Text('${_t('from')} · ${_filterDay(_from!)}'),
+                    label: Text('${_t('from')} / ${_filterDay(_from!)}'),
                     onDeleted: () => setState(() => _from = null),
                   ),
                 if (_to != null)
                   InputChip(
-                    label: Text('${_t('to')} · ${_filterDay(_to!)}'),
+                    label: Text('${_t('to')} / ${_filterDay(_to!)}'),
                     onDeleted: () => setState(() => _to = null),
                   ),
               ],
@@ -904,7 +905,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
             label: [
               row.serverLabel,
               row.label,
-            ].where((value) => value.isNotEmpty).join(' · '),
+            ].where((value) => value.isNotEmpty).join(' / '),
           ),
       ],
       onSelected: (value) {
@@ -1028,7 +1029,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
                   label: _t('total'),
                   value: _number(stats['total'] as num),
                   supporting:
-                      '${_t('member')} ${_number(stats['member'] as num)} · ${_t('support')} ${_number(stats['support'] as num)}',
+                      '${_t('member')} ${_number(stats['member'] as num)} / ${_t('support')} ${_number(stats['support'] as num)}',
                   tone: 'primary',
                 ),
                 _stat(
@@ -1039,7 +1040,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
                     _percent(stats['high'] as num, stats['total'] as num),
                     if (official != null)
                       '${_t('officialRate')} ${_pct(official)}',
-                  ].join(' · '),
+                  ].join(' / '),
                   tone: 'tertiary',
                 ),
                 _stat(
@@ -1430,9 +1431,9 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
           (kind['total'] as num) > 0,
     ))
       GachaHistoryChart(
-        title: '${_t(kind['kind'] as String)} · ${_t('rarityDistribution')}',
+        title: '${_t(kind['kind'] as String)} / ${_t('rarityDistribution')}',
         caption:
-            '${_t(kind['kind'] as String)} ${_number(kind['total'] as num)} · SSR+ ${_percent(kind['high'] as num, kind['total'] as num)}',
+            '${_t(kind['kind'] as String)} ${_number(kind['total'] as num)} / SSR+ ${_percent(kind['high'] as num, kind['total'] as num)}',
         labels: [_t('nonPickup'), _t('pickup')],
         rows: [
           for (final row in (kind['distribution'] as List).cast<Map>().where(
@@ -1443,7 +1444,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
                     row['rarity'] != 'unknown'),
           ))
             (
-              '${row['rarity']} · ${_percent(row['count'] as num, kind['total'] as num)}',
+              '${row['rarity']} / ${_percent(row['count'] as num, kind['total'] as num)}',
               [row['nonPickup'] as num, row['pickup'] as num],
             ),
         ],
@@ -1510,7 +1511,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
                                       DateTime.parse(hit['pulledAt'] as String),
                                     ),
                                     '#${_interval(hit['position'])}',
-                                  ].join(' · '),
+                                  ].join(' / '),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: theme.textTheme.bodySmall?.copyWith(
@@ -1581,7 +1582,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
 
   Widget _collectedCard(_Collected card, {bool showPickup = true}) =>
       GachaPrizeCard(
-        label: '${card.prize.name} · ×${card.count}',
+        label: '${card.prize.name} / ×${card.count}',
         rarityValue: int.tryParse('${card.prize.rarity}') ?? 0,
         image: card.prize.imageUrl,
         attribute: card.prize.attributeImageUrl,
@@ -1608,7 +1609,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
       _cardGrid([
         for (final card in cards.take(12))
           GachaPrizeCard(
-            label: '${card.prize.name} · ×${card.count}',
+            label: '${card.prize.name} / ×${card.count}',
             rarityValue: int.tryParse('${card.prize.rarity}') ?? 0,
             image: card.prize.imageUrl,
             attribute: card.prize.attributeImageUrl,
@@ -1694,7 +1695,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
                                 if (view?.startAt != null &&
                                     view?.endAt != null)
                                   '${_date(view!.startAt!)} – ${_date(view.endAt!)}',
-                              ].join(' · '),
+                              ].join(' / '),
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: scheme.onSurfaceVariant,
                               ),
@@ -1730,7 +1731,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
                         _percent(pool['high'] as num, total),
                         if (rates != null)
                           '${_t('officialRate')} ${_pct(rates['high'] as num)}',
-                      ].join(' · '),
+                      ].join(' / '),
                       tone: 'tertiary',
                       container: scheme.surfaceContainer,
                     ),
@@ -1742,7 +1743,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
                         _percent(pool['pickup'] as num, total),
                         if (rates != null && (rates['pickup'] as num) > 0)
                           '${_t('officialRate')} ${_pct(rates['pickup'] as num)}',
-                      ].join(' · '),
+                      ].join(' / '),
                       tone: 'secondary',
                       container: scheme.surfaceContainer,
                     ),
@@ -1763,7 +1764,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
                           : _fixed(pool['pullsPerHigh'] as num, 1),
                       supporting: pool['expectedHigh'] == null
                           ? ''
-                          : '${_t('expected')} ${_fixed(pool['expectedHigh'] as num, 2)} · ${_t('difference')} ${NumberFormat('+0.##;-0.##', _locale).format(pool['delta'] ?? 0)}',
+                          : '${_t('expected')} ${_fixed(pool['expectedHigh'] as num, 2)} / ${_t('difference')} ${NumberFormat('+0.##;-0.##', _locale).format(pool['delta'] ?? 0)}',
                       container: scheme.surfaceContainer,
                     ),
                   ]),
@@ -1834,7 +1835,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
                                         ]),
                                   child: GachaPrizeCard(
                                     label:
-                                        '${card.name} · ${owned[card.key] == null ? _t('notObtained') : '×${owned[card.key]!.count}'}',
+                                        '${card.name} / ${owned[card.key] == null ? _t('notObtained') : '×${owned[card.key]!.count}'}',
                                     rarityValue:
                                         int.tryParse('${card.rarity}') ?? 0,
                                     image: card.imageUrl,
@@ -2002,7 +2003,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
                       '×${card.count}',
                       if (card.pickup > 0) '${_t('pickup')} ×${card.pickup}',
                       if (card.last != null) _date(card.last!),
-                    ].join(' · '),
+                    ].join(' / '),
                   ),
                   onTap: _open(card.prize),
                 ),
@@ -2134,7 +2135,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
                                           style: theme.textTheme.titleSmall,
                                         ),
                                         Text(
-                                          '${batch.pulledAt == null ? _t('unknownTime') : DateFormat.Hm(_locale).format(_inServerTime(batch.pulledAt!))} · ${batch.drawCount == null ? _t('unknownCount') : _t('draws', {'count': batch.drawCount})}',
+                                          '${batch.pulledAt == null ? _t('unknownTime') : DateFormat.Hm(_locale).format(_inServerTime(batch.pulledAt!))} / ${batch.drawCount == null ? _t('unknownCount') : _t('draws', {'count': batch.drawCount})}',
                                           style: theme.textTheme.bodySmall,
                                         ),
                                       ],
@@ -2201,7 +2202,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
           labels: composition,
           details: [
             for (final row in months)
-              'SSR+ ${row['high']} · ${_t('pickup')} ${row['pickup']}',
+              'SSR+ ${row['high']} / ${_t('pickup')} ${row['pickup']}',
           ],
           rows: [
             for (final row in months)
@@ -2212,7 +2213,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
       ),
       (
         GachaHistoryChart(
-          title: 'SSR+ · ${_t('monthlyTrend')}',
+          title: 'SSR+ / ${_t('monthlyTrend')}',
           labels: [_t('nonPickup'), _t('pickup')],
           rows: [
             for (final row in months)
@@ -2234,7 +2235,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
           labels: composition,
           details: [
             for (final day in (stats['days'] as List).cast<Map>())
-              'SSR+ ${day['high']} · ${_t('pickup')} ${day['pickup']}',
+              'SSR+ ${day['high']} / ${_t('pickup')} ${day['pickup']}',
           ],
           rows: [
             for (final day in (stats['days'] as List).cast<Map>())
@@ -2387,14 +2388,14 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
       (_t('total'), _number(summary['total'] as num)),
       (
         'SSR+',
-        '${_number(summary['high'] as num)} · ${_percent(summary['high'] as num, summary['total'] as num)}',
+        '${_number(summary['high'] as num)} / ${_percent(summary['high'] as num, summary['total'] as num)}',
       ),
       (_t('pickup'), _number(summary['pickup'] as num)),
       (
         _t('luck'),
         luck == null
             ? '—'
-            : '${_t('luckTier${_luckTier(luck)}')} · ${_luckValue(luck)}',
+            : '${_t('luckTier${_luckTier(luck)}')} / ${_luckValue(luck)}',
       ),
     ];
     final stats = _analysisData(batches);
@@ -2413,7 +2414,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
         groups.add(
           GachaHistoryReportGroup(
             label:
-                '${_pools[pool['poolId']]?.name ?? pool['poolId']} · ${_t(kind)}',
+                '${_pools[pool['poolId']]?.name ?? pool['poolId']} / ${_t(kind)}',
             imageUrl: _pools[pool['poolId']]?.imageUrl,
             cards: [
               for (final card in poolCards.where(
@@ -2444,9 +2445,9 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
         stats['kinds'],
       ).where((kind) => kind['kind'] == 'member' || kind['kind'] == 'support'))
         GachaHistoryChart(
-          title: '${_t(kind['kind'] as String)} · ${_t('rarityDistribution')}',
+          title: '${_t(kind['kind'] as String)} / ${_t('rarityDistribution')}',
           caption:
-              '${_t(kind['kind'] as String)} ${_number(kind['total'] as num)} · SSR+ ${_percent(kind['high'] as num, kind['total'] as num)}',
+              '${_t(kind['kind'] as String)} ${_number(kind['total'] as num)} / SSR+ ${_percent(kind['high'] as num, kind['total'] as num)}',
           labels: [_t('nonPickup'), _t('pickup')],
           rows: [
             for (final row in rows(kind['distribution']).where(
@@ -2457,7 +2458,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
                       row['rarity'] != 'unknown'),
             ))
               (
-                '${row['rarity']} · ${_percent(row['count'] as num, kind['total'] as num)}',
+                '${row['rarity']} / ${_percent(row['count'] as num, kind['total'] as num)}',
                 [row['nonPickup'] as num, row['pickup'] as num],
               ),
           ],
@@ -2660,7 +2661,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
                         ),
                       DetailFold(
                         title:
-                            '${_t('exchangeTargets')} · ${_number(group.length)}',
+                            '${_t('exchangeTargets')} / ${_number(group.length)}',
                         child: Column(
                           children: [
                             for (final entry in group)
@@ -2707,7 +2708,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
                                       ),
                                     ),
                                     title: Text(name),
-                                    subtitle: Text(details.join(' · ')),
+                                    subtitle: Text(details.join(' / ')),
                                     onTap:
                                         href == null ||
                                             widget.onOpenCard == null
@@ -2738,7 +2739,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
           'count': known.fold<int>(0, (sum, batch) => sum + batch.drawCount!),
         }),
       if (unknown > 0) _t('unknownDraws', {'count': unknown}),
-    ].join(' · ');
+    ].join(' / ');
   }
 
   VoidCallback? _open(GachaHistoryPrize prize) =>
@@ -2752,7 +2753,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
       '×${prize.quantity}',
       if (prize.pickup == true) _t('pickup'),
       if (prize.converted) _t('converted'),
-    ].join(' · ');
+    ].join(' / ');
     if (_view == 'table') {
       return SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -2823,7 +2824,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
               SizedBox(
                 width: (constraints.maxWidth - (columns - 1) * 8) / columns,
                 child: GachaPrizeCard(
-                  label: '${prize.name} · ${subtitle(prize)}',
+                  label: '${prize.name} / ${subtitle(prize)}',
                   rarityValue: int.tryParse('${prize.rarity}') ?? 0,
                   image: prize.imageUrl,
                   attribute: prize.attributeImageUrl,
@@ -2940,7 +2941,7 @@ class _GachaConversionEditorState extends State<_GachaConversionEditor> {
             enabled: widget.onChanged != null,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
-              labelText: '${field.$2} · ${widget.conversion.currencyCode}',
+              labelText: '${field.$2} / ${widget.conversion.currencyCode}',
             ),
             validator: (value) {
               if (value == null || value.trim().isEmpty) return null;

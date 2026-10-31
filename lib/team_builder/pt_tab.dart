@@ -169,7 +169,7 @@ class _PtTabState extends State<PtTab> {
       controller: c,
       storageKey: 'reward',
       summary:
-          '${c.tb('farm.title', 'Farming recommendations')} · ${c.searchSettings.songs.length}',
+          '${c.tb('farm.title', 'Farming recommendations')} / ${c.searchSettings.songs.length}',
       conditions: (context) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -318,15 +318,17 @@ class _PtTabState extends State<PtTab> {
               ),
             ),
             LuckSamplingField(
-                label: c.tb('pt.luckSampling', 'LUCK calculation'),
-                autoLabel: c.tb('rewardPlan.auto', 'Automatic'),
-                customLabel: c.tb('arena.custom', 'Custom'),
-                samplesLabel: c.tb('pt.luckSamples', 'Luck samples'),
-                manual: s.ptSamplingManual,
-                samples: s.ptLuckSamples,
-                onMode: (manual) => c.updateSettings({'ptSamplingMode': manual ? 'manual' : 'auto'}),
-                onSamples: (value) => c.updateSettings({'ptLuckSamples': value}),
-              ),
+              label: c.tb('pt.luckSampling', 'LUCK calculation'),
+              autoLabel: c.tb('rewardPlan.auto', 'Automatic'),
+              customLabel: c.tb('arena.custom', 'Custom'),
+              samplesLabel: c.tb('pt.luckSamples', 'Luck samples'),
+              manual: s.ptSamplingManual,
+              samples: s.ptLuckSamples,
+              onMode: (manual) => c.updateSettings({
+                'ptSamplingMode': manual ? 'manual' : 'auto',
+              }),
+              onSamples: (value) => c.updateSettings({'ptLuckSamples': value}),
+            ),
           ],
         ],
       ),
@@ -421,7 +423,7 @@ class _PtTabState extends State<PtTab> {
           leading: const Icon(Symbols.tune_rounded),
           title: Text(t('constraints', 'Leader and snapshots')),
           subtitle: Text(
-            c.tb('candidateSummary', '{members} members · {snaps} snaps', {
+            c.tb('candidateSummary', '{members} members / {snaps} snaps', {
               'members': request?.members.length ?? 0,
               'snaps': request?.snaps.length ?? 0,
             }),
@@ -545,21 +547,21 @@ class _PtTabState extends State<PtTab> {
     if (RegExp(r'^([ms])(\d+)(?:[.:/]|$)').firstMatch(target)
         case final card?) {
       final name = catalog.cardName(card[1] == 'm', int.parse(card[2]!));
-      return fields[fieldName] == null ? name : '$name · ${fields[fieldName]}';
+      return fields[fieldName] == null ? name : '$name / ${fields[fieldName]}';
     }
     if (RegExp(r'^(?:challenge:|gekiso:)?(\d+):(\d+)$').firstMatch(target)
         case final song?) {
       final id = int.parse(song[1]!);
-      return '${catalog.songTitle(id)} · ${catalog.difficultyLabel(id, int.parse(song[2]!))}';
+      return '${catalog.songTitle(id)} / ${catalog.difficultyLabel(id, int.parse(song[2]!))}';
     }
     if (key == 'cr') {
-      return '${catalog.characterName(int.tryParse(fieldName) ?? 0)} · ${fields[key]}';
+      return '${catalog.characterName(int.tryParse(fieldName) ?? 0)} / ${fields[key]}';
     }
     if (key == 'bi') {
       final name = catalog.text(
         objectRow(objectRow(catalog.data['bandItems'])[fieldName])['name'],
       );
-      return '${name.isEmpty ? '#$fieldName' : name} · ${fields[key]}';
+      return '${name.isEmpty ? '#$fieldName' : name} / ${fields[key]}';
     }
     return target;
   }
@@ -911,7 +913,7 @@ class _PtTabState extends State<PtTab> {
           card(
             challenge,
             badge(const Icon(Symbols.swords_rounded, size: 18), false),
-            '${catalog.difficultyLabel(challenge.song!.songId, challenge.song!.difficulty)} · '
+            '${catalog.difficultyLabel(challenge.song!.songId, challenge.song!.difficulty)} / '
             '${t('challengeBest', 'Challenge team')}',
             number(challenge.event!.mean),
           ),
@@ -921,7 +923,7 @@ class _PtTabState extends State<PtTab> {
           card(
             hit,
             badge(Text('${position + 1}'), position == 0),
-            '${catalog.difficultyLabel(hit.song!.songId, hit.song!.difficulty)} · '
+            '${catalog.difficultyLabel(hit.song!.songId, hit.song!.difficulty)} / '
                 '${c.tb('eventBonus', 'Event bonus')} +${number(hit.event!.bonusPercent.floor())}%',
             '${number(hit.event!.mean)} $currency',
             best: position == 0,

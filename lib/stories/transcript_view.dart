@@ -138,7 +138,7 @@ class _StoryTranscriptState extends State<StoryTranscript> {
               border: const OutlineInputBorder(),
               prefixIcon: const Icon(Symbols.search_rounded),
               labelText:
-                  '${t('common.actions.search', 'Search')} · ${t('navigation.storyText', 'Story text')}',
+                  '${t('common.actions.search', 'Search')} / ${t('navigation.storyText', 'Story text')}',
               helperText:
                   '${entries.where((e) => e.dialogue).length} / ${widget.entries.where((e) => e.dialogue).length}',
               suffixIcon: _query.isEmpty

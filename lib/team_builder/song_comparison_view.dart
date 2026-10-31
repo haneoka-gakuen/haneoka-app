@@ -347,7 +347,7 @@ class SongComparisonTab extends StatelessWidget {
     return TeamToolLayout(
       controller: controller,
       storageKey: 'song-comparison',
-      summary: '${c.text('choose')} · ${c.songs.length}',
+      summary: '${c.text('choose')} / ${c.songs.length}',
       conditions: _conditions,
       action: _action,
       results: _results,

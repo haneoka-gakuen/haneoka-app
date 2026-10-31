@@ -344,7 +344,7 @@ class _CommunityUserScreenState extends State<CommunityUserScreen> {
               title: Text(
                 '${account['displayName'] ?? account['playerUid'] ?? ''}',
               ),
-              subtitle: Text(facts.join(' · ')),
+              subtitle: Text(facts.join(' / ')),
             );
           },
         ),

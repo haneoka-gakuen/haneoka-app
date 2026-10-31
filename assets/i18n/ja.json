@@ -3297,7 +3297,11 @@
       "justWindowRandom": "このランダムスキルでは判定幅を指定できません",
       "minBonusUnreachable": "最低イベントボーナスに届きません",
       "clearRequired": "「必ず含める」をすべて解除",
-      "clearRequiredDone": "{count} 枚の「必ず含める」を解除しました"
+      "clearRequiredDone": "{count} 枚の「必ず含める」を解除しました",
+      "stepsLabel": "手順",
+      "stepCards": "カードをインポート",
+      "stepCardsDone": "{count} 枚",
+      "stepSongs": "楽曲を選ぶ"
     },
     "calendar": {
       "title": "カレンダー",

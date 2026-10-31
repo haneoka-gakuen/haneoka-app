@@ -4,7 +4,6 @@ import '../core/catalog_source.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
-
 import '../core/api.dart';
 import '../core/app_state.dart';
 import '../core/audio.dart';
@@ -526,7 +525,7 @@ class _SongRow extends StatelessWidget {
         [
           text.artist(song),
           text.category(song),
-        ].where((s) => s.isNotEmpty).join(' · '),
+        ].where((s) => s.isNotEmpty).join(' / '),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),

@@ -97,7 +97,7 @@ class _AccountAppealsState extends State<AccountAppeals> {
             ),
             icon: const Icon(Symbols.gavel_rounded),
             label: Text(
-              '${state.text('account.page.displayName')} · ${t('appeal')}',
+              '${state.text('account.page.displayName')} / ${t('appeal')}',
             ),
           ),
         if (avatar['moderationStatus'] == 'block')
@@ -105,7 +105,7 @@ class _AccountAppealsState extends State<AccountAppeals> {
             onPressed: () => appeal('attachment', '${avatar['id']}'),
             icon: const Icon(Symbols.gavel_rounded),
             label: Text(
-              '${state.text('account.page.avatar')} · ${t('appeal')}',
+              '${state.text('account.page.avatar')} / ${t('appeal')}',
             ),
           ),
         FutureBuilder(
@@ -142,7 +142,7 @@ class _AccountAppealsState extends State<AccountAppeals> {
                           : t('appeal'),
                     ),
                     subtitle: Text(
-                      '${t('appealStatus.${appeal['status']}')} · ${formatCommunityTime(appeal['updatedAt'], state.text.locale)?.text ?? ''}',
+                      '${t('appealStatus.${appeal['status']}')} / ${formatCommunityTime(appeal['updatedAt'], state.text.locale)?.text ?? ''}',
                     ),
                   ),
               ],

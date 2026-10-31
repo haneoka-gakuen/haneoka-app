@@ -83,7 +83,7 @@ ResultMetric resultMetric(
     return ResultMetric(
       '$measure:${converted ? 'converted' : 'direct'}',
       converted
-          ? '$label · ${text('farm.converted', 'Direct rewards + CP conversion')}'
+          ? '$label / ${text('farm.converted', 'Direct rewards + CP conversion')}'
           : label,
       measure == 'challenge-points' ? event.challengePoints : event.mean,
       digits: 1,

@@ -1,4 +1,5 @@
 import '../core/site_date.dart';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -506,7 +507,7 @@ class _Profile extends StatelessWidget {
                       ),
                       if (started is num && started > 0)
                         Text(
-                          '${t.tutorialDone} · ${SiteDate.day(locale).format(DateTime.fromMillisecondsSinceEpoch(started.toInt() * 1000))}',
+                          '${t.tutorialDone} / ${SiteDate.day(locale).format(DateTime.fromMillisecondsSinceEpoch(started.toInt() * 1000))}',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),
@@ -1005,7 +1006,7 @@ class _Profile extends StatelessWidget {
                 const SizedBox(height: 16),
                 section(
                   Symbols.person_rounded,
-                  '${t.ownedMembers} · ${number.format(view.rows(SaveSection.memberCards).length)}',
+                  '${t.ownedMembers} / ${number.format(view.rows(SaveSection.memberCards).length)}',
                   rail(
                     'cards',
                     SaveSection.memberCards,
@@ -1018,7 +1019,7 @@ class _Profile extends StatelessWidget {
                 ),
                 section(
                   Symbols.photo_library_rounded,
-                  '${t.ownedSnapshots} · ${number.format(view.rows(SaveSection.snapshots).length)}',
+                  '${t.ownedSnapshots} / ${number.format(view.rows(SaveSection.snapshots).length)}',
                   rail(
                     'support-cards',
                     SaveSection.snapshots,

@@ -143,7 +143,7 @@ class _AdminResourcesState extends State<AdminResources> {
                       ListTile(
                         title: Text('${server['displayName']}'),
                         subtitle: Text(
-                          '${server['slug']} · ${server['region']}',
+                          '${server['slug']} / ${server['region']}',
                         ),
                         trailing: Text(t('values.${server['status']}')),
                         onTap: c.busy ? null : () => _serverForm(server),
@@ -224,7 +224,7 @@ class _AdminResourcesState extends State<AdminResources> {
                         value: _package,
                         title: Text(t('resources.file')),
                         subtitle: Text(
-                          '${ready['fileName']} · ${ready['server']}',
+                          '${ready['fileName']} / ${ready['server']}',
                         ),
                         onChanged: c.busy
                             ? null

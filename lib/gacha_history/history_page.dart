@@ -1,4 +1,5 @@
 import '../core/site_date.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
@@ -756,7 +757,7 @@ class _HistoryPageState extends State<HistoryPage> {
                         GachaHistoryPrize(
                           id: prize.prizeId,
                           kind: 'unknown',
-                          name: '${_t('unknown')} · ${prize.prizeId}',
+                          name: '${_t('unknown')} / ${prize.prizeId}',
                           rarity: '',
                           rarityLabel: _t('unknown'),
                           quantity: 1,

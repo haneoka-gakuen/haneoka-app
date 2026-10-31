@@ -382,7 +382,11 @@ class _NativeStoryPlayerScreenState extends State<NativeStoryPlayerScreen>
         ) as Map,
       );
       if (!mounted || epoch != _epoch) return;
-      final api = CatalogSourceScope.resolve(context, api: widget.api, server: widget.server);
+      final api = CatalogSourceScope.resolve(
+        context,
+        api: widget.api,
+        server: widget.server,
+      );
       final document = await NativeStoryDocument.load(api, widget.storyId);
       final renderProfile = await bindStoryRenderProfile(
         document.chapter.sourceIdentity,
@@ -1847,7 +1851,11 @@ class _NativeStoryPlayerScreenState extends State<NativeStoryPlayerScreen>
     late final Future<NativeStoryTransitionSource> pending;
     pending =
         NativeStoryTransitionSource.load(
-          api: CatalogSourceScope.resolve(context, api: widget.api, server: widget.server),
+          api: CatalogSourceScope.resolve(
+            context,
+            api: widget.api,
+            server: widget.server,
+          ),
           identity: _document!.chapter.sourceIdentity,
           definition: definition,
           current: current,
@@ -1957,7 +1965,11 @@ class _NativeStoryPlayerScreenState extends State<NativeStoryPlayerScreen>
     if (uri.queryParameters['release'] != identity.release) {
       throw const FormatException('story_ui_save_resource_release');
     }
-    final api = CatalogSourceScope.resolve(context, api: widget.api, server: widget.server);
+    final api = CatalogSourceScope.resolve(
+      context,
+      api: widget.api,
+      server: widget.server,
+    );
     return api.asset(uri.path).replace(queryParameters: uri.queryParameters);
   }
 
@@ -3605,11 +3617,11 @@ class _NativeStoryPlayerScreenState extends State<NativeStoryPlayerScreen>
   Widget _preparationOverlay() {
     final t = AppScope.of(context).text;
     final detail = _seekBusy
-        ? '${t('story.playback.sceneIndex', 'Scene index')} · ${_seekTargetPosition ?? _player!.controller.cursor}'
+        ? '${t('story.playback.sceneIndex', 'Scene index')} / ${_seekTargetPosition ?? _player!.controller.cursor}'
         : _preparingIndex
-        ? '${t('story.playback.sceneIndex', 'Scene index')} · $_preparedIndexCommands / $_preparationIndexCommands'
+        ? '${t('story.playback.sceneIndex', 'Scene index')} / $_preparedIndexCommands / $_preparationIndexCommands'
         : _preparing && _preparationModels > 0
-        ? '${t('story.playback.resources', 'Story resources')} · $_preparedModels / $_preparationModels'
+        ? '${t('story.playback.resources', 'Story resources')} / $_preparedModels / $_preparationModels'
         : t('story.playback.resources', 'Story resources');
     return ColoredBox(
       color: const Color(0xff111317),

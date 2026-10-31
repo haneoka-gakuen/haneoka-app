@@ -1,4 +1,5 @@
 import '../core/site_date.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -52,7 +53,7 @@ String artistOf(BuildContext context, LibrarySong song) {
   final t = AppScope.of(context).text;
   final names = song.performer?.names ?? const [];
   return names.isNotEmpty
-      ? names.map(t.text).where((n) => n.isNotEmpty).join(' · ')
+      ? names.map(t.text).where((n) => n.isNotEmpty).join(' / ')
       : t.text(song.bandName);
 }
 
@@ -1042,7 +1043,7 @@ class _PlaylistDetailState extends State<_PlaylistDetail> {
     final description = playlist.description?.trim() ?? '';
     final stats = [
       _t(context, 'songCount', '{count} songs', {'count': playlist.trackCount}),
-      if (fromNotes > 0 && fromGbp > 0) 'Our Notes $fromNotes · GBP $fromGbp',
+      if (fromNotes > 0 && fromGbp > 0) 'Our Notes $fromNotes / GBP $fromGbp',
       if (playable < rows.length && hub.library != null)
         _t(context, 'playableCount', '{count} playable', {'count': playable}),
       if (playlist.updatedAt > 0)
@@ -1096,7 +1097,7 @@ class _PlaylistDetailState extends State<_PlaylistDetail> {
                 children: [
                   Text(
                     playlist.visibility == 'private'
-                        ? '${_t(context, 'communityPlaylist', 'Playlist')} · ${_t(context, 'private', 'Private')}'
+                        ? '${_t(context, 'communityPlaylist', 'Playlist')} / ${_t(context, 'private', 'Private')}'
                         : _t(context, 'communityPlaylist', 'Playlist'),
                     style: theme.textTheme.labelLarge?.copyWith(
                       color: scheme.onSurfaceVariant,
@@ -1142,7 +1143,7 @@ class _PlaylistDetailState extends State<_PlaylistDetail> {
                     ),
                   ],
                   const SizedBox(height: 8),
-                  Text(stats.join(' · '), style: theme.textTheme.bodySmall),
+                  Text(stats.join(' / '), style: theme.textTheme.bodySmall),
                 ],
               );
               final actions = Wrap(
@@ -1168,7 +1169,7 @@ class _PlaylistDetailState extends State<_PlaylistDetail> {
                       ),
                       label: Text(
                         '${playlist.viewerLiked ? _t(context, 'collected', 'Saved') : _t(context, 'collect', 'Save')}'
-                        '${playlist.likeCount > 0 ? ' · ${playlist.likeCount}' : ''}',
+                        '${playlist.likeCount > 0 ? ' / ${playlist.likeCount}' : ''}',
                       ),
                     ),
                   if (playlist.kind == 'community' && playlist.viewerOwns)
@@ -1694,7 +1695,7 @@ class _PlaylistEditorState extends State<_PlaylistEditor> {
                     children: [
                       Expanded(
                         child: Text(
-                          '${_t(context, 'tracks', 'Tracks')} · ${_tracks.length}',
+                          '${_t(context, 'tracks', 'Tracks')} / ${_tracks.length}',
                           style: theme.textTheme.titleMedium,
                         ),
                       ),
@@ -1931,7 +1932,7 @@ class _SongPickerState extends State<_SongPicker> {
                 child: FilledButton(
                   onPressed: () => Navigator.of(context).pop(_selected),
                   child: Text(
-                    '${_t(context, 'done', 'Done')} · ${_selected.length}',
+                    '${_t(context, 'done', 'Done')} / ${_selected.length}',
                   ),
                 ),
               ),

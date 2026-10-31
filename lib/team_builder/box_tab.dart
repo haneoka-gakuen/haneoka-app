@@ -286,7 +286,7 @@ class _BoxTabState extends State<BoxTab> {
             child: Text(
               c.tb(
                 'boxSummary',
-                '{owned} owned · {used} in search · {shown} shown',
+                '{owned} owned / {used} in search / {shown} shown',
                 {'owned': owned.length, 'used': used, 'shown': ids.length},
               ),
               style: theme.textTheme.labelLarge?.copyWith(

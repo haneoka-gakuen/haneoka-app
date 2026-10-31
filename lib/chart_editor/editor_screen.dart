@@ -185,7 +185,7 @@ class _ChartEditorScreenState extends State<ChartEditorScreen> {
           context: context,
           builder: (context) => AlertDialog(
             title: Text(
-              '${t('creation.export_chart')} · ${format.toUpperCase()}',
+              '${t('creation.export_chart')} / ${format.toUpperCase()}',
             ),
             content: SizedBox(
               width: 560,

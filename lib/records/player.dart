@@ -127,7 +127,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
                       [
                         ?gameRegionNames[row['region']],
                         '${row['id']}',
-                      ].join(' · '),
+                      ].join(' / '),
                     ),
                     trailing: const Icon(Symbols.chevron_right_rounded),
                     onTap: () => setState(() {
@@ -325,7 +325,7 @@ class PlayerProfileView extends StatelessWidget {
                 children: [
                   Text(name, style: theme.textTheme.headlineSmall),
                   Text(
-                    '${rankingLabel(t, 'profileSearch', 'Player profile ID')} · ${record['profileId'] ?? profile['playerId']}',
+                    '${rankingLabel(t, 'profileSearch', 'Player profile ID')} / ${record['profileId'] ?? profile['playerId']}',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),
@@ -378,7 +378,7 @@ class PlayerProfileView extends StatelessWidget {
             icon: Symbols.badge_rounded,
             title:
                 '${namecard['name'] ?? rankingLabel(t, 'profileCard', 'Profile card')}'
-                '${namecard['slot'] != null ? ' · ${rankingLabel(t, 'profileCardSlot', 'Slot {slot}').replaceAll('{slot}', '${namecard['slot']}')}' : ''}',
+                '${namecard['slot'] != null ? ' / ${rankingLabel(t, 'profileCardSlot', 'Slot {slot}').replaceAll('{slot}', '${namecard['slot']}')}' : ''}',
             child: ImageGallery(images: pages, aspectRatio: 16 / 9),
           ),
         if (art != null)
@@ -435,7 +435,7 @@ class PlayerProfileView extends StatelessWidget {
           ),
         if (updated is num)
           Text(
-            '${rankingLabel(t, 'updated', 'Updated')} · ${SiteDate.day(t.locale).withTime(seconds: true).format(DateTime.fromMillisecondsSinceEpoch(updated.toInt()))}',
+            '${rankingLabel(t, 'updated', 'Updated')} / ${SiteDate.day(t.locale).withTime(seconds: true).format(DateTime.fromMillisecondsSinceEpoch(updated.toInt()))}',
             style: theme.textTheme.bodySmall?.copyWith(
               color: scheme.onSurfaceVariant,
             ),

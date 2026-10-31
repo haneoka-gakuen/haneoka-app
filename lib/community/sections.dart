@@ -235,7 +235,7 @@ class _TagsState extends _PagedState<CommunityTagsScreen> {
             subtitle: Text(
               '${tag['description'] ?? ''}'.isNotEmpty
                   ? '${tag['description']}'
-                  : '${number.format((tag['postCount'] as num?) ?? 0)} ${communityLabel(context, 'posts', 'posts')} · ${number.format((tag['followerCount'] as num?) ?? 0)} ${communityLabel(context, 'followers', 'followers')}',
+                  : '${number.format((tag['postCount'] as num?) ?? 0)} ${communityLabel(context, 'posts', 'posts')} / ${number.format((tag['followerCount'] as num?) ?? 0)} ${communityLabel(context, 'followers', 'followers')}',
             ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,

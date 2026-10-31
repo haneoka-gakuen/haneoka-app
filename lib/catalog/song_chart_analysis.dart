@@ -176,7 +176,7 @@ class _SongChartAnalysisState extends State<SongChartAnalysis> {
                 if ((counts[kind] ?? 0) > 0)
                   (
                     _text(kind.name, kind.name),
-                    '${number.format(counts[kind])} · ${(counts[kind]! / notes.length * 100).round()}%',
+                    '${number.format(counts[kind])} / ${(counts[kind]! / notes.length * 100).round()}%',
                   ),
             ],
           ),
@@ -366,7 +366,7 @@ class _SongChartAnalysisState extends State<SongChartAnalysis> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${_text('section', 'Section')} ${i + 1} · ${_text('placement', 'Place')}',
+                        '${_text('section', 'Section')} ${i + 1} / ${_text('placement', 'Place')}',
                         style: theme.textTheme.labelMedium,
                       ),
                       const SizedBox(height: 4),

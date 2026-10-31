@@ -185,7 +185,7 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
       ),
       BoxSyncStatus.offline => (
         Symbols.cloud_off_rounded,
-        c.tb('syncOffline', 'Offline · changes are kept and sent later'),
+        c.tb('syncOffline', 'Offline / changes are kept and sent later'),
       ),
       BoxSyncStatus.signedOut => (
         Symbols.no_accounts_rounded,
@@ -197,7 +197,7 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
       ),
       _ => (
         Symbols.save_rounded,
-        c.tb('syncLocal', 'Saved on this device · sign in to sync'),
+        c.tb('syncLocal', 'Saved on this device / sign in to sync'),
       ),
     };
     final tabs = [
@@ -341,7 +341,7 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
             )
           : widget.importSave?.regionName == null
           ? c.tb('title', 'Team builder')
-          : '${c.tb('title', 'Team builder')} · ${widget.importSave!.regionName}',
+          : '${c.tb('title', 'Team builder')} / ${widget.importSave!.regionName}',
       search: ready && _tab == _Tab.box
           ? ShellSearch(
               label: t('common.actions.search', 'Search'),
@@ -462,7 +462,7 @@ class _Credit extends StatelessWidget {
             style: style,
           ),
           link('haneoka.org', 'https://haneoka.org'),
-          Text(' · ', style: style),
+          Text(' / ', style: style),
           link(
             controller.tb('creditSource', 'Source code'),
             'https://github.com/haneoka-gakuen/ournotes-team-builder',

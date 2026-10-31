@@ -106,7 +106,7 @@ class _ChartLibraryScreenState extends State<_ChartLibraryScreen> {
             SimpleDialogOption(
               onPressed: () => Navigator.pop(context, ('bestdori', server)),
               child: Text(
-                'GBP · ${t('tools.teamBuilder.boxImport.servers.$server', server.toUpperCase())}',
+                'GBP / ${t('tools.teamBuilder.boxImport.servers.$server', server.toUpperCase())}',
               ),
             ),
         ],
@@ -180,7 +180,7 @@ class _ChartLibraryScreenState extends State<_ChartLibraryScreen> {
                       DropdownMenuItem(
                         value: '${row['difficulty']}',
                         child: Text(
-                          '${row['difficulty'] is num ? const ['EASY', 'NORMAL', 'HARD', 'EXPERT', 'SPECIAL'][(row['difficulty'] as num).toInt().clamp(0, 4)] : '${row['difficulty']}'.toUpperCase()} · ${row['playLevel'] ?? ''}',
+                          '${row['difficulty'] is num ? const ['EASY', 'NORMAL', 'HARD', 'EXPERT', 'SPECIAL'][(row['difficulty'] as num).toInt().clamp(0, 4)] : '${row['difficulty']}'.toUpperCase()} / ${row['playLevel'] ?? ''}',
                         ),
                       ),
                   ],

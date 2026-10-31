@@ -696,7 +696,7 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
                           [
                             for (final e in card.observedPractice.entries)
                               '${_t('practice_${e.key}', e.key)} ${e.value}',
-                          ].join(' · '),
+                          ].join(' / '),
                           style: theme.textTheme.labelSmall,
                         ),
                     ],
@@ -760,7 +760,7 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
         Text(
           _frame == null
               ? _t(_phase.name, 'Recognizing screenshots')
-              : '${_t(_phase.name, 'Recognizing screenshots')} · ${_frame!.$1} / ${_frame!.$2}',
+              : '${_t(_phase.name, 'Recognizing screenshots')} / ${_frame!.$1} / ${_frame!.$2}',
           style: theme.textTheme.bodyMedium,
         ),
       ],

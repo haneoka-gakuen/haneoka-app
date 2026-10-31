@@ -617,7 +617,7 @@ class _SongPuzzleScreenState extends State<SongPuzzleScreen> {
                     ExpansionTile(
                       tilePadding: EdgeInsets.zero,
                       title: Text(
-                        '${_text('steps')} · ${_solution!.path.length}',
+                        '${_text('steps')} / ${_solution!.path.length}',
                       ),
                       children: [
                         for (final (index, tile) in _solution!.path.indexed)

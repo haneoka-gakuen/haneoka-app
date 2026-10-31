@@ -263,7 +263,7 @@ class _GachaSimulatorState extends State<GachaSimulator> {
   }
 
   String _optionLabel(Map option) =>
-      '${t.system('draw', '{count} draws', {'count': number(drawCountOf(option))})} · ${t.text(option['currency']).isEmpty ? t.label('free', 'Free') : t.text(option['currency'])}';
+      '${t.system('draw', '{count} draws', {'count': number(drawCountOf(option))})} / ${t.text(option['currency']).isEmpty ? t.label('free', 'Free') : t.text(option['currency'])}';
 
   String _kindLabel(String kind) => t.label(
     kind == 'member'
@@ -742,7 +742,7 @@ class _GachaSimulatorState extends State<GachaSimulator> {
             for (final (currency, image, spent) in costs.values)
               fact(
                 caption(
-                  '${t.label('spent', 'Cost')} · ${t.text(currency).isEmpty ? t.label('free', 'Free') : t.text(currency)}',
+                  '${t.label('spent', 'Cost')} / ${t.text(currency).isEmpty ? t.label('free', 'Free') : t.text(currency)}',
                 ),
                 spent > 0
                     ? _cost(number(spent), image, style: value)
@@ -941,7 +941,7 @@ class _GachaSimulatorState extends State<GachaSimulator> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  '${_kindLabel(kind)}  ${entries.length} · ${entries.fold(0, (sum, e) => sum + e.$2)}',
+                  '${_kindLabel(kind)}  ${entries.length} / ${entries.fold(0, (sum, e) => sum + e.$2)}',
                   style: theme.textTheme.titleSmall,
                 ),
                 const SizedBox(height: 8),

@@ -303,7 +303,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ).where((o) => o.facets.any(_categories.contains)).toList();
         return ShellPage(
           title:
-              '${label('title', 'Calendar')} · ${DateFormat.yMMMM(t.locale).format(_selected)}',
+              '${label('title', 'Calendar')} / ${DateFormat.yMMMM(t.locale).format(_selected)}',
           actions: [
             BarAction(
               icon: Symbols.chevron_left_rounded,
@@ -661,7 +661,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                           ? label('starts', 'Starts')
                                           : label('ends', 'Ends'),
                                     label(item.kind, item.kind),
-                                  ].join(' · '),
+                                  ].join(' / '),
                                   style: theme.textTheme.labelSmall,
                                 ),
                               ],
@@ -855,7 +855,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     if (item.source['allDay'] == true || start == null) {
       final dates = DateFormat.MMMMd(t.locale);
       return item.kind == 'live'
-          ? '${dates.format(item.start)}${item.end != item.start ? ' – ${dates.format(item.end)}' : ''} · ${label('allDay', 'All day')}'
+          ? '${dates.format(item.start)}${item.end != item.start ? ' – ${dates.format(item.end)}' : ''} / ${label('allDay', 'All day')}'
           : label('allDay', 'All day');
     }
     final format = SiteDate.day(t.locale).withTime();

@@ -417,7 +417,7 @@ class TeamGrowthDialog extends StatelessWidget {
               DropdownMenuItem(
                 value: key,
                 child: Text(
-                  '${catalog.cardName(members, id)} · ${t(inTeam ? 'inTeam' : 'inPool')}',
+                  '${catalog.cardName(members, id)} / ${t(inTeam ? 'inTeam' : 'inPool')}',
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -553,7 +553,7 @@ class TeamGrowthDialog extends StatelessWidget {
             children: [
               if (upgraded.song != null)
                 Text(
-                  '${catalog.songTitle(upgraded.song!.songId)} · ${catalog.difficultyLabel(upgraded.song!.songId, upgraded.song!.difficulty)}',
+                  '${catalog.songTitle(upgraded.song!.songId)} / ${catalog.difficultyLabel(upgraded.song!.songId, upgraded.song!.difficulty)}',
                 ),
               Formation(
                 controller: c,
@@ -574,7 +574,7 @@ class TeamGrowthDialog extends StatelessWidget {
                   '${metric(hit('searchBefore'))} → ${metric(hit('searchAfter'))}',
                   style: theme.textTheme.titleLarge,
                 ),
-                Text('${status('searchBefore')} · ${status('searchAfter')}'),
+                Text('${status('searchBefore')} / ${status('searchAfter')}'),
                 SpecList(
                   facts: [
                     Fact(

@@ -235,7 +235,7 @@ List<(String, String)> resultConditions(
         c.tb('playJudgements', 'Play judgements'),
         play.isAllPerfect
             ? c.tb('playAp', 'All Perfect')
-            : 'GREAT ${formatNumber(c.state.text.locale, play.great * 100, 1)}% · GOOD ${formatNumber(c.state.text.locale, play.good * 100, 1)}% · BAD ${formatNumber(c.state.text.locale, play.bad * 100, 1)}% · MISS ${formatNumber(c.state.text.locale, play.miss * 100, 1)}%',
+            : 'GREAT ${formatNumber(c.state.text.locale, play.great * 100, 1)}% / GOOD ${formatNumber(c.state.text.locale, play.good * 100, 1)}% / BAD ${formatNumber(c.state.text.locale, play.bad * 100, 1)}% / MISS ${formatNumber(c.state.text.locale, play.miss * 100, 1)}%',
       ),
     if (play != null && play.missEvery > 0)
       (c.tb('missEvery', 'Miss every N notes'), '${play.missEvery}'),
@@ -261,7 +261,7 @@ List<(String, String)> resultConditions(
                     .firstOrNull
                     ?.placements ??
                 [goal.rank, goal.rank, goal.rank])
-            .join(' · '),
+            .join(' / '),
       ),
     ],
     if (goal is EventGoal && goal.gekiso != null) ...[
@@ -421,7 +421,7 @@ class _ResultsViewState extends State<ResultsView> {
                   child: Text(
                     gap == null
                         ? proof
-                        : '$proof · ${c.tb('improvementBound', 'Up to {percent}% improvement', {'percent': gap})}',
+                        : '$proof / ${c.tb('improvementBound', 'Up to {percent}% improvement', {'percent': gap})}',
                     style: theme.textTheme.labelLarge,
                   ),
                 ),
@@ -437,7 +437,7 @@ class _ResultsViewState extends State<ResultsView> {
               Text(
                 c.tb(
                   'resultMeta',
-                  '{ms} ms · {exact} teams simulated exactly',
+                  '{ms} ms / {exact} teams simulated exactly',
                   {
                     'ms': formatNumber(locale, results.elapsedMs),
                     'exact': exact,
@@ -838,7 +838,7 @@ class _ResultComparisonPanelState extends State<ResultComparisonPanel> {
               DropdownMenuItem(
                 value: i,
                 child: Text(
-                  '#${pickedEntries[i].position} · ${pickedEntries[i].hit.song == null ? c.tb('goalPower', 'Power') : catalog.songTitle(pickedEntries[i].hit.song!.songId)}',
+                  '#${pickedEntries[i].position} / ${pickedEntries[i].hit.song == null ? c.tb('goalPower', 'Power') : catalog.songTitle(pickedEntries[i].hit.song!.songId)}',
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -883,7 +883,7 @@ class _ResultComparisonPanelState extends State<ResultComparisonPanel> {
                 children: [
                   if (valid)
                     Text(
-                      '${b.label}: ${formatNumber(locale, b.value, b.digits)}${b.unit} (${b.value >= a.value ? '+' : ''}${formatNumber(locale, b.value - a.value, b.digits)}${b.unit}${relative == null ? '' : ' · ${formatNumber(locale, relative, 2)}%'})',
+                      '${b.label}: ${formatNumber(locale, b.value, b.digits)}${b.unit} (${b.value >= a.value ? '+' : ''}${formatNumber(locale, b.value - a.value, b.digits)}${b.unit}${relative == null ? '' : ' / ${formatNumber(locale, relative, 2)}%'})',
                     ),
                   Wrap(
                     spacing: 12,
@@ -908,7 +908,7 @@ class _ResultComparisonPanelState extends State<ResultComparisonPanel> {
           ),
         for (final entry in entries.where((entry) => !entry.listed))
           Text(
-            '#${entry.position} · ${c.tb('outsideRanking', 'Outside current ranking')}',
+            '#${entry.position} / ${c.tb('outsideRanking', 'Outside current ranking')}',
           ),
         Wrap(
           spacing: 8,
@@ -926,7 +926,7 @@ class _ResultComparisonPanelState extends State<ResultComparisonPanel> {
                         ),
                   icon: const Icon(Symbols.trending_up_rounded),
                   label: Text(
-                    '#${entry.position} · ${c.tb('tg.title', 'Training comparison')}',
+                    '#${entry.position} / ${c.tb('tg.title', 'Training comparison')}',
                   ),
                 ),
           ],
@@ -1033,7 +1033,7 @@ class _HitCardState extends State<_HitCard> {
       if (s.goal == GoalKind.gekiso && placements != null)
         ValueChip(
           label: c.tb('gekisoPlacements', 'Scoring placements'),
-          value: placements.join(' · '),
+          value: placements.join(' / '),
         ),
       if (hit.comboBonus != null)
         ValueChip(
@@ -1125,7 +1125,7 @@ class _HitCardState extends State<_HitCard> {
     final lines = [
       if (hit.song case final song?)
         '${catalog.songTitle(song.songId)} ${catalog.difficultyLabel(song.songId, song.difficulty)}',
-      '${main.label}: ${main.value} · ${c.tb('power', 'Power')}: ${formatNumber(c.state.text.locale, hit.power)}',
+      '${main.label}: ${main.value} / ${c.tb('power', 'Power')}: ${formatNumber(c.state.text.locale, hit.power)}',
       ...resultConditions(
         c,
         hit,
@@ -1207,7 +1207,7 @@ class _HitCardState extends State<_HitCard> {
                                 '${catalog.songTitle(song.songId)} ${catalog.difficultyLabel(song.songId, song.difficulty)}',
                               if (widget.index < 0)
                                 c.tb('pt.challengeBest', 'Challenge team'),
-                            ].join(' · '),
+                            ].join(' / '),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.labelLarge?.copyWith(
@@ -1356,7 +1356,7 @@ class _HitCardState extends State<_HitCard> {
                       if (part.song case final song?)
                         ListTile(
                           title: Text(
-                            '${catalog.songTitle(song.songId)} · ${catalog.difficultyLabel(song.songId, song.difficulty)}',
+                            '${catalog.songTitle(song.songId)} / ${catalog.difficultyLabel(song.songId, song.difficulty)}',
                           ),
                           subtitle: Text(
                             '${c.tb('power', 'Power')} ${formatNumber(c.state.text.locale, part.power)}',
@@ -1438,7 +1438,7 @@ class Formation extends StatelessWidget {
                 final owned = c.view?.members[member];
                 return Tooltip(
                   message:
-                      '${catalog.cardSubtitle(true, member)} · ${c.tb('slotPower', 'Slot power')} '
+                      '${catalog.cardSubtitle(true, member)} / ${c.tb('slotPower', 'Slot power')} '
                       '${formatNumber(c.state.text.locale, hit.slotPowers.elementAtOrNull(index) ?? 0)}',
                   child: Column(
                     children: [
@@ -1933,7 +1933,7 @@ class _SkillOrdersState extends State<_SkillOrders> {
                 ),
                 title: _faces(entry.index, firing),
                 subtitle: Text(
-                  '${formatNumber(locale, entry.value)} · ${gap(entry.value)}',
+                  '${formatNumber(locale, entry.value)} / ${gap(entry.value)}',
                 ),
               ),
           ],
@@ -1981,7 +1981,7 @@ class _TimelinePlot extends StatelessWidget {
                 height: 26,
                 child: Tooltip(
                   message:
-                      '+${(window.percent + window.perfectPercent).round()}%${window.extensionMs != 0 ? ' · +${(window.extensionMs / 1000).toStringAsFixed(1)}s' : ''}',
+                      '+${(window.percent + window.perfectPercent).round()}%${window.extensionMs != 0 ? ' / +${(window.extensionMs / 1000).toStringAsFixed(1)}s' : ''}',
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: colorOf(window.member).withValues(alpha: 0.85),
@@ -2065,7 +2065,7 @@ Future<List<int>> renderHitImage(
       title: catalog.cardName(members, id),
       character: [
         for (final character in characters) catalog.characterName(character),
-      ].join(' · '),
+      ].join(' / '),
       image: catalog.cardImage(members, id),
       avatars: [
         if (members)
@@ -2094,7 +2094,7 @@ Future<List<int>> renderHitImage(
       title: c.tb('title', 'Team builder'),
       subtitle: hit.song == null
           ? main.label
-          : '${catalog.songTitle(hit.song!.songId)} · ${catalog.difficultyLabel(hit.song!.songId, hit.song!.difficulty)}',
+          : '${catalog.songTitle(hit.song!.songId)} / ${catalog.difficultyLabel(hit.song!.songId, hit.song!.difficulty)}',
       membersLabel: c.tb('members', 'Members'),
       snapshotsLabel: c.tb('snapshots', 'Snaps'),
       leaderLabel: c.tb('leader', 'Leader'),
@@ -2170,5 +2170,5 @@ String _justWindowText(TeamBuilderController c, JustWindow window) {
   final span = before == after ? '±$before ms' : '−$before / +$after ms';
   return window.meetsTarget
       ? span
-      : '$span · ${c.tb('justWindowUnmet', 'Below the desired window')}';
+      : '$span / ${c.tb('justWindowUnmet', 'Below the desired window')}';
 }

@@ -557,7 +557,7 @@ class _SystemDetailState extends State<SystemDetail> {
               value(
                 active.isEmpty
                     ? text('eventRankingOff', 'No rankings')
-                    : active.join(' · '),
+                    : active.join(' / '),
               ),
             ),
           if (eventItem is Map)
@@ -1024,7 +1024,7 @@ class _SystemDetailState extends State<SystemDetail> {
       ])
         if (_num(raw[field]) > 0)
           text(key, fallback, {'count': _num(raw[field])}),
-    ].join(' · ');
+    ].join(' / ');
   }
 
   /// One resource with its quantity and authored chance (`eventRewardRow`).
@@ -1046,7 +1046,7 @@ class _SystemDetailState extends State<SystemDetail> {
             text('eventProbability', '{rate}% chance', {
               'rate': probability / 100,
             }),
-          ].where((s) => s.isNotEmpty && s != name).join(' · '),
+          ].where((s) => s.isNotEmpty && s != name).join(' / '),
         'count': null,
       },
       quantity: false,

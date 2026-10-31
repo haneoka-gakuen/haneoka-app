@@ -639,7 +639,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                   ),
                                   title: Text('${track['musicId']}'),
                                   subtitle: Text(
-                                    '${track['provider']} · ${track['server']}',
+                                    '${track['provider']} / ${track['server']}',
                                   ),
                                 ),
                             ],
@@ -773,12 +773,12 @@ class _AdminScreenState extends State<AdminScreen> {
     final fields = [
       AdminField('slug', t('forum.slug'), required: true),
       for (final locale in ['ja', 'en', 'zh-TW', 'zh-CN', 'ko'])
-        AdminField('names.$locale', '${t('forum.name')} · $locale'),
+        AdminField('names.$locale', '${t('forum.name')} / $locale'),
       if (!group) ...[
         for (final locale in ['ja', 'en', 'zh-TW', 'zh-CN', 'ko'])
           AdminField(
             'descriptions.$locale',
-            '${t('forum.description')} · $locale',
+            '${t('forum.description')} / $locale',
             multiline: true,
           ),
         AdminField(

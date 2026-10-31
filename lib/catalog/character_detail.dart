@@ -1002,7 +1002,7 @@ class _CharacterDetailState extends State<CharacterDetail> {
                 v('response'),
             if (type == 6 || voiceKind(entry) == 'resultPair')
               _ids(entry).map(_name).join(' → '),
-          ].where((s) => s.isNotEmpty).join(' · ');
+          ].where((s) => s.isNotEmpty).join(' / ');
         }
 
         String condition(Map entry) {
@@ -1035,7 +1035,7 @@ class _CharacterDetailState extends State<CharacterDetail> {
                 ).add(const Duration(hours: 9)),
               ),
             unlock,
-          ].where((value) => value.isNotEmpty).join(' · ');
+          ].where((value) => value.isNotEmpty).join(' / ');
         }
 
         final audio = _voice;
@@ -1239,7 +1239,7 @@ class _CharacterDetailState extends State<CharacterDetail> {
     return DialogueRow(
       name: _num(line['characterId']) > 0
           ? _name(speaker)
-          : _ids(entry).map(_name).join(' · '),
+          : _ids(entry).map(_name).join(' / '),
       marks: mark == null
           ? null
           : Tooltip(
@@ -1268,7 +1268,7 @@ class _CharacterDetailState extends State<CharacterDetail> {
         ],
       ),
       action: IconButton(
-        tooltip: '${v(playing ? 'stop' : 'playLine')} · ${_name(speaker)}',
+        tooltip: '${v(playing ? 'stop' : 'playLine')} / ${_name(speaker)}',
         onPressed: clip == null ? null : () => audio.toggle(clip),
         icon: Icon(playing ? Symbols.stop_rounded : Symbols.play_arrow_rounded),
       ),

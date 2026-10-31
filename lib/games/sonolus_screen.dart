@@ -141,7 +141,7 @@ class _SonolusScreenState extends State<SonolusScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  '${type == 'levels' ? text('levels', 'Charts') : text('playlists', 'Playlists')} · ${label(section.title)}',
+                  '${type == 'levels' ? text('levels', 'Charts') : text('playlists', 'Playlists')} / ${label(section.title)}',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),

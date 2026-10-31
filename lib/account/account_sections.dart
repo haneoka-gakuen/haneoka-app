@@ -1,4 +1,5 @@
 import '../core/site_date.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -47,7 +48,7 @@ String deviceLabel(String agent) {
     (r'Mac OS', 'macOS'),
     (r'Linux', 'Linux'),
   ]);
-  return [?browser, ?system].join(' · ');
+  return [?browser, ?system].join(' / ');
 }
 
 /// Name, handle, email, role, verification, UID and join date.
@@ -183,7 +184,7 @@ class GameAccountsSection extends StatelessWidget {
                     player.public
                         ? _label(context, 'visibilityPublic', 'Public')
                         : _label(context, 'visibilityPrivate', 'Private'),
-                  ].join(' · '),
+                  ].join(' / '),
                 ),
                 trailing: const Icon(Symbols.chevron_right_rounded),
                 onTap: () => openLink(
@@ -377,8 +378,8 @@ class _ApiTokensSectionState extends State<ApiTokensSection> {
                 [
                   ((token['scopes'] as List?) ?? const [])
                       .map((value) => scope('$value'))
-                      .join(' · '),
-                  '${_label(context, 'apiTokenExpires', 'Expires')} ${_date(context, token['expiresAt']) ?? ''} · ${_label(context, 'apiTokenUsed', 'Last used')} ${_date(context, token['lastUsedAt']) ?? _label(context, 'apiTokenNeverUsed', 'Never')}',
+                      .join(' / '),
+                  '${_label(context, 'apiTokenExpires', 'Expires')} ${_date(context, token['expiresAt']) ?? ''} / ${_label(context, 'apiTokenUsed', 'Last used')} ${_date(context, token['lastUsedAt']) ?? _label(context, 'apiTokenNeverUsed', 'Never')}',
                 ].join('\n'),
               ),
               trailing: TextButton(
@@ -392,7 +393,7 @@ class _ApiTokensSectionState extends State<ApiTokensSection> {
               leading: const Icon(Symbols.history_rounded),
               title: Text('${event['tokenName']}'),
               subtitle: Text(
-                '${_label(context, 'apiTokenEventChanged', 'Box entries changed')}: ${NumberFormat.decimalPattern(t.locale).format(event['changed'] as num? ?? 0)} · ${'${event['server']}'.toUpperCase()} · ${_date(context, event['createdAt']) ?? ''}',
+                '${_label(context, 'apiTokenEventChanged', 'Box entries changed')}: ${NumberFormat.decimalPattern(t.locale).format(event['changed'] as num? ?? 0)} / ${'${event['server']}'.toUpperCase()} / ${_date(context, event['createdAt']) ?? ''}',
               ),
             ),
           TextField(

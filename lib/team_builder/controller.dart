@@ -1464,7 +1464,7 @@ class TeamBuilderController extends ChangeNotifier {
     final random = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
     final label =
         name ??
-        '${catalog.characterName(catalog.characterIds(true, members.first).firstOrNull ?? 0)} · '
+        '${catalog.characterName(catalog.characterIds(true, members.first).firstOrNull ?? 0)} / '
             '${song != null ? catalog.songTitle(song.songId) : tb('noSong', 'No song')}';
     write([
       (

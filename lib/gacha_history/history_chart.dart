@@ -34,7 +34,7 @@ class GachaHistoryChart extends StatelessWidget {
             for (final row in rows)
               for (var i = 0; i < labels.length; i++)
                 (
-                  '${row.$1} · ${labels[i]}',
+                  '${row.$1} / ${labels[i]}',
                   [
                     for (var j = 0; j < labels.length; j++)
                       i == j ? row.$2[i] : 0,
@@ -82,7 +82,7 @@ class GachaHistoryChart extends StatelessWidget {
                                   '${labels[i]} ${row.$2[i]}',
                                 if (rowIndex < details.length)
                                   details[rowIndex],
-                              ].join(' · '),
+                              ].join(' / '),
                               child: LayoutBuilder(
                                 builder: (context, box) => Row(
                                   children: [

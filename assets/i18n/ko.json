@@ -3297,7 +3297,11 @@
       "justWindowRandom": "이 랜덤 스킬에는 판정 폭 조건을 쓸 수 없습니다",
       "minBonusUnreachable": "최소 이벤트 보너스에 도달할 수 없습니다",
       "clearRequired": "'항상 포함' 모두 해제",
-      "clearRequiredDone": "카드 {count}장의 '항상 포함'을 해제했습니다"
+      "clearRequiredDone": "카드 {count}장의 '항상 포함'을 해제했습니다",
+      "stepsLabel": "단계",
+      "stepCards": "카드 가져오기",
+      "stepCardsDone": "{count}장",
+      "stepSongs": "곡 고르기"
     },
     "calendar": {
       "title": "달력",

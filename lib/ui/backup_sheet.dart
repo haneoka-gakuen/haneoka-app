@@ -1,8 +1,8 @@
 import '../core/site_date.dart';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
-
 
 import '../l10n/app_localizations.dart';
 import '../sources/ios_backup.dart';
@@ -107,9 +107,8 @@ class _BackupSheetState extends State<_BackupSheet> {
   @override
   Widget build(BuildContext context) {
     final backups = _backups;
-    final date = SiteDate.day(
-      Localizations.localeOf(context).toLanguageTag(),
-    ).withTime();
+    final date = SiteDate.day(Localizations.localeOf(context).toLanguageTag())
+        .withTime();
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -152,7 +151,7 @@ class _BackupSheetState extends State<_BackupSheet> {
                     if (backup.date != null)
                       date.format(backup.date!.toLocal()),
                     if (backup.encrypted) t.encrypted,
-                  ].join(' · '),
+                  ].join(' / '),
                 ),
                 onTap: () => _read(backup),
               ),

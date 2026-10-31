@@ -481,7 +481,7 @@ class HistoryCatalog {
           : 'unknown',
       name: card is Map
           ? localized(card['prefix'] ?? card['cardName'] ?? card['name'])
-          : '$unknownLabel · ${prize.prizeId}',
+          : '$unknownLabel / ${prize.prizeId}',
       rarity: rarity is num || rarity is String ? rarity! : '',
       rarityLabel: rarityLabel,
       converted: prize.converted,

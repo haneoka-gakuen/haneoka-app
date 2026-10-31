@@ -986,7 +986,7 @@ class _FeedFiltersState extends State<_FeedFilters> {
                               FilterChip(
                                 showCheckmark: false,
                                 label: Text(
-                                  '#${tag['displayName']} · ${tag['postCount']}',
+                                  '#${tag['displayName']} / ${tag['postCount']}',
                                 ),
                                 selected: feed._selectedTags.contains(
                                   tag['normalizedName'],

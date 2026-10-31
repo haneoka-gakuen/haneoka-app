@@ -289,7 +289,7 @@ class _StudioScreenState extends State<StudioScreen> {
             ),
           ),
           Text(
-            '${hours((level['efficiencyTime'] as num?) ?? 0)} · ${number.format((value * session).round())}',
+            '${hours((level['efficiencyTime'] as num?) ?? 0)} / ${number.format((value * session).round())}',
             style: theme.textTheme.bodySmall?.copyWith(
               color: scheme.onSurfaceVariant,
             ),

@@ -5,11 +5,13 @@ library;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:material_new_shapes/material_new_shapes.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../ui/app_image.dart';
 import '../ui/card_artwork.dart';
 import '../ui/shapes.dart';
 import '../ui/theme.dart';
+import 'box_import_screen.dart';
 import 'catalog.dart';
 import 'controller.dart';
 import 'engine/api.dart';
@@ -23,9 +25,13 @@ class TeamToolLayout extends StatelessWidget {
     required this.action,
     required this.results,
     this.storageKey = 'build',
+    this.onRun,
   });
   final TeamBuilderController controller;
   final String storageKey;
+
+  /// Shows the first-search steps above the results.
+  final VoidCallback? onRun;
   final String summary;
   final WidgetBuilder conditions, action, results;
 
@@ -84,12 +90,51 @@ class TeamToolLayout extends StatelessWidget {
               child: ListView(
                 key: PageStorageKey('$storageKey:results'),
                 padding: const EdgeInsets.all(16),
-                children: [results(context)],
+                children: [
+                  if (onRun != null)
+                    _TeamSteps(controller: controller, onRun: onRun!),
+                  results(context),
+                ],
               ),
             ),
           ],
         );
       }
+      void openConditions() => _openConditions(
+        context: context,
+        builder: (context) => Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+          child: SizedBox(
+            width: 560,
+            height: MediaQuery.sizeOf(context).height * .88,
+            child: ListenableBuilder(
+              listenable: controller,
+              builder: (context, _) => Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            controller.tb(
+                              'adjustConditions',
+                              'Adjust conditions',
+                            ),
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ),
+                        CloseButton(),
+                      ],
+                    ),
+                  ),
+                  Expanded(child: settings(context)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -107,51 +152,7 @@ class TeamToolLayout extends StatelessWidget {
                       ),
                     ),
                     TextButton(
-                      onPressed: () => _openConditions(
-                        context: context,
-                        builder: (context) => Dialog(
-                          insetPadding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 16,
-                          ),
-                          child: SizedBox(
-                            width: 560,
-                            height: MediaQuery.sizeOf(context).height * .88,
-                            child: ListenableBuilder(
-                              listenable: controller,
-                              builder: (context, _) => Column(
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      8,
-                                      8,
-                                      0,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            controller.tb(
-                                              'adjustConditions',
-                                              'Adjust conditions',
-                                            ),
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .titleMedium,
-                                          ),
-                                        ),
-                                        CloseButton(),
-                                      ],
-                                    ),
-                                  ),
-                                  Expanded(child: settings(context)),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
+                      onPressed: openConditions,
                       child: Text(
                         controller.tb('adjustConditions', 'Adjust conditions'),
                       ),
@@ -165,7 +166,15 @@ class TeamToolLayout extends StatelessWidget {
             child: ListView(
               key: PageStorageKey('$storageKey:results'),
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              children: [results(context)],
+              children: [
+                if (onRun != null)
+                  _TeamSteps(
+                    controller: controller,
+                    onSongs: openConditions,
+                    onRun: onRun!,
+                  ),
+                results(context),
+              ],
             ),
           ),
           Padding(
@@ -176,6 +185,117 @@ class TeamToolLayout extends StatelessWidget {
       );
     },
   );
+}
+
+/// What is left before a first search (`teamSteps` on the website).
+class _TeamSteps extends StatelessWidget {
+  const _TeamSteps({
+    required this.controller,
+    required this.onRun,
+    this.onSongs,
+  });
+  final TeamBuilderController controller;
+  final VoidCallback onRun;
+  final VoidCallback? onSongs;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller;
+    if (c.results != null) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
+    final cards = c.view?.members.length ?? 0;
+    final cardsDone = c.searchSettings.theoretical || cards > 0;
+    final songsDone = c.goal() != null;
+    Widget step(
+      int index,
+      bool done,
+      bool active,
+      String label,
+      VoidCallback? onTap,
+    ) => Expanded(
+      child: Opacity(
+        opacity: done || active ? 1 : .6,
+        child: Material(
+          color: active ? scheme.primaryContainer : scheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(Corner.medium),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: done || active ? onTap : null,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  spacing: 8,
+                  children: [
+                    CircleAvatar(
+                      radius: 12,
+                      backgroundColor: done
+                          ? scheme.primary
+                          : scheme.surfaceContainerHighest,
+                      foregroundColor: done
+                          ? scheme.onPrimary
+                          : scheme.onSurfaceVariant,
+                      child: done
+                          ? const Icon(Symbols.check_rounded, size: 18)
+                          : Text('$index'),
+                    ),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: active
+                              ? scheme.onPrimaryContainer
+                              : scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        spacing: 4,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          step(
+            1,
+            cardsDone,
+            !cardsDone,
+            cards > 0
+                ? c.tb('stepCardsDone', '{count} cards', {'count': cards})
+                : c.tb('stepCards', 'Import cards'),
+            () => openBoxImport(context, c, members: true),
+          ),
+          step(
+            2,
+            songsDone,
+            cardsDone && !songsDone,
+            songsDone
+                ? c.tb('chartCount', '{count} charts', {
+                    'count': c.searchSettings.songs.length,
+                  })
+                : c.tb('stepSongs', 'Choose songs'),
+            onSongs,
+          ),
+          step(
+            3,
+            false,
+            cardsDone && songsDone,
+            c.tb('findTeams', 'Find teams'),
+            onRun,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// A tool settings section (`.surface` with `detail-section-title`).

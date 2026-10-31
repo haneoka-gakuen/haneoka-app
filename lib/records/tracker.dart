@@ -304,7 +304,7 @@ class _EventTrackerScreenState extends State<EventTrackerScreen>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${t('tools.eventTracker.event', 'Event')} · #${event['id']} · ${date(event['startAtMs'])} - ${date(event['endAtMs'])}',
+                          '${t('tools.eventTracker.event', 'Event')} / #${event['id']} / ${date(event['startAtMs'])} - ${date(event['endAtMs'])}',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),

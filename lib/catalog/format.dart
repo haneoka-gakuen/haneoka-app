@@ -1,6 +1,5 @@
 import '../core/site_date.dart';
 
-
 import '../core/i18n.dart';
 
 /// Turns API values into text: localized tuples, dates, birthdays and lists.
@@ -36,7 +35,7 @@ class ValueFormat {
     if (value is List && value.isNotEmpty && value.every((v) => v is String)) {
       final localized = text.text(value);
       if (value.length == 5) return localized;
-      return value.join(' · ');
+      return value.join(' / ');
     }
     if (value is List && value.every((v) => v is num)) return value.join(', ');
     if (value is bool) return value ? '✓' : '—';

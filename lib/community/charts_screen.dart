@@ -155,7 +155,7 @@ class _CommunityChartsScreenState extends State<CommunityChartsScreen> {
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
-          '${row['artist']} · ${row['difficulty']} ${row['level']}',
+          '${row['artist']} / ${row['difficulty']} ${row['level']}',
         ),
         onTap: () => _open(context, row),
       ),

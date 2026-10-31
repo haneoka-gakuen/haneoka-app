@@ -387,7 +387,7 @@ class GachaHistoryReportPage extends StatelessWidget {
             ],
             const SizedBox(height: 24),
             Text(
-              'Haneoka · $pageLabel',
+              'Haneoka / $pageLabel',
               style: theme.textTheme.labelSmall?.copyWith(
                 color: scheme.onSurfaceVariant,
               ),

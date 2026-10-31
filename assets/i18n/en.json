@@ -3297,7 +3297,11 @@
       "justWindowRandom": "Window targets are unavailable for this random skill",
       "minBonusUnreachable": "Minimum event bonus cannot be reached",
       "clearRequired": "Clear all required marks",
-      "clearRequiredDone": "Cleared required marks on {count} cards"
+      "clearRequiredDone": "Cleared required marks on {count} cards",
+      "stepsLabel": "Steps",
+      "stepCards": "Import cards",
+      "stepCardsDone": "{count} cards",
+      "stepSongs": "Choose songs"
     },
     "calendar": {
       "title": "Calendar",

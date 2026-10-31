@@ -393,7 +393,7 @@ Future<void> _showQueue(
                 const SizedBox(width: 24),
                 Expanded(
                   child: Text(
-                    '${t('media.audio.queue', 'Queue')} · ${audio.queue.length}',
+                    '${t('media.audio.queue', 'Queue')} / ${audio.queue.length}',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),

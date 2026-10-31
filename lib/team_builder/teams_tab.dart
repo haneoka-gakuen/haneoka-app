@@ -109,7 +109,9 @@ class _TeamsTabState extends State<TeamsTab> {
                     'missEvery': s.allPerfect ? 0 : s.missEvery,
                   },
                   'rank': s.gekisoRank,
-                  'seeds': c.hasMission(2, c.manualSongs) ? s.resolvedGekisoSeeds : 0,
+                  'seeds': c.hasMission(2, c.manualSongs)
+                      ? s.resolvedGekisoSeeds
+                      : 0,
                 }
               : null,
           challengeEventId: s.challengeRules ? s.eventId : null,
@@ -640,7 +642,7 @@ class _TeamsTabState extends State<TeamsTab> {
                             formatNumber(locale, hit.score!.mean),
                           if (hit.event != null)
                             '${formatNumber(locale, hit.event!.mean, 1)} pt',
-                        ].join(' · '),
+                        ].join(' / '),
                       ),
                       trailing: FilledButton.tonal(
                         onPressed: () {
@@ -728,7 +730,9 @@ class _TeamsTabState extends State<TeamsTab> {
                 samplesLabel: c.tb('pt.luckSamples', 'Luck samples'),
                 manual: s.gekisoSamplingManual,
                 samples: s.gekisoSeeds,
-                onMode: (manual) => c.updateSettings({'gekisoSamplingMode': manual ? 'manual' : 'auto'}),
+                onMode: (manual) => c.updateSettings({
+                  'gekisoSamplingMode': manual ? 'manual' : 'auto',
+                }),
                 onSamples: (value) => c.updateSettings({'gekisoSeeds': value}),
               ),
             ],

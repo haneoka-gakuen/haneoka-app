@@ -281,7 +281,7 @@ class _OfflineStoriesScreenState extends State<OfflineStoriesScreen> {
                             ),
                             title: Text(t.text(package['title'])),
                             subtitle: Text(
-                              '${episodes.length} · ${_size(package['bytes'] as int)}',
+                              '${episodes.length} / ${_size(package['bytes'] as int)}',
                             ),
                             trailing: IconButton(
                               tooltip: t(
