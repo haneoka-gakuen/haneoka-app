@@ -42,6 +42,14 @@ class _CommunityResults {
   final String? nextCursor;
 }
 
+/// Search (`global-search`): the catalogue and stories through the full-text
+/// service, and community posts.
+class SearchScreen extends StatefulWidget {
+  const SearchScreen({super.key});
+  @override
+  State<SearchScreen> createState() => _SearchScreenState();
+}
+
 class _SearchScreenState extends State<SearchScreen> {
   Future<Map<String, Object?>>? _hits;
   String _kind = '';
