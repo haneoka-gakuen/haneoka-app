@@ -817,16 +817,19 @@ class _ThemeGroup extends StatelessWidget {
         ),
       ],
     );
+    final narrow = MediaQuery.sizeOf(context).width < 600;
     final faces = Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: narrow
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.end,
       children: [
         for (final row in rows)
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: EdgeInsets.only(bottom: narrow ? 4 : 8),
             child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              alignment: WrapAlignment.end,
+              spacing: narrow ? 4 : 8,
+              runSpacing: narrow ? 4 : 8,
+              alignment: narrow ? WrapAlignment.start : WrapAlignment.end,
               children: [
                 for (final option in row)
                   _Face(
