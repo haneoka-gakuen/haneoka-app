@@ -5,11 +5,11 @@
 library;
 
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:media_kit/media_kit.dart';
-import 'package:media_kit_video/media_kit_video.dart';
 
 import 'screenshot_import.dart';
 
@@ -23,17 +23,26 @@ int videoFrameCount(Duration duration) =>
 
 /// Each frame as an image the caller disposes, with its index and the total.
 Stream<(ui.Image, int, int)> videoFrames(String path) async* {
-  final player = Player();
-  final controller = VideoController(player);
+  // No texture: mpv's image output draws each frame in software, so a
+  // screenshot has it; the files it writes go to a folder removed after.
+  final folder = await Directory.systemTemp.createTemp('haneoka-frames-');
+  final player = Player(
+    configuration: const PlayerConfiguration(vo: 'image', muted: true),
+  );
   try {
+    await player.open(Media(path), play: false);
     final native = player.platform;
     if (native is NativePlayer) {
-      // Exact seeks: a keyframe seek would repeat frames while scrolling.
+      // Without a video view the player leaves video off; frames are needed
+      // here. Exact seeks: a keyframe seek would repeat frames.
+      await native.setProperty('vo-image-outdir', folder.path);
+      await native.setProperty('vo-image-format', 'jpg');
+      await native.setProperty('hwdec', 'no');
+      await native.setProperty('vid', 'auto');
       await native.setProperty('hr-seek', 'yes');
     }
-    await player.setVolume(0);
-    await player.open(Media(path), play: false);
-    final ready = await controller.waitUntilFirstFrameRendered
+    final ready = await player.stream.width
+        .firstWhere((width) => width != null && width > 0)
         .then((_) => true)
         .timeout(const Duration(seconds: 20), onTimeout: () => false);
     var duration = player.state.duration;
@@ -61,10 +70,15 @@ Stream<(ui.Image, int, int)> videoFrames(String path) async* {
     }
   } finally {
     await player.dispose();
+    await folder.delete(recursive: true).catchError((Object _) => folder);
   }
 }
 
 Future<ui.Image> _image(Uint8List bgra, int width, int height) {
+  // mpv's raw frames are bgr0: the fourth byte is padding, not alpha.
+  for (var i = 3; i < bgra.length; i += 4) {
+    bgra[i] = 255;
+  }
   final done = Completer<ui.Image>();
   ui.decodeImageFromPixels(
     bgra,
@@ -72,6 +86,8 @@ Future<ui.Image> _image(Uint8List bgra, int width, int height) {
     height,
     ui.PixelFormat.bgra8888,
     done.complete,
+    // Rows are padded to the decoder's alignment.
+    rowBytes: bgra.length ~/ height,
   );
   return done.future;
 }
