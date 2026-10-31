@@ -1,4 +1,5 @@
 import '../core/site_date.dart';
+
 import 'dart:math';
 
 import 'package:flutter/gestures.dart';
@@ -70,6 +71,7 @@ class _SongMetaScreenState extends State<SongMetaScreen> {
   String _query = '';
   final Set<int> _difficulties = {};
   final Set<int> _bands = {};
+  final Set<String> _timing = {};
   final _deckController = AnalysisDeckController.instance;
   final Map<String, ChartRateTable> _rates = {};
   final Map<_Chart, SongAnalysis?> _analysisCache = {};
@@ -369,6 +371,9 @@ class _SongMetaScreenState extends State<SongMetaScreen> {
           for (final c in rows)
             if ((_difficulties.isEmpty || _difficulties.contains(c.index)) &&
                 (_bands.isEmpty || _bands.contains(c.song['bandId'])) &&
+                (!_gekisou ||
+                    _timing.isEmpty ||
+                    _timingOf(c).any(_timing.contains)) &&
                 (_tier.startsWith('band:')
                     ? '${c.song['bandId']}' == _tier.substring(5)
                     : true) &&
@@ -1353,6 +1358,21 @@ class _SongMetaScreenState extends State<SongMetaScreen> {
     return result;
   }
 
+  /// COMBO sections whose first or last notes miss the section edges.
+  Set<String> _timingOf(_Chart c) {
+    final types =
+        ((c.song['gekisou'] as Map?)?['missionTypes'] as List?) ?? const [];
+    final segments = (c.gekisou['segments'] as List?) ?? const [];
+    return {
+      for (final (index, segment) in segments.indexed)
+        if (index < types.length && types[index] == 1)
+          if ((segment as Map?)?['timing'] case final Map timing) ...[
+            if (timing['opening'] != null) 'opening',
+            if (timing['ending'] != null) 'ending',
+          ],
+    };
+  }
+
   void _filters(BuildContext context, CatalogVisuals visuals) {
     final t = AppScope.of(context).text;
     showModalBottomSheet<void>(
@@ -1393,6 +1413,7 @@ class _SongMetaScreenState extends State<SongMetaScreen> {
                           setState(() {
                             _difficulties.clear();
                             _bands.clear();
+                            _timing.clear();
                           });
                           setSheet(() {});
                         },
@@ -1401,6 +1422,47 @@ class _SongMetaScreenState extends State<SongMetaScreen> {
                     ],
                   ),
                   if (_rates.isNotEmpty) ..._deckFilters(context, setSheet),
+                  if (_gekisou) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      t('catalog.analysis.fields.gekisouTiming', 'Timing'),
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        for (final (key, label) in [
+                          (
+                            'opening',
+                            t(
+                              'catalog.analysis.fields.gekisouTimingOpening',
+                              'Late start',
+                            ),
+                          ),
+                          (
+                            'ending',
+                            t(
+                              'catalog.analysis.fields.gekisouTimingEnding',
+                              'Early end',
+                            ),
+                          ),
+                        ])
+                          FilterChip(
+                            label: Text(label),
+                            selected: _timing.contains(key),
+                            onSelected: (_) {
+                              setState(
+                                () => _timing.contains(key)
+                                    ? _timing.remove(key)
+                                    : _timing.add(key),
+                              );
+                              setSheet(() {});
+                            },
+                          ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   Text(
                     t.label('difficulty', 'Difficulty'),
