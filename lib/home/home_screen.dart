@@ -631,8 +631,9 @@ class _HomeScreenState extends State<HomeScreen> {
       title: t('catalog.arena.title', 'Gekiso Arena'),
       viewAll: t('home.dashboard.viewAll', 'View all'),
       onViewAll: open,
+      framed: true,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           spacing: 4,
@@ -2565,17 +2566,17 @@ class _HomeBoard extends StatelessWidget {
           i + 1 < modules.length &&
           modules[i + 1].$1 != 'cards' &&
           modules[i + 1].$1 != 'songs') {
+        final arena = id == 'arena' || modules[i + 1].$1 == 'arena';
+        Widget box(Widget child) => arena
+            ? SizedBox(height: 280, child: child)
+            : AspectRatio(aspectRatio: 7 / 3, child: child);
         rows.add(
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: AspectRatio(aspectRatio: 7 / 3, child: child),
-              ),
+              Expanded(child: box(child)),
               const SizedBox(width: 16),
-              Expanded(
-                child: AspectRatio(aspectRatio: 7 / 3, child: modules[++i].$2),
-              ),
+              Expanded(child: box(modules[++i].$2)),
             ],
           ),
         );
@@ -2583,6 +2584,8 @@ class _HomeBoard extends StatelessWidget {
         rows.add(
           id == 'cards' || id == 'songs'
               ? child
+              : id == 'arena'
+              ? SizedBox(height: 300, child: child)
               : AspectRatio(aspectRatio: 7 / 3, child: child),
         );
       }

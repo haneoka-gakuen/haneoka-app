@@ -264,6 +264,9 @@ class _HubArt extends StatelessWidget {
         CatalogSourceScope.apiOf(context).asset('$value').toString(),
       ],
       fit: fit,
+      alignment: const {'portraits', 'models'}.contains(data['visual'])
+          ? Alignment.topCenter
+          : Alignment.center,
       localized: false,
     );
     final visual = data['visual'],
