@@ -106,7 +106,7 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
       setState(
         () => _saves = [
           for (final save in AccountStore.instance.saves)
-            if (save.release?.server == 'jp' || save.release?.server == 'intl')
+            if (save.server == 'jp' || save.server == 'intl')
               save,
         ],
       );
@@ -117,7 +117,7 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
   Future<void> _addAccount() async {
     final added = [
       for (final save in await addGameAccounts(context))
-        if (save.release?.server == 'jp' || save.release?.server == 'intl')
+        if (save.server == 'jp' || save.server == 'intl')
           save,
     ];
     if (!mounted || added.isEmpty) return;
@@ -128,7 +128,7 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
           if (!added.any(
             (row) =>
                 row.profileId == save.profileId &&
-                row.release?.server == save.release?.server,
+                row.server == save.server,
           ))
             save,
       ],
@@ -306,7 +306,7 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
     _parse(() async {
       final candidate = projectBox({'_player': player}, 'encrypted-player');
       if (candidate == null) throw const BoxImportError('box_no_player');
-      candidate.declaredServer = save.release?.server;
+      candidate.declaredServer = save.server;
       return [candidate];
     });
   }

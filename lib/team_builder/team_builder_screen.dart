@@ -8,11 +8,9 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../account/account_widgets.dart';
 import '../account/haneoka_account.dart';
 import '../core/app_state.dart';
-import '../l10n/app_localizations.dart';
 import '../save/game_save.dart';
 import '../shell/links.dart';
 import '../shell/page.dart';
-import '../ui/labels.dart';
 import 'account_tab.dart';
 import 'arena.dart';
 import 'box.dart';
@@ -109,7 +107,7 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
     final state = AppScope.of(context);
     final controller = _controller ??= TeamBuilderController(
       state,
-      serverOverride: widget.server ?? widget.importSave?.release?.server,
+      serverOverride: widget.server ?? widget.importSave?.server,
     )..addListener(_changed);
     controller.activate(
       _tab == _Tab.arena
@@ -341,9 +339,9 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
                   : 'tabTeams',
               '',
             )
-          : widget.importSave?.release == null
+          : widget.importSave?.regionName == null
           ? c.tb('title', 'Team builder')
-          : '${c.tb('title', 'Team builder')} · ${widget.importSave!.release!.label(AppLocalizations.of(context))}',
+          : '${c.tb('title', 'Team builder')} · ${widget.importSave!.regionName}',
       search: ready && _tab == _Tab.box
           ? ShellSearch(
               label: t('common.actions.search', 'Search'),

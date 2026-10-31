@@ -28,7 +28,6 @@ import 'card_artwork.dart';
 import 'detail.dart';
 import 'import_screen.dart';
 import 'json_view.dart';
-import 'labels.dart';
 import 'shapes.dart';
 import 'theme.dart';
 import 'tile.dart';
@@ -159,7 +158,7 @@ class _SaveScreenState extends State<SaveScreen> {
           .where(
             (s) =>
                 s.profileId == widget.save.profileId &&
-                s.release?.server == widget.save.release?.server,
+                s.server == widget.save.server,
           )
           .firstOrNull ??
       widget.save;
@@ -218,7 +217,7 @@ class _SaveScreenState extends State<SaveScreen> {
     super.didChangeDependencies();
     final state = AppScope.of(context);
     _catalog ??= _Catalog.of(
-      state.apiFor(save.release?.server ?? state.server),
+      state.apiFor(save.server ?? state.server),
     );
   }
 
@@ -236,7 +235,7 @@ class _SaveScreenState extends State<SaveScreen> {
     final t = AppLocalizations.of(context);
     final bytes = exportSave(save);
     final name =
-        'our-notes-${save.release?.server ?? 'save'}-${save.profileId}.json';
+        'our-notes-${save.server ?? 'save'}-${save.profileId}.json';
     final path = await FilePicker.saveFile(fileName: name, bytes: bytes);
     if (path == null) return;
     if (mounted) _say(t.saved);
@@ -339,7 +338,7 @@ class _Profile extends StatelessWidget {
     final view = SaveView(save);
     final locale = Localizations.localeOf(context).toLanguageTag();
     final number = NumberFormat.decimalPattern(locale);
-    final api = state.apiFor(save.release?.server ?? state.server);
+    final api = state.apiFor(save.server ?? state.server);
     String asset(Object? path) => api.asset('$path').toString();
 
     final favorite = catalog?.cards['${view.favoriteMemberCardId}'];
@@ -430,7 +429,7 @@ class _Profile extends StatelessWidget {
                           const SizedBox(width: 6),
                           Flexible(
                             child: Text(
-                              save.release?.label(t) ?? '',
+                              save.regionName ?? '',
                               style: theme.textTheme.labelLarge,
                             ),
                           ),

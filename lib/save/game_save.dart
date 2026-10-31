@@ -21,6 +21,28 @@ enum GameRelease {
   }
 }
 
+/// The game region an 11-digit player ID belongs to: its first digit names it.
+String? regionOfProfile(String profileId) {
+  if (!RegExp(r'^[2-5]\d{10}$').hasMatch(profileId)) return null;
+  return const {'2': 'tw', '3': 'en', '4': 'kr', '5': 'jp'}[profileId[0]];
+}
+
+/// The catalogue server holding a player's cards.
+String? serverOfProfile(String profileId) =>
+    switch (regionOfProfile(profileId)) {
+      null => null,
+      'jp' => 'jp',
+      _ => 'intl',
+    };
+
+/// The name each game region goes by.
+const gameRegionNames = {
+  'jp': 'JP',
+  'tw': 'TW/HK/MO',
+  'en': 'EN Regions',
+  'kr': 'KR',
+};
+
 /// The three documents the game keeps per account.
 enum SaveDocumentKind {
   /// `LocalCacheData`: settings plus `_player`, the account's progress.
@@ -53,6 +75,12 @@ class GameSave {
   final String profileId;
   final String? name;
   final GameRelease? release;
+
+  /// The save's game region and catalogue server. The ID decides them, so
+  /// imported files without a package still resolve.
+  String? get region => regionOfProfile(profileId);
+  String? get server => serverOfProfile(profileId) ?? release?.server;
+  String? get regionName => gameRegionNames[region];
 
   /// Where the files were read from, for display.
   final String source;
@@ -134,7 +162,8 @@ class SaveCollector {
       unreadable++;
       return false;
     }
-    final identity = '${candidate.release?.server ?? "unknown"}:$id';
+    final identity =
+        '${serverOfProfile(id) ?? candidate.release?.server ?? "unknown"}:$id';
     final existing = _byProfile[identity];
     final newer =
         existing == null ||

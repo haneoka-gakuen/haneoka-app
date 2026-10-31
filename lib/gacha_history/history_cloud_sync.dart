@@ -598,7 +598,7 @@ class HistoryCloudSync extends ChangeNotifier with WidgetsBindingObserver {
         .firstOrNull;
     if (region == null) return null;
     for (final save in _accounts.saves) {
-      if (save.release?.server != region.catalogServer) continue;
+      if (save.server != region.catalogServer) continue;
       final hash = historyPersistKey(
         save.documents[SaveDocumentKind.persist]?.data,
       );

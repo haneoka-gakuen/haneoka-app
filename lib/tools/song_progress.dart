@@ -139,7 +139,7 @@ class _SongProgressScreenState extends State<SongProgressScreen> {
   bool _fill({bool silent = false}) {
     final store = _store!;
     final save = AccountStore.instance.saves
-        .where((s) => (s.release?.server ?? '') == store.server)
+        .where((s) => (s.server ?? '') == store.server)
         .firstOrNull;
     if (save == null) return false;
     final values = <String, int>{};
@@ -186,7 +186,7 @@ class _SongProgressScreenState extends State<SongProgressScreen> {
       const ['Not cleared', 'Cleared', 'FULL COMBO', 'ALL PERFECT'][value],
     );
     final hasSave = AccountStore.instance.saves.any(
-      (s) => s.release?.server == state.server,
+      (s) => s.server == state.server,
     );
     return ShellPage(
       title: text('title', 'Song progress'),

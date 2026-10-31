@@ -26,7 +26,6 @@ import '../sources/ios_direct.dart';
 import 'adb_sheet.dart';
 import 'backup_sheet.dart';
 import 'game_release_picker.dart';
-import 'labels.dart';
 import 'save_screen.dart';
 import 'shapes.dart';
 import 'theme.dart';
@@ -107,9 +106,28 @@ class _ImportScreenState extends State<ImportScreen> {
           ? GameRelease.jp
           : GameRelease.intlStore);
 
-  /// Files that do not name their version take the one the player picks.
+  /// A player ID names its region; only files without one ask the player.
   Future<List<GameSave>?> _withRelease(List<GameSave> saves) async {
-    if (saves.every((save) => save.release != null)) return saves;
+    GameRelease? detected(GameSave save) =>
+        switch (serverOfProfile(save.profileId)) {
+          'jp' => GameRelease.jp,
+          'intl' => GameRelease.intlStore,
+          _ => null,
+        };
+    if (saves.every((save) => save.release != null || detected(save) != null)) {
+      return [
+        for (final save in saves)
+          if (save.release != null)
+            save
+          else
+            GameSave(
+              profileId: save.profileId,
+              name: save.name,
+              release: detected(save),
+              source: save.source,
+            )..documents.addAll(save.documents),
+      ];
+    }
     final chosen =
         widget.updateSave?.release ??
         await chooseGameSaveRelease(context, initial: _defaultRelease);
@@ -152,7 +170,7 @@ class _ImportScreenState extends State<ImportScreen> {
             .where(
               (save) =>
                   save.profileId == previous.profileId &&
-                  save.release?.server == previous.release?.server,
+                  save.server == previous.server,
             )
             .firstOrNull;
         if (replacement == null) {
@@ -976,9 +994,7 @@ class _StoredPlayerScreenState extends State<StoredPlayerScreen> {
     builder: (context, _) {
       final save = AccountStore.instance.saves
           .where(
-            (s) =>
-                s.release?.server == widget.server &&
-                s.profileId == widget.profileId,
+            (s) => s.server == widget.server && s.profileId == widget.profileId,
           )
           .firstOrNull;
       final action =
@@ -1053,7 +1069,7 @@ class AccountCard extends StatelessWidget {
                     ),
                     Text(
                       [
-                        if (save.release != null) save.release!.label(t),
+                        if (save.regionName case final region?) region,
                         'ID ${save.profileId}',
                       ].join(' · '),
                       style: theme.textTheme.bodySmall?.copyWith(

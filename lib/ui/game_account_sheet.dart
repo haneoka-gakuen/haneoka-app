@@ -6,7 +6,6 @@ import '../l10n/app_localizations.dart';
 import '../save/account_store.dart';
 import '../save/game_save.dart';
 import 'import_screen.dart';
-import 'labels.dart';
 
 /// Reads new game accounts and returns them to the page that asked.
 Future<List<GameSave>> addGameAccounts(BuildContext context) async =>
@@ -50,7 +49,7 @@ Future<GameAccountChoice?> chooseGameAccount(
       final theme = Theme.of(context);
       final saves = [
         for (final save in AccountStore.instance.saves)
-          if (server == null || save.release?.server == server) save,
+          if (server == null || save.server == server) save,
       ];
       return SafeArea(
         child: SingleChildScrollView(
@@ -80,10 +79,7 @@ Future<GameAccountChoice?> chooseGameAccount(
                     overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(
-                    [
-                      if (save.release != null) save.release!.label(t),
-                      'ID ${save.profileId}',
-                    ].join(' · '),
+                    [?save.regionName, 'ID ${save.profileId}'].join(' · '),
                   ),
                   trailing: const Icon(Symbols.chevron_right_rounded),
                   onTap: () => Navigator.pop(context, save),
@@ -114,7 +110,7 @@ Future<GameAccountChoice?> chooseGameAccount(
   final added = await addGameAccounts(context);
   final save =
       added
-          .where((save) => server == null || save.release?.server == server)
+          .where((save) => server == null || save.server == server)
           .firstOrNull ??
       added.firstOrNull;
   return save == null ? null : (save: save, action: null);

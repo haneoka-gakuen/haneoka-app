@@ -28,7 +28,7 @@ class AccountStore extends ChangeNotifier {
   List<GameSave> get saves => List.unmodifiable(_saves);
 
   static String _key(GameSave save) =>
-      '${save.release?.server ?? 'save'}-${save.profileId}';
+      '${save.server ?? 'save'}-${save.profileId}';
 
   Future<Directory> _folder() async {
     final root = await getApplicationSupportDirectory();

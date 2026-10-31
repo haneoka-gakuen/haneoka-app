@@ -214,7 +214,7 @@ class _HistoryPageState extends State<HistoryPage> {
     final key = historyPersistKey(
       save.documents[SaveDocumentKind.persist]?.data,
     );
-    return _persists['$key-${save.release?.server}'];
+    return _persists['$key-${save.server}'];
   }
 
   List<_HistoryChoice> _choices() {
@@ -251,7 +251,7 @@ class _HistoryPageState extends State<HistoryPage> {
     final choices = [
       for (final save in saves)
         for (final region in GameHistoryRegion.values)
-          if (region.catalogServer == save.release?.server)
+          if (region.catalogServer == save.server)
             _HistoryChoice(
               HistoryRepository.accountKey(save, region),
               region,
@@ -263,7 +263,7 @@ class _HistoryPageState extends State<HistoryPage> {
     for (final persist in _persists.values) {
       if (saves.any(
         (save) =>
-            save.release?.server == persist.release.server &&
+            save.server == persist.release.server &&
             historyPersistKey(save.documents[SaveDocumentKind.persist]?.data) ==
                 persist.sessionKey,
       )) {

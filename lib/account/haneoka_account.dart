@@ -147,7 +147,7 @@ class HaneokaAccount extends ChangeNotifier {
   LinkedPlayer? linkOf(GameSave save) => _players
       .where(
         (p) =>
-            p.server == save.release?.server && p.profileId == save.profileId,
+            p.server == save.server && p.profileId == save.profileId,
       )
       .firstOrNull;
 
@@ -353,7 +353,7 @@ class HaneokaAccount extends ChangeNotifier {
       'PUT',
       '/api/v1/account/game-accounts',
       body: {
-        'server': save.release?.server,
+        'server': save.server,
         'profileId': save.profileId,
         'name': save.name,
         'visibility': (public ?? current?.public ?? true)
@@ -379,7 +379,7 @@ class HaneokaAccount extends ChangeNotifier {
   Future<void> unlink(GameSave save) async {
     final body = await request(
       'DELETE',
-      '/api/v1/account/game-accounts/${save.release?.server}/${save.profileId}',
+      '/api/v1/account/game-accounts/${save.server}/${save.profileId}',
     );
     _readPlayersFrom(body);
   }

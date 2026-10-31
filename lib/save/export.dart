@@ -45,7 +45,7 @@ Uint8List exportSave(GameSave save) {
   final cache = save.documents[SaveDocumentKind.cache]?.data ?? const {};
   final document = {
     'schema': 'haneoka-game-save-v1',
-    'server': save.release?.server,
+    'server': save.server,
     'release': save.release?.packageId,
     'exportedAt': DateTime.now().toUtc().toIso8601String(),
     'savedAt': save.modifiedAt?.toUtc().toIso8601String(),

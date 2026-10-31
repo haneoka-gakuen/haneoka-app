@@ -1,3 +1,5 @@
+import '../save/game_save.dart' show regionOfProfile;
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -59,6 +61,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
     }
     setState(() {
       _id = id;
+      _region = regionOfProfile(id) ?? _region;
       _data = _load();
     });
   }

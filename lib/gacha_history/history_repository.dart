@@ -160,7 +160,7 @@ class HistoryRepository extends ChangeNotifier {
     if (session == null) {
       throw const GameHistoryException('history_missing_session');
     }
-    if (save.release?.server != region.catalogServer) {
+    if (save.server != region.catalogServer) {
       throw const GameHistoryException('history_server_mismatch');
     }
     return _refresh(
@@ -185,7 +185,7 @@ class HistoryRepository extends ChangeNotifier {
       throw const GameHistoryException('history_missing_session');
     }
     if (account != null &&
-        (account.release?.server != region.catalogServer ||
+        (account.server != region.catalogServer ||
             historyPersistKey(
                   account.documents[SaveDocumentKind.persist]?.data,
                 ) !=
