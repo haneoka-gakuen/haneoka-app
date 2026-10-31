@@ -1,3 +1,4 @@
+import '../core/site_date.dart';
 import '../save/game_save.dart' show regionOfProfile;
 
 import 'package:flutter/material.dart';
@@ -321,7 +322,7 @@ class PlayerProfileView extends StatelessWidget {
           ),
         if (updated is num)
           Text(
-            '${rankingLabel(t, 'updated', 'Updated')} · ${DateFormat.yMd(t.locale).add_Hms().format(DateTime.fromMillisecondsSinceEpoch(updated.toInt()))}',
+            '${rankingLabel(t, 'updated', 'Updated')} · ${SiteDate.day(t.locale).withTime(seconds: true).format(DateTime.fromMillisecondsSinceEpoch(updated.toInt()))}',
             style: theme.textTheme.bodySmall?.copyWith(
               color: scheme.onSurfaceVariant,
             ),

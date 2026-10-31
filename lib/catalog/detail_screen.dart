@@ -1,3 +1,4 @@
+import '../core/site_date.dart';
 import '../core/catalog_source.dart';
 
 import 'package:flutter/material.dart';
@@ -627,7 +628,7 @@ class _Page {
       if (published != null && published > 0)
         (
           t.label('release'),
-          DateFormat.yMd(t.locale)
+          SiteDate.day(t.locale)
               .format(DateTime.fromMillisecondsSinceEpoch(published.toInt())),
         ),
     ];

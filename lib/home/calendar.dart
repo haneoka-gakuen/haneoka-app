@@ -1,3 +1,4 @@
+import '../core/site_date.dart';
 import '../core/catalog_source.dart';
 
 import 'package:flutter/material.dart';
@@ -857,7 +858,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ? '${dates.format(item.start)}${item.end != item.start ? ' – ${dates.format(item.end)}' : ''} · ${label('allDay', 'All day')}'
           : label('allDay', 'All day');
     }
-    final format = DateFormat.yMMMd(t.locale).add_Hm();
+    final format = SiteDate.day(t.locale).withTime();
     final end = item.source['endAtMs'] as num?;
     return '${format.format(DateTime.fromMillisecondsSinceEpoch(start.toInt()))}'
         '${end == null ? '' : ' – ${format.format(DateTime.fromMillisecondsSinceEpoch(end.toInt()))}'}';

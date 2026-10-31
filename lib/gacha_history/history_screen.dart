@@ -1,3 +1,4 @@
+import '../core/site_date.dart';
 import 'dart:math' as math;
 
 import 'package:game_data_exporter/gacha_history_analysis.dart'
@@ -386,7 +387,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
                         subtitle: Text(
                           (start ? _from : _to) == null
                               ? '—'
-                              : DateFormat.yMMMd(_locale)
+                              : SiteDate.day(_locale)
                                     .format((start ? _from : _to)!),
                         ),
                         trailing: const Icon(Symbols.calendar_month_rounded),
@@ -451,9 +452,9 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
   }
 
   String _date(DateTime value) =>
-      DateFormat.yMMMd(_locale).format(_inServerTime(value));
+      SiteDate.day(_locale).format(_inServerTime(value));
   String _dateTime(DateTime value) =>
-      DateFormat.yMMMd(_locale).add_Hm().format(_inServerTime(value));
+      SiteDate.day(_locale).withTime().format(_inServerTime(value));
   String _poolName(String? id) =>
       _pools[id ?? '']?.name ?? ((id ?? '').isEmpty ? _t('unknown') : id!);
 
@@ -2475,7 +2476,7 @@ class _GachaHistoryScreenState extends State<GachaHistoryScreen> {
     final scope = [
       dates.isEmpty
           ? _t('unknownTime')
-          : '${DateFormat.yMMMd(_locale).format(dates.first)} – ${DateFormat.yMMMd(_locale).format(dates.last)}',
+          : '${SiteDate.day(_locale).format(dates.first)} – ${SiteDate.day(_locale).format(dates.last)}',
       if (dates.isNotEmpty && dates.length != batches.length) _t('unknownTime'),
     ];
     return GachaHistoryReportData(

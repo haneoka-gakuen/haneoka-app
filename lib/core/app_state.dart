@@ -1,3 +1,5 @@
+import 'site_date.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart' show ThemeMode;
@@ -24,6 +26,7 @@ class AppState extends ChangeNotifier {
       compact = _prefs.getBool('compact') ?? false,
       japaneseTitles = _prefs.getBool('japaneseTitles') ?? true,
       difficultyEstimates = _prefs.getBool('difficultyEstimates') ?? false {
+    SiteDatePreferences.changes.addListener(notifyListeners);
     HistoryCloudSync.instance.start();
     _apis[server] = api;
     api.addListener(_publicDataChanged);

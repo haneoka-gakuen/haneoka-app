@@ -1,10 +1,11 @@
+import '../core/site_date.dart';
 import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:intl/intl.dart';
+
 import 'package:material_new_shapes/material_new_shapes.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -1069,7 +1070,7 @@ class AccountCard extends StatelessWidget {
                     ),
                     Text(
                       [
-                        if (save.regionName case final region?) region,
+                        ?save.regionName,
                         'ID ${save.profileId}',
                       ].join(' · '),
                       style: theme.textTheme.bodySmall?.copyWith(
@@ -1079,8 +1080,8 @@ class AccountCard extends StatelessWidget {
                     if (save.modifiedAt != null)
                       Text(
                         t.savedOn(
-                          DateFormat.yMMMd(locale)
-                              .add_Hm()
+                          SiteDate.day(locale)
+                              .withTime()
                               .format(save.modifiedAt!.toLocal()),
                         ),
                         style: theme.textTheme.bodySmall?.copyWith(

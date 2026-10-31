@@ -1,3 +1,4 @@
+import '../core/site_date.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
@@ -8,7 +9,7 @@ import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:intl/intl.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:game_data_exporter/gacha_history_points.dart';
 
@@ -797,7 +798,7 @@ class _HistoryPageState extends State<HistoryPage> {
                     choice.save?.name ??
                     (choice.record == null
                         ? null
-                        : DateFormat.yMMMd(state.text.locale).add_Hm().format(
+                        : SiteDate.day(state.text.locale).withTime().format(
                             choice.record!.snapshot.queriedAt.toLocal(),
                           )) ??
                     _t('account'),

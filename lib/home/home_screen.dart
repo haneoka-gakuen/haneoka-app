@@ -1,3 +1,7 @@
+import '../core/site_date.dart';
+import '../catalog/arena_detail.dart'
+    show arenaPeriods, arenaRuleAt, arenaWindowContains;
+import '../team_builder/engine/num.dart' show dataRows, intOf, intListOf, Doc;
 import '../core/catalog_source.dart';
 
 import 'dart:async';
@@ -23,7 +27,6 @@ import '../core/api.dart';
 import '../core/net.dart';
 import '../core/page_data.dart';
 import '../shell/links.dart';
-import 'announcements.dart';
 import '../core/app_state.dart';
 import '../core/i18n.dart';
 import '../core/relative_time.dart';
@@ -103,7 +106,7 @@ class _HomeData {
 /// current events stay on top.
 const _modules = [
   'birthdays',
-  'news',
+  'arena',
   'cards',
   'songs',
   'community',
@@ -113,7 +116,6 @@ const _layoutKey = 'haneoka:home-layout:v6';
 
 class _HomeScreenState extends State<HomeScreen> {
   Future<_HomeData>? _data;
-  Future<List<Map<String, Object?>>>? _announcements;
   Future<List<Map<String, Object?>>>? _community;
   Future<List<Map<String, Object?>>>? _fanInfo;
   List<String> _order = [..._modules];
@@ -185,7 +187,8 @@ class _HomeScreenState extends State<HomeScreen> {
         if (state is! Map || !mounted) return;
         final order = [
           for (final id in state['order'] as List? ?? const [])
-            if (_modules.contains(id)) '$id',
+            if (_modules.contains(id == 'news' ? 'arena' : id))
+              id == 'news' ? 'arena' : '$id',
         ];
         setState(() {
           if (order.toSet().length == order.length) {
@@ -251,26 +254,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ];
   }
 
-  Future<List<Announcement>> _loadNews() async {
-    final state = AppScope.of(context);
-    try {
-      return (await fetchAnnouncements(
-        state,
-        api: CatalogSourceScope.apiOf(context),
-      )).take(5).toList();
-    } on Exception {
-      final seed = (await _data!).seed;
-      if (seed['announcements'] case final List rows) {
-        return rows
-            .whereType<Map>()
-            .map((r) => r.cast<String, Object?>())
-            .take(5)
-            .toList();
-      }
-      rethrow;
-    }
-  }
-
   /// bandori.fans entries the website's home seed carries.
   Future<List<Map<String, Object?>>> _loadFanInfo() async {
     final seed = (await _data!).seed;
@@ -293,7 +276,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_dataKey != key) {
       _dataKey = key;
       _data = _load();
-      _announcements = _loadNews();
       _fanInfo = _loadFanInfo();
     }
     final communityKey = (
@@ -368,7 +350,7 @@ class _HomeScreenState extends State<HomeScreen> {
     'birthdays' => t('home.dashboard.birthdaysTitle', 'Birthday countdown'),
     'community' => t('home.dashboard.communityTitle', 'Trending community'),
     'fanInfo' => 'bandori.fans',
-    _ => t('home.announcements.title', 'Announcements'),
+    _ => t('catalog.arena.title', 'Gekiso Arena'),
   };
 
   /// Module order and visibility (`home-layout-dialog`).
@@ -553,11 +535,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final day = '${entry['eventDate'] ?? ''}';
     String date = '';
     if (entry['allDay'] != true && start is num) {
-      date = DateFormat.yMMMd(t.locale)
-          .add_jm()
+      date = SiteDate.day(t.locale)
+          .withTime()
           .format(DateTime.fromMillisecondsSinceEpoch(start.toInt()));
     } else if (RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(day)) {
-      date = DateFormat.yMMMd(t.locale).format(DateTime.parse(day));
+      date = SiteDate.day(t.locale).format(DateTime.parse(day));
     }
     if (date.isNotEmpty) {
       return [
@@ -570,6 +552,151 @@ class _HomeScreenState extends State<HomeScreen> {
         : (const {'live', 'real-live'}.contains(entry['category'])
               ? t('tools.calendar.live', 'Live')
               : '');
+  }
+
+  /// The current season: each league's rule now and at the next rotation.
+  Widget _arenaModule(
+    BuildContext context,
+    SiteText t,
+    Map<String, Object?>? seed,
+  ) {
+    final theme = Theme.of(context);
+    final api = CatalogSourceScope.apiOf(context);
+    final arena = (seed?['arena'] as Map?)?.cast<String, Object?>();
+    final catalog = (arena?['catalog'] as Map?)?.cast<String, Object?>();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final seasons = dataRows(catalog?['entries'])
+      ..sort((a, b) => intOf(a['startAt']) - intOf(b['startAt']));
+    final season =
+        seasons.where((s) => arenaWindowContains(s, now)).firstOrNull ??
+        seasons.where((s) => intOf(s['startAt']) > now).firstOrNull ??
+        seasons.lastOrNull;
+    void open([int? band]) =>
+        _browse(band == null ? '/catalog/arena' : '/catalog/arena?band=$band');
+    if (season == null) {
+      return _Module(
+        icon: Symbols.emoji_events_rounded,
+        title: t('catalog.arena.title', 'Gekiso Arena'),
+        child: Center(child: Text(t('common.states.unavailable'))),
+      );
+    }
+    final live = arenaWindowContains(season, now);
+    final periods = arenaPeriods(season);
+    final rotation = live
+        ? periods.where((p) => p.start > now).firstOrNull
+        : null;
+    final missions = ((catalog?['images'] as Map?)?['missions'] as Map?) ?? {};
+    String span(int until) {
+      final minutes = ((until - now) / 60000).round().clamp(0, 1 << 31);
+      final days = minutes ~/ 1440, hours = (minutes % 1440) ~/ 60;
+      return days > 0
+          ? t('catalog.arena.remainingDays', '{days}d {hours}h', {
+              'days': days,
+              'hours': hours,
+            })
+          : t('catalog.arena.remainingHours', '{hours}h {minutes}m', {
+              'hours': hours,
+              'minutes': minutes % 60,
+            });
+    }
+
+    Widget mark(Object? source, double size) => SizedBox(
+      width: size,
+      height: size,
+      child: source == null
+          ? null
+          : AppImage(candidates: [api.asset('$source').toString()]),
+    );
+    Widget rule(Doc? value, {bool next = false}) {
+      final id = intListOf(value?['missions']).firstOrNull;
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        spacing: 2,
+        children: [
+          if (next) const Icon(Symbols.arrow_forward_rounded, size: 12),
+          mark(missions['$id'], next ? 16 : 18),
+          Text(
+            ['', 'COMBO', 'LUCK', 'JUST'].elementAtOrNull(id ?? 0) ?? '',
+            style: next
+                ? theme.textTheme.labelSmall
+                : theme.textTheme.labelMedium,
+          ),
+        ],
+      );
+    }
+
+    final leagues = dataRows(season['leagues']);
+    return _Module(
+      icon: Symbols.emoji_events_rounded,
+      title: t('catalog.arena.title', 'Gekiso Arena'),
+      viewAll: t('home.dashboard.viewAll', 'View all'),
+      onViewAll: open,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 4,
+          children: [
+            Wrap(
+              spacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  t.text(season['title']),
+                  style: theme.textTheme.labelLarge,
+                ),
+                Text(
+                  t(
+                    live
+                        ? 'catalog.arena.status.current'
+                        : 'catalog.arena.status.upcoming',
+                  ),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                Text(
+                  live
+                      ? span(intOf(season['endAt']) + 1000)
+                      : span(intOf(season['startAt'])),
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            ),
+            for (final (index, league) in leagues.indexed)
+              Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(Corner.small),
+                  onTap: () => open(intOf(league['bandId'])),
+                  child: Row(
+                    spacing: 8,
+                    children: [
+                      mark(league['image'], 24),
+                      Expanded(
+                        child: Text(
+                          t.text(league['name']),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                      rule(
+                        arenaRuleAt(
+                          season,
+                          league,
+                          live ? now : intOf(season['startAt']),
+                        ),
+                      ),
+                      if (rotation != null)
+                        rule(rotation.rules.elementAtOrNull(index), next: true),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _fanInfoModule(BuildContext context, SiteText t) => _Module(
@@ -817,7 +944,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 onRefresh: () async {
                   setState(() {
                     _data = _load();
-                    _announcements = _loadNews();
                     _community = _loadCommunity()..ignore();
                     _fanInfo = _loadFanInfo();
                   });
@@ -880,56 +1006,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                               context,
                                             ),
                                           ),
-                                          'news' => _Module(
-                                            framed: true,
-                                            icon: Symbols.newspaper_rounded,
-                                            title: t(
-                                              'home.announcements.title',
-                                              'Announcements',
-                                            ),
-                                            viewAll: t(
-                                              'home.announcements.viewAll',
-                                              'View all',
-                                            ),
-                                            onViewAll: () => widget.onBrowse
-                                                ?.call('/announcements'),
-                                            child: FutureBuilder(
-                                              future: _announcements,
-                                              builder: (context, snapshot) {
-                                                final entries = snapshot.data;
-                                                if (entries == null) {
-                                                  return snapshot.hasError
-                                                      ? Padding(
-                                                          padding:
-                                                              const EdgeInsets.all(
-                                                                24,
-                                                              ),
-                                                          child: Text(
-                                                            t(
-                                                              'home.dashboard.sourceUnavailable',
-                                                              '',
-                                                            ),
-                                                            textAlign: TextAlign
-                                                                .center,
-                                                          ),
-                                                        )
-                                                      : const SizedBox(
-                                                          height: 96,
-                                                        );
-                                                }
-                                                return _FitRows(
-                                                  extent: 80,
-                                                  children: [
-                                                    for (final entry
-                                                        in entries.take(5))
-                                                      AnnouncementRow(
-                                                        entry: entry,
-                                                        compact: true,
-                                                      ),
-                                                  ],
-                                                );
-                                              },
-                                            ),
+                                          'arena' => _arenaModule(
+                                            context,
+                                            t,
+                                            snapshot.data?.seed,
                                           ),
                                           'songs' => _Module(
                                             aside: _railButtons(_songsScroll),
@@ -1573,7 +1653,7 @@ class _EventCard extends StatelessWidget {
                               end != null &&
                               box.maxHeight > 125)
                             Text(
-                              '${DateFormat.yMMMd(t.locale).format(DateTime.fromMillisecondsSinceEpoch(start.toInt()))} – ${DateFormat.yMMMd(t.locale).format(DateTime.fromMillisecondsSinceEpoch(end.toInt()))}',
+                              '${SiteDate.day(t.locale).format(DateTime.fromMillisecondsSinceEpoch(start.toInt()))} – ${SiteDate.day(t.locale).format(DateTime.fromMillisecondsSinceEpoch(end.toInt()))}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.bodySmall,

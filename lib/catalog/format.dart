@@ -1,12 +1,13 @@
-import 'package:intl/intl.dart';
+import '../core/site_date.dart';
+
 
 import '../core/i18n.dart';
 
 /// Turns API values into text: localized tuples, dates, birthdays and lists.
 class ValueFormat {
-  ValueFormat(this.text) : _date = DateFormat.yMMMd(text.locale);
+  ValueFormat(this.text) : _date = SiteDate.day(text.locale);
   final SiteText text;
-  final DateFormat _date;
+  final SiteDate _date;
 
   static bool isTimestampKey(String key) =>
       key.endsWith('At') || key.endsWith('Date');

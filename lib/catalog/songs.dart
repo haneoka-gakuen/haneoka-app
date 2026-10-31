@@ -1,8 +1,9 @@
+import '../core/site_date.dart';
 import '../core/catalog_source.dart';
 
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:intl/intl.dart';
+
 
 import '../core/api.dart';
 import '../core/app_state.dart';
@@ -424,7 +425,7 @@ class _SongText {
     final ms = releasedAt(song);
     return ms == null
         ? '—'
-        : DateFormat.yMMMd(t.locale)
+        : SiteDate.day(t.locale)
               .format(DateTime.fromMillisecondsSinceEpoch(ms.toInt()));
   }
 

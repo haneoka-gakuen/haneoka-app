@@ -1,3 +1,4 @@
+import '../core/site_date.dart';
 import '../core/catalog_source.dart';
 
 import 'package:flutter/material.dart';
@@ -508,7 +509,7 @@ class CatalogKit {
 
   String date(num? ms) => ms == null
       ? '—'
-      : DateFormat.yMMMd(t.locale)
+      : SiteDate.day(t.locale)
             .format(DateTime.fromMillisecondsSinceEpoch(ms.toInt()));
 
   String searchText(Entry item) => [

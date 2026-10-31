@@ -1,3 +1,4 @@
+import '../core/site_date.dart';
 import '../core/catalog_source.dart';
 
 import 'dart:async';
@@ -70,7 +71,7 @@ String _title(SiteText t, MissionGroup group) {
 
 String _date(SiteText t, num value) => value <= 0
     ? ''
-    : '${DateFormat.yMMMd(t.locale).add_jm().format(DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true).add(const Duration(hours: 9)))} JST';
+    : '${SiteDate.day(t.locale).withTime().format(DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true).add(const Duration(hours: 9)))} JST';
 
 String _window(SiteText t, MissionGroup group) {
   if (const [1, 12].contains(group.category) && !group.timed) {

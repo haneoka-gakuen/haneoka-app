@@ -1,5 +1,6 @@
+import '../core/site_date.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+
 import 'package:material_new_shapes/material_new_shapes.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
@@ -331,7 +332,7 @@ class _PlayerLinkState extends State<PlayerLink> {
                   Expanded(
                     child: Text(
                       t.syncedOn(
-                        DateFormat.yMMMd(locale).add_Hm().format(synced),
+                        SiteDate.day(locale).withTime().format(synced),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

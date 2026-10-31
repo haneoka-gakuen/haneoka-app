@@ -1,7 +1,8 @@
+import '../core/site_date.dart';
 import '../core/catalog_source.dart';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../catalog/browse.dart';
@@ -696,7 +697,7 @@ class _StoriesScreenState extends State<StoriesScreen> {
               title: Text(label),
               subtitle: selected == null
                   ? null
-                  : Text(DateFormat.yMd(t.locale).format(selected)),
+                  : Text(SiteDate.day(t.locale).format(selected)),
               leading: const Icon(Symbols.calendar_month_rounded),
               trailing: selected == null
                   ? null
@@ -1250,7 +1251,7 @@ class _StoriesScreenState extends State<StoriesScreen> {
                           : 'Lv.${e['unlockCharacterFriendshipLevel']}',
                       release <= 0
                           ? ''
-                          : DateFormat.yMMMd(t.locale).format(
+                          : SiteDate.day(t.locale).format(
                               DateTime.fromMillisecondsSinceEpoch(
                                 release.toInt(),
                               ),
@@ -1713,7 +1714,7 @@ class _StoryReaderScreenState extends State<StoryReaderScreen> {
                             switch (RelativeTime.timestamp(
                               detail['publishedAt'] ?? detail['releaseAt'],
                             )) {
-                              final num at => DateFormat.yMMMd(t.locale).format(
+                              final num at => SiteDate.day(t.locale).format(
                                 DateTime.fromMillisecondsSinceEpoch(at.toInt()),
                               ),
                               _ => '',

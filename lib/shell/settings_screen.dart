@@ -1,3 +1,5 @@
+import '../core/site_date.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -212,6 +214,7 @@ class SettingsScreen extends StatelessWidget {
                           ),
                         ],
                       ),
+                      _Card(children: _dateGroups(context)),
                       const _Card(children: [StorageSettings()]),
                       const _Card(children: [AppUpdateSettings()]),
                       const _Card(children: [DistributionSettings()]),
@@ -299,18 +302,31 @@ class _Group extends StatelessWidget {
         ),
       ],
     );
-    final faces = Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (final option in options)
-          _Face(
-            option: option,
-            selected: option.value == value,
-            onTap: () => onSelected(option.value),
-          ),
-      ],
-    );
+    final Widget faces = options.length > 12
+        ? DropdownMenu<String>(
+            enableFilter: true,
+            requestFocusOnTap: true,
+            initialSelection: value,
+            dropdownMenuEntries: [
+              for (final option in options)
+                DropdownMenuEntry(value: option.value, label: option.label),
+            ],
+            onSelected: (selected) {
+              if (selected != null) onSelected(selected);
+            },
+          )
+        : Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final option in options)
+                _Face(
+                  option: option,
+                  selected: option.value == value,
+                  onTap: () => onSelected(option.value),
+                ),
+            ],
+          );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24),
       child: LayoutBuilder(
@@ -540,4 +556,90 @@ class _About extends StatelessWidget {
       ],
     );
   }
+}
+
+List<Widget> _dateGroups(BuildContext context) {
+  final t = AppScope.of(context).text;
+  final sample = DateTime.utc(2026, 3, 5, 21, 7, 9);
+  final morning = DateTime.utc(2026, 3, 5, 9, 7, 9);
+  String date(Map<String, String> overrides) => SiteDatePreferences.preview({
+    'weekday': 'none',
+    'zone': 'UTC',
+    ...overrides,
+  }, () => SiteDate.day(t.locale).format(sample));
+  String time(Map<String, String> overrides, [DateTime? at]) {
+    return SiteDatePreferences.preview({
+      'zone': 'UTC',
+      'seconds': 'off',
+      'zoneName': 'none',
+      ...overrides,
+    }, () => SiteDate.day(t.locale).formatTime(at ?? sample));
+  }
+
+  String named(String key, String fallback) =>
+      t('settings.labels.$key', fallback);
+  final titles = <String, (String, String, IconData)>{
+    'order': ('dateOrder', 'Date order', Symbols.swap_horiz_rounded),
+    'month': ('dateMonth', 'Month', Symbols.calendar_month_rounded),
+    'day': ('dateDay', 'Day', Symbols.event_rounded),
+    'separator': ('dateSeparator', 'Separator', Symbols.more_horiz_rounded),
+    'year': ('dateYear', 'Year', Symbols.calendar_month_rounded),
+    'yearDigits': ('dateYearDigits', 'Year digits', Symbols.pin_rounded),
+    'weekday': ('dateWeekday', 'Weekday', Symbols.event_rounded),
+    'cycle': ('timeFormat', 'Time format', Symbols.schedule_rounded),
+    'hour': ('timeHour', 'Hour', Symbols.schedule_rounded),
+    'seconds': ('timeSeconds', 'Seconds', Symbols.schedule_rounded),
+    'zoneName': ('timeZoneName', 'Time zone label', Symbols.public_rounded),
+  };
+  String option(String key, String value) => switch (key) {
+    'order' =>
+      value == 'auto'
+          ? named('dateAuto', 'Auto')
+          : date({'order': value, 'year': 'always'}),
+    'month' => date({'month': value, 'year': 'never'}),
+    'day' => date({'day': value, 'year': 'never'}),
+    'separator' => date({
+      'month': 'numeric',
+      'separator': value,
+      'year': 'always',
+    }),
+    'year' => switch (value) {
+      'auto' => named('yearAuto', 'Other years'),
+      'always' => named('yearAlways', 'Always'),
+      _ => named('yearNever', 'Never'),
+    },
+    'yearDigits' => date({'yearDigits': value, 'year': 'always'}),
+    'weekday' => date({'weekday': value, 'year': 'never'}),
+    'cycle' => time({'cycle': value}),
+    'hour' => time({'hour': value, 'cycle': 'h23'}, morning),
+    'seconds' => time({'seconds': value}),
+    _ => time({'zoneName': value, 'zone': 'Asia/Tokyo'}),
+  };
+  return [
+    _Group(
+      icon: Symbols.public_rounded,
+      title: named('timeZone', 'Time zone'),
+      value: SiteDatePreferences.value('zone'),
+      options: [
+        for (final zone in SiteDatePreferences.zones)
+          _Option(
+            zone,
+            zone == 'local' ? named('zoneLocal', 'Device time zone') : zone,
+          ),
+      ],
+      onSelected: (value) => SiteDatePreferences.set('zone', value),
+    ),
+    for (final MapEntry(:key, value: values) in dateChoices.entries)
+      _Group(
+        icon: titles[key]!.$3,
+        title: named(titles[key]!.$1, titles[key]!.$2),
+        value: SiteDatePreferences.value(key),
+        options: [
+          for (final value in values)
+            if (key != 'day' || value != 'ordinal' || t.locale.startsWith('en'))
+              _Option(value, option(key, value)),
+        ],
+        onSelected: (value) => SiteDatePreferences.set(key, value),
+      ),
+  ];
 }

@@ -1,3 +1,4 @@
+import '../core/site_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -19,7 +20,7 @@ String? _date(BuildContext context, Object? value) {
   };
   return date == null
       ? null
-      : DateFormat.yMd(AppScope.of(context).text.locale).format(date);
+      : SiteDate.day(AppScope.of(context).text.locale).format(date);
 }
 
 /// The browser and system a session's agent names, as on the website.

@@ -1,3 +1,4 @@
+import '../core/site_date.dart';
 import 'dart:math';
 
 import 'package:flutter/gestures.dart';
@@ -973,7 +974,7 @@ class _SongMetaScreenState extends State<SongMetaScreen> {
           return text(
             at == null
                 ? '—'
-                : DateFormat.yMMMd(t.locale)
+                : SiteDate.day(t.locale)
                       .format(DateTime.fromMillisecondsSinceEpoch(at.toInt())),
           );
         case 'play':

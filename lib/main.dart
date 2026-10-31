@@ -1,3 +1,4 @@
+import 'core/site_date.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -36,6 +37,7 @@ Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
   registerAppFontLicenses();
   MediaKit.ensureInitialized();
+  await SiteDatePreferences.load();
   final state = await AppState.load(
     WidgetsBinding.instance.platformDispatcher.locale,
   );

@@ -1,9 +1,10 @@
+import '../core/site_date.dart';
 import '../core/catalog_source.dart';
 import '../core/api.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
-import 'package:intl/intl.dart';
+
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../core/app_state.dart';
@@ -19,8 +20,8 @@ typedef Announcement = Map<String, Object?>;
 String _date(SiteText t, Object? seconds, {bool full = false}) {
   if (seconds is! num) return '';
   final at = DateTime.fromMillisecondsSinceEpoch(seconds.toInt() * 1000);
-  final format = DateFormat.yMMMd(t.locale);
-  return (full ? format.add_Hm() : format).format(at);
+  final format = SiteDate.day(t.locale);
+  return (full ? format.withTime() : format).format(at);
 }
 
 String _category(SiteText t, Object? category) => t(

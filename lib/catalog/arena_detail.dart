@@ -1,3 +1,5 @@
+import '../core/site_date.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -20,9 +22,11 @@ String arenaTime(int value, String locale) {
       offset = DateTime.fromMillisecondsSinceEpoch(value)
           .timeZoneOffset
           .inMinutes;
-  return '${DateFormat.yMd(locale).add_Hm().format(date)} UTC${offset >= 0 ? '+' : '−'}${(offset.abs() ~/ 60).toString().padLeft(2, '0')}:${(offset.abs() % 60).toString().padLeft(2, '0')}';
+  return '${SiteDate.day(locale).withTime().format(date)} UTC${offset >= 0 ? '+' : '−'}${(offset.abs() ~/ 60).toString().padLeft(2, '0')}:${(offset.abs() % 60).toString().padLeft(2, '0')}';
 }
 
+bool arenaWindowContains(Doc row, int now) => _contains(row, now);
+Doc? arenaRuleAt(Doc season, Doc league, int now) => _rule(season, league, now);
 bool _contains(Doc row, int now) =>
     intOf(row['startAt']) <= now && now < intOf(row['endAt']) + 1000;
 Doc? _rule(Doc season, Doc league, int now) => !_contains(season, now)
@@ -51,8 +55,15 @@ List<({int start, int end, List<Doc?> rules})> arenaPeriods(Doc season) {
 }
 
 class ArenaScreen extends StatefulWidget {
-  const ArenaScreen({super.key, this.server, this.seasonId, this.anchor = ''});
+  const ArenaScreen({
+    super.key,
+    this.server,
+    this.seasonId,
+    this.anchor = '',
+    this.band,
+  });
   final String? server, seasonId;
+  final int? band;
   final String anchor;
   @override
   State<ArenaScreen> createState() => _ArenaScreenState();
@@ -233,6 +244,7 @@ class _ArenaScreenState extends State<ArenaScreen> with WidgetsBindingObserver {
                       parameters: objectRow(data['parameters']),
                       index: index,
                       seasonCount: seasons.length,
+                      band: widget.band,
                       onSeason: (step) => choose(seasons[index + step]),
                     ),
                   ],
@@ -267,6 +279,7 @@ class ArenaDetail extends StatefulWidget {
     this.parameters = const {},
     this.index = 0,
     this.seasonCount = 1,
+    this.band,
     this.onSeason,
   });
   final Doc season, images, parameters;
@@ -274,6 +287,7 @@ class ArenaDetail extends StatefulWidget {
   final String anchor;
   final List<Doc> basePoints;
   final int index, seasonCount;
+  final int? band;
   final ValueChanged<int>? onSeason;
   @override
   State<ArenaDetail> createState() => _ArenaDetailState();
@@ -282,7 +296,7 @@ class ArenaDetail extends StatefulWidget {
 class _ArenaDetailState extends State<ArenaDetail> with WidgetsBindingObserver {
   Timer? _timer;
   _Tab _tab = _Tab.overview;
-  int? _bandId;
+  late int? _bandId = widget.band;
   int _players = 5;
   bool _allPeriods = false;
   int _start = 1;
@@ -367,8 +381,8 @@ class _ArenaDetailState extends State<ArenaDetail> with WidgetsBindingObserver {
   String _number(num value) =>
       NumberFormat.decimalPattern(_locale).format(value);
   String _short(int at) =>
-      DateFormat.Md(_locale)
-          .add_Hm()
+      SiteDate.day(_locale)
+          .withTime()
           .format(DateTime.fromMillisecondsSinceEpoch(at));
   String _range(int start, int end) => '${_short(start)} – ${_short(end)}';
   String _remaining(int until) {
@@ -1403,7 +1417,7 @@ class _ArenaDetailState extends State<ArenaDetail> with WidgetsBindingObserver {
                 trailing: Text(
                   published > _now
                       ? _short(published)
-                      : DateFormat.yMd(_locale).format(
+                      : SiteDate.day(_locale).format(
                           DateTime.fromMillisecondsSinceEpoch(published),
                         ),
                   style: theme.textTheme.labelSmall,

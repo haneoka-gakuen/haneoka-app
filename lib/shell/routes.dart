@@ -281,6 +281,7 @@ Widget? screenFor(String route, {required ValueChanged<String> navigate}) {
       server: uri.queryParameters['server'],
       seasonId: route == '/catalog/arena' ? null : route.split('/').last,
       anchor: uri.fragment,
+      band: int.tryParse(uri.queryParameters['band'] ?? ''),
     );
   }
   if (route == '/catalog/song-meta') {

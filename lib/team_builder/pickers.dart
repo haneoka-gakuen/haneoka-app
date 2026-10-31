@@ -3,8 +3,9 @@
 /// card filters the box and the pickers share (`card-filters.ts`).
 library;
 
+import '../core/site_date.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../catalog/catalog_screen.dart' show cardRarityName;
@@ -394,7 +395,7 @@ class CardFilterPanel extends StatelessWidget {
               for (final lower in [true, false])
                 InputChip(
                   label: Text(
-                    '${t.label(lower ? 'minimum' : 'maximum')}: ${(lower ? filters.releaseFrom : filters.releaseTo) == null ? t('common.states.all', 'All') : DateFormat.yMd(t.locale).format(DateTime.fromMillisecondsSinceEpoch((lower ? filters.releaseFrom : filters.releaseTo)!))}',
+                    '${t.label(lower ? 'minimum' : 'maximum')}: ${(lower ? filters.releaseFrom : filters.releaseTo) == null ? t('common.states.all', 'All') : SiteDate.day(t.locale).format(DateTime.fromMillisecondsSinceEpoch((lower ? filters.releaseFrom : filters.releaseTo)!))}',
                   ),
                   onPressed: () async {
                     final value = lower

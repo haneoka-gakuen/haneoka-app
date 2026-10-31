@@ -1,9 +1,10 @@
+import '../core/site_date.dart';
 import '../core/catalog_source.dart';
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../catalog/catalog_screen.dart';
@@ -230,7 +231,7 @@ class _EventTrackerScreenState extends State<EventTrackerScreen>
             visuals,
             songTitles: state.songTitle,
           );
-          final dates = DateFormat.yMd(t.locale).add_Hm();
+          final dates = SiteDate.day(t.locale).withTime();
           String date(Object? ms) => ms is num
               ? dates.format(DateTime.fromMillisecondsSinceEpoch(ms.toInt()))
               : '';

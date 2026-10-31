@@ -107,6 +107,7 @@ dependencies:
   path_provider: ^2.1.6
   photo_view: ^0.15.0
   pointycastle: ^4.0.0
+  timezone: ^0.10.1
   shared_preferences: ^2.5.6
   sqlite3: ^3.7.0
   two_dimensional_scrollables: ^0.5.5

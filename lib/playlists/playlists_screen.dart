@@ -1,6 +1,7 @@
+import '../core/site_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
+
 import 'package:material_new_shapes/material_new_shapes.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
@@ -1046,7 +1047,7 @@ class _PlaylistDetailState extends State<_PlaylistDetail> {
         _t(context, 'playableCount', '{count} playable', {'count': playable}),
       if (playlist.updatedAt > 0)
         _t(context, 'updated', 'Updated {date}', {
-          'date': DateFormat.yMd(t.locale)
+          'date': SiteDate.day(t.locale)
               .format(DateTime.fromMillisecondsSinceEpoch(playlist.updatedAt)),
         }),
     ];
