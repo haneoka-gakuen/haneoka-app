@@ -92,7 +92,8 @@ class SongPickerState extends State<SongPicker> {
     final saved = catalog.songPickerPreferences[_preferenceKey];
     if (saved != null) {
       _query = '${saved['query'] ?? ''}';
-      _difficulties = intListOf(saved['difficulties']).toSet();
+      final difficulties = intListOf(saved['difficulties']).toSet();
+      if (difficulties.isNotEmpty) _difficulties = difficulties;
       for (final (key, target) in [
         ('bands', _bands),
         ('categories', _categories),
@@ -195,9 +196,17 @@ class SongPickerState extends State<SongPicker> {
   void _clearQuery(Set<String> keys) =>
       _query = _queryEngine.removeFacets(_query, keys);
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: catalog,
-    builder: (context, _) => _content(context),
+  Widget build(BuildContext context) => PopScope<List<SongRef>>(
+    canPop: _songs.length == widget.initial.length &&
+        _songs.toSet().containsAll(widget.initial),
+    onPopInvokedWithResult: (didPop, _) {
+      if (didPop) return;
+      Navigator.of(context).pop(_songs.where(_legal).toSet().toList());
+    },
+    child: ListenableBuilder(
+      listenable: catalog,
+      builder: (context, _) => _content(context),
+    ),
   );
   Widget _content(BuildContext context) {
     final t = catalog.t;
@@ -449,7 +458,11 @@ class SongPickerState extends State<SongPicker> {
                   showCheckmark: false,
                   selected: _difficulties.contains(i),
                   onSelected: (_) => _update(() {
-                    if (!_difficulties.remove(i)) _difficulties.add(i);
+                    if (!_difficulties.contains(i)) {
+                      _difficulties.add(i);
+                    } else if (_difficulties.length > 1) {
+                      _difficulties.remove(i);
+                    }
                   }),
                 ),
             ],
