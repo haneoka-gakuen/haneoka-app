@@ -2,6 +2,8 @@
 /// settings, the engine and its results (`lit/team-builder.ts`).
 library;
 
+import 'constraint_feasibility.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
@@ -617,7 +619,7 @@ class TeamBuilderController extends ChangeNotifier {
         missEvery: settings.allPerfect ? 0 : settings.missEvery,
       ),
       rank: settings.gekisoRank,
-      seeds: mission(2) ? settings.gekisoSeeds : 0,
+      seeds: mission(2) ? settings.resolvedGekisoSeeds : 0,
       musicType: rules?.musicType,
       missions: rules?.missions,
     );
@@ -846,6 +848,23 @@ class TeamBuilderController extends ChangeNotifier {
   }
 
   String? get inputIssue {
+    final issue = _baseInputIssue;
+    if (issue != null) return issue;
+    final s = settings;
+    final data = catalog?.master;
+    if (data != null && s.minBonus != null && s.goal == GoalKind.event) {
+      final built = request();
+      if (built != null && minimumEventBonusUnreachable(data, built)) {
+        return tb(
+          'minBonusUnreachable',
+          'Minimum event bonus cannot be reached',
+        );
+      }
+    }
+    return null;
+  }
+
+  String? get _baseInputIssue {
     if (catalog == null || view == null) {
       return tb('loadingData', 'Loading card data');
     }
@@ -1004,7 +1023,7 @@ class TeamBuilderController extends ChangeNotifier {
   }
 
   Goal? goal() {
-    if (inputIssue != null) return null;
+    if (_baseInputIssue != null) return null;
     final s = searchSettings;
     final challengeId = s.challengeRules && s.eventId != null
         ? s.eventId
@@ -1039,7 +1058,7 @@ class TeamBuilderController extends ChangeNotifier {
                   missEvery: s.allPerfect ? 0 : s.missEvery,
                 ),
                 rank: s.gekisoRank,
-                seeds: _missionEnabled(s, 2) ? s.gekisoSeeds : 0,
+                seeds: _missionEnabled(s, 2) ? s.resolvedGekisoSeeds : 0,
                 minComboBonus: _missionEnabled(s, 1) ? s.minComboBonus : 1,
                 minJustWindowMs: _missionEnabled(s, 3) ? s.justWindowMs : 0,
                 opponents: s.opponents,
@@ -1070,7 +1089,7 @@ class TeamBuilderController extends ChangeNotifier {
             minComboBonus: s.minComboBonus,
             minJustWindowMs: _missionEnabled(s, 3) ? s.justWindowMs : 0,
             gekiso: s.ptGekiso && s.route == 'live'
-                ? (just: s.ptJust / 100, luckSamples: s.ptLuckSamples)
+                ? (just: s.ptJust / 100, luckSamples: s.resolvedPtLuckSamples)
                 : null,
             eventEffects: manualEventEffects(s),
           );

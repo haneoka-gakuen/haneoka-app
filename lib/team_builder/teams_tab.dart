@@ -109,7 +109,7 @@ class _TeamsTabState extends State<TeamsTab> {
                     'missEvery': s.allPerfect ? 0 : s.missEvery,
                   },
                   'rank': s.gekisoRank,
-                  'seeds': c.hasMission(2, c.manualSongs) ? s.gekisoSeeds : 0,
+                  'seeds': c.hasMission(2, c.manualSongs) ? s.resolvedGekisoSeeds : 0,
                 }
               : null,
           challengeEventId: s.challengeRules ? s.eventId : null,
@@ -721,15 +721,15 @@ class _TeamsTabState extends State<TeamsTab> {
                 ],
                 onChanged: (value) => c.updateSettings({'gekisoRank': value}),
               ),
-              TextFormField(
-                key: const ValueKey('manual-seeds'),
-                initialValue: '${s.gekisoSeeds}',
-                decoration: InputDecoration(
-                  labelText: c.tb('pt.luckSamples', 'Luck samples'),
-                ),
-                keyboardType: TextInputType.number,
-                onChanged: (value) =>
-                    c.updateSettings({'gekisoSeeds': int.tryParse(value) ?? 0}),
+              LuckSamplingField(
+                label: c.tb('pt.luckSampling', 'LUCK calculation'),
+                autoLabel: c.tb('rewardPlan.auto', 'Automatic'),
+                customLabel: c.tb('arena.custom', 'Custom'),
+                samplesLabel: c.tb('pt.luckSamples', 'Luck samples'),
+                manual: s.gekisoSamplingManual,
+                samples: s.gekisoSeeds,
+                onMode: (manual) => c.updateSettings({'gekisoSamplingMode': manual ? 'manual' : 'auto'}),
+                onSamples: (value) => c.updateSettings({'gekisoSeeds': value}),
               ),
             ],
             if (widget.showAction)

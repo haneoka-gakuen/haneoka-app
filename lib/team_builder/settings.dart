@@ -160,6 +160,7 @@ class BuildSettings {
     'ptMode': 'solo',
     'ptJust': 25,
     'ptLuckSamples': 32,
+    'ptSamplingMode': 'auto',
     'goal': 'score',
     'songs': <Object?>[],
     'criterion': 'mean',
@@ -172,6 +173,7 @@ class BuildSettings {
     'weightCp': 0,
     'manualScoreMode': 'score',
     'gekisoSeeds': 0,
+    'gekisoSamplingMode': 'auto',
     'gekisoPlacementMode': 'rank',
     'gekisoOpponents': <Object?>['', '', ''],
     'minComboBonus': 1,
@@ -247,6 +249,8 @@ class BuildSettings {
       : null;
   String get manualScoreMode => '${_json['manualScoreMode']}';
   int get gekisoSeeds => _int('gekisoSeeds');
+  bool get gekisoSamplingManual => _json['gekisoSamplingMode'] == 'manual';
+  int get resolvedGekisoSeeds => gekisoSamplingManual ? gekisoSeeds : 0;
   int get minComboBonus => _int('minComboBonus');
   int get justWindowMs => _int('justWindowMs');
   bool get opponentsMode => _json['gekisoPlacementMode'] == 'opponents';
@@ -309,6 +313,8 @@ class BuildSettings {
   bool get ptGekiso => _json['ptMode'] == 'gekiso';
   int get ptJust => _int('ptJust');
   int get ptLuckSamples => _int('ptLuckSamples');
+  bool get ptSamplingManual => _json['ptSamplingMode'] == 'manual';
+  int get resolvedPtLuckSamples => ptSamplingManual ? ptLuckSamples : 32;
   int get just => _int('just');
   int get gekisoRank => _int('gekisoRank');
 }

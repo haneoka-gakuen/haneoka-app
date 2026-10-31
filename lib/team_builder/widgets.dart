@@ -613,3 +613,48 @@ class PillTabs<T> extends StatelessWidget {
     );
   }
 }
+
+/// LUCK sampling: automatic, or a typed sample count.
+class LuckSamplingField extends StatelessWidget {
+  const LuckSamplingField({
+    super.key,
+    required this.label,
+    required this.autoLabel,
+    required this.customLabel,
+    required this.samplesLabel,
+    required this.manual,
+    required this.samples,
+    required this.onMode,
+    required this.onSamples,
+  });
+  final String label;
+  final String autoLabel;
+  final String customLabel;
+  final String samplesLabel;
+  final bool manual;
+  final int samples;
+  final ValueChanged<bool> onMode;
+  final ValueChanged<int> onSamples;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    spacing: 8,
+    children: [
+      Text(label, style: Theme.of(context).textTheme.labelLarge),
+      Segmented<bool>(
+        value: manual,
+        options: [Choice(false, autoLabel), Choice(true, customLabel)],
+        onSelected: onMode,
+      ),
+      if (manual)
+        TextFormField(
+          key: ValueKey('luck-samples-$label'),
+          initialValue: '$samples',
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(labelText: samplesLabel),
+          onChanged: (value) => onSamples(int.tryParse(value) ?? samples),
+        ),
+    ],
+  );
+}

@@ -2707,7 +2707,8 @@
         "photoBindings": "A snapshot is bound twice",
         "correctionHelp": "Editing an input for event rewards",
         "back": "Back",
-        "requiredMemberCount": "More than five required members"
+        "requiredMemberCount": "More than five required members",
+        "luckSampling": "LUCK calculation"
       },
       "criterionMax": "Single-run maximum (ranking)",
       "criterionMeanHelp": "Rank by the average of 120 skill orders for everyday play.",
@@ -3094,7 +3095,10 @@
       "justWindowActual": "JUST tap window",
       "justWindowUnmet": "Below the desired window",
       "justWindowTiming": "JUST tap timing data is missing",
-      "justWindowRandom": "Window targets are unavailable for this random skill"
+      "justWindowRandom": "Window targets are unavailable for this random skill",
+      "minBonusUnreachable": "Minimum event bonus cannot be reached",
+      "clearRequired": "Clear all required marks",
+      "clearRequiredDone": "Cleared required marks on {count} cards"
     },
     "calendar": {
       "title": "Calendar",

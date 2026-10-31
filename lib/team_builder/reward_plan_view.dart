@@ -194,18 +194,16 @@ class RewardPlanControls extends StatelessWidget {
               if (parsed != null) c.updateSettings({'ptJust': parsed});
             },
           ),
-          TextFormField(
-            key: const ValueKey('reward-samples'),
-            initialValue: '${s.ptLuckSamples}',
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: c.tb('pt.luckSamples', 'Luck samples'),
-            ),
-            onChanged: (value) {
-              final parsed = int.tryParse(value);
-              if (parsed != null) c.updateSettings({'ptLuckSamples': parsed});
-            },
-          ),
+          LuckSamplingField(
+                label: c.tb('pt.luckSampling', 'LUCK calculation'),
+                autoLabel: c.tb('rewardPlan.auto', 'Automatic'),
+                customLabel: c.tb('arena.custom', 'Custom'),
+                samplesLabel: c.tb('pt.luckSamples', 'Luck samples'),
+                manual: s.ptSamplingManual,
+                samples: s.ptLuckSamples,
+                onMode: (manual) => c.updateSettings({'ptSamplingMode': manual ? 'manual' : 'auto'}),
+                onSamples: (value) => c.updateSettings({'ptLuckSamples': value}),
+              ),
           TextFormField(
             key: const ValueKey('reward-combo'),
             initialValue: '${s.minComboBonus}',

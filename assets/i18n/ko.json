@@ -2707,7 +2707,8 @@
         "photoBindings": "스냅이 중복 장착되었습니다",
         "correctionHelp": "이벤트 보상 입력 수정 중",
         "back": "뒤로",
-        "requiredMemberCount": "필수 멤버가 5명을 넘습니다"
+        "requiredMemberCount": "필수 멤버가 5명을 넘습니다",
+        "luckSampling": "LUCK 계산"
       },
       "criterionMax": "최고 점수 (랭킹)",
       "criterionMeanHelp": "120가지 스킬 순서의 평균 점수로 비교합니다. 일상적인 플레이에 적합합니다.",
@@ -3094,7 +3095,10 @@
       "justWindowActual": "JUST 탭 판정 폭",
       "justWindowUnmet": "이상적인 판정 폭 미달",
       "justWindowTiming": "JUST 탭 판정 데이터가 없습니다",
-      "justWindowRandom": "이 랜덤 스킬에는 판정 폭 조건을 쓸 수 없습니다"
+      "justWindowRandom": "이 랜덤 스킬에는 판정 폭 조건을 쓸 수 없습니다",
+      "minBonusUnreachable": "최소 이벤트 보너스에 도달할 수 없습니다",
+      "clearRequired": "'항상 포함' 모두 해제",
+      "clearRequiredDone": "카드 {count}장의 '항상 포함'을 해제했습니다"
     },
     "calendar": {
       "title": "달력",

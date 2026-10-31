@@ -353,10 +353,15 @@ class _BuildTabState extends State<BuildTab> {
                   value: s.justWindowMs,
                   onChanged: (value) => set({'justWindowMs': value}),
                 ),
-              _NumberField(
-                label: c.tb('pt.luckSamples', 'Luck samples'),
-                value: s.gekisoSeeds,
-                onChanged: (value) => set({'gekisoSeeds': value}),
+              LuckSamplingField(
+                label: c.tb('pt.luckSampling', 'LUCK calculation'),
+                autoLabel: c.tb('rewardPlan.auto', 'Automatic'),
+                customLabel: c.tb('arena.custom', 'Custom'),
+                samplesLabel: c.tb('pt.luckSamples', 'Luck samples'),
+                manual: s.gekisoSamplingManual,
+                samples: s.gekisoSeeds,
+                onMode: (manual) => set({'gekisoSamplingMode': manual ? 'manual' : 'auto'}),
+                onSamples: (value) => set({'gekisoSeeds': value}),
               ),
               if (!s.shared && !(c.arenaActive && c.arena.shared))
                 _WrappingSegments(

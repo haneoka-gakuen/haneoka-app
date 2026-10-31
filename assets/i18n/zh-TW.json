@@ -2707,7 +2707,8 @@
         "photoBindings": "留影重複綁定",
         "correctionHelp": "正在修改活動收益所需的輸入",
         "back": "返回",
-        "requiredMemberCount": "必帶成員超過五人"
+        "requiredMemberCount": "必帶成員超過五人",
+        "luckSampling": "LUCK 計算"
       },
       "criterionMax": "單次最高分（衝榜）",
       "criterionMeanHelp": "依 120 種技能順序的平均分排序，適合日常遊玩。",
@@ -3094,7 +3095,10 @@
       "justWindowActual": "JUST 點按窗口",
       "justWindowUnmet": "未達理想窗口",
       "justWindowTiming": "缺少 JUST 點按判定資料",
-      "justWindowRandom": "此隨機技能不支援窗口條件"
+      "justWindowRandom": "此隨機技能不支援窗口條件",
+      "minBonusUnreachable": "最低活動加成無法達到",
+      "clearRequired": "清除全部「必須使用」",
+      "clearRequiredDone": "已清除 {count} 張卡牌的「必須使用」"
     },
     "calendar": {
       "title": "日曆",

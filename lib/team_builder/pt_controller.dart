@@ -103,7 +103,7 @@ class PtController {
         consumption: s.boosts,
         play: ap,
         gekiso: s.ptGekiso
-            ? (just: s.ptJust / 100, luckSamples: s.ptLuckSamples)
+            ? (just: s.ptJust / 100, luckSamples: s.resolvedPtLuckSamples)
             : null,
       ),
       constraints: ConstraintInput(

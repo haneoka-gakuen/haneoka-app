@@ -2707,7 +2707,8 @@
         "photoBindings": "スナップが重複しています",
         "correctionHelp": "イベント報酬の入力を編集中",
         "back": "戻る",
-        "requiredMemberCount": "必須メンバーが5人を超えています"
+        "requiredMemberCount": "必須メンバーが5人を超えています",
+        "luckSampling": "LUCK 計算"
       },
       "criterionMax": "最高スコア（ランキング）",
       "criterionMeanHelp": "120 通りのスキル順の平均スコアで比較。普段のプレイ向け。",
@@ -3094,7 +3095,10 @@
       "justWindowActual": "JUST タップ判定幅",
       "justWindowUnmet": "理想の判定幅に未達",
       "justWindowTiming": "JUST タップの判定データがありません",
-      "justWindowRandom": "このランダムスキルでは判定幅を指定できません"
+      "justWindowRandom": "このランダムスキルでは判定幅を指定できません",
+      "minBonusUnreachable": "最低イベントボーナスに届きません",
+      "clearRequired": "「必ず含める」をすべて解除",
+      "clearRequiredDone": "{count} 枚の「必ず含める」を解除しました"
     },
     "calendar": {
       "title": "カレンダー",

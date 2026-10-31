@@ -2707,7 +2707,8 @@
         "photoBindings": "留影重复绑定",
         "correctionHelp": "正在修改活动收益所需的输入",
         "back": "返回",
-        "requiredMemberCount": "必带成员超过五人"
+        "requiredMemberCount": "必带成员超过五人",
+        "luckSampling": "LUCK 计算"
       },
       "criterionMax": "单次最高分（冲榜）",
       "criterionMeanHelp": "按 120 种技能顺序的平均分排序，适合日常游玩。",
@@ -3094,7 +3095,10 @@
       "justWindowActual": "JUST 点按窗口",
       "justWindowUnmet": "未达理想窗口",
       "justWindowTiming": "缺少 JUST 点按判定数据",
-      "justWindowRandom": "此随机技能不支持窗口条件"
+      "justWindowRandom": "此随机技能不支持窗口条件",
+      "minBonusUnreachable": "最低活动加成无法达到",
+      "clearRequired": "清除全部“必须使用”",
+      "clearRequiredDone": "已清除 {count} 张卡牌的“必须使用”"
     },
     "calendar": {
       "title": "日历",

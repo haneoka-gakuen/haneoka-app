@@ -55,6 +55,17 @@ class _BoxTabState extends State<BoxTab> {
   String _prefix(bool members) => members ? 'm' : 's';
 
   /// Bulk edits keep the previous values for one undo.
+  List<(String, Object?)> _requiredChanges() {
+    final store = c.store;
+    if (store == null) return const [];
+    return [
+      for (final entry in store.entries.entries)
+        if (RegExp(r'^[ms]\.[1-9]\d*\.lock$').hasMatch(entry.key) &&
+            entry.value.v == true)
+          (entry.key, false),
+    ];
+  }
+
   void _bulk(String label, List<(String, Object?)> changes) {
     final store = c.store;
     if (changes.isEmpty || store == null) return;
@@ -335,6 +346,22 @@ class _BoxTabState extends State<BoxTab> {
                   ),
             icon: const Icon(Symbols.upgrade_rounded),
             label: Text(c.tb('bulkMax', 'Full growth')),
+          ),
+          TextButton(
+            onPressed: _requiredChanges().isEmpty
+                ? null
+                : () {
+                    final changes = _requiredChanges();
+                    _bulk(
+                      c.tb(
+                        'clearRequiredDone',
+                        'Cleared required marks on {count} cards',
+                        {'count': changes.length},
+                      ),
+                      changes,
+                    );
+                  },
+            child: Text(c.tb('clearRequired', 'Clear all required marks')),
           ),
           TextButton(
             onPressed: c.view!.members.isEmpty && c.view!.snaps.isEmpty

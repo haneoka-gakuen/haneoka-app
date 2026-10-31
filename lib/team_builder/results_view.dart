@@ -2105,7 +2105,10 @@ Future<List<int>> renderHitImage(
         if (hit.comboBonus != null)
           (c.tb('comboBonus', 'Base COMBO BONUS'), '×${hit.comboBonus}'),
         if (hit.justWindow case final window?)
-          (c.tb('justWindowActual', 'JUST tap window'), _justWindowText(c, window)),
+          (
+            c.tb('justWindowActual', 'JUST tap window'),
+            _justWindowText(c, window),
+          ),
         if (hit.event?.rewardValues case final values?)
           for (final entry in values.entries)
             (
