@@ -5174,6 +5174,20 @@
       "mention": "参加申請の際は「haneoka から」とお書き添えください",
       "partnerTitle": "協力関係について",
       "partnerBody": "haneoka は独立して運営されているサイトで、MoeNotes およびその開発チーム StarMoe とは資本・組織上の関係はありません。両者は友好的な協力関係にあり、上記のコミュニティを共同で運営しています。"
+    },
+    "sponsor": {
+      "title": "支援",
+      "heroTitle": "haneoka を支援する",
+      "afdian": "愛発電",
+      "patreon": "Patreon",
+      "wallTitle": "支援者",
+      "wallUpdated": "{date} 更新",
+      "tierEmpty": "まだいません",
+      "pastTitle": "これまでの支援者",
+      "body": [
+        "haneoka は無料で広告もなく、サーバーやストレージ、毎日のリソース更新はすべて自分たちで負担しています。お役に立てているなら、ご支援いただけるとうれしいです。いただいたご支援は、haneoka をより安定させ、更新を早くするために使います。"
+      ],
+      "kofi": "Ko-fi"
     }
   },
   "admin": {

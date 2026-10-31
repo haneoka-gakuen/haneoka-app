@@ -5174,6 +5174,20 @@
       "mention": "When you ask to join, mention you came from haneoka",
       "partnerTitle": "About the partnership",
       "partnerBody": "haneoka is an independent website and is not affiliated with MoeNotes or its developer, StarMoe. We are friendly partners and run the groups above together."
+    },
+    "sponsor": {
+      "title": "Sponsor",
+      "heroTitle": "Sponsor haneoka",
+      "afdian": "Afdian",
+      "patreon": "Patreon",
+      "wallTitle": "Sponsors",
+      "wallUpdated": "Updated {date}",
+      "tierEmpty": "None yet",
+      "pastTitle": "Past sponsors",
+      "body": [
+        "haneoka is free and ad-free, and we cover the servers, storage and daily resource updates ourselves. If it has helped you, we'd be grateful for your support; every sponsorship goes into keeping haneoka stable and up to date."
+      ],
+      "kofi": "Ko-fi"
     }
   },
   "admin": {

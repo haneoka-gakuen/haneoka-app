@@ -5174,6 +5174,20 @@
       "mention": "申請加入時請註明「來自 haneoka」",
       "partnerTitle": "關於合作關係",
       "partnerBody": "haneoka 是獨立經營的網站，與 MoeNotes 及其開發團隊 StarMoe 之間不存在隸屬關係。雙方為友好合作關係，共同維護上述交流社群。"
+    },
+    "sponsor": {
+      "title": "贊助",
+      "heroTitle": "贊助 haneoka",
+      "afdian": "愛發電",
+      "patreon": "Patreon",
+      "wallTitle": "贊助者",
+      "wallUpdated": "更新於 {date}",
+      "tierEmpty": "暫無",
+      "pastTitle": "曾經的贊助者",
+      "body": [
+        "haneoka 免費、沒有廣告，伺服器、儲存空間和每天的資源更新都由我們自己承擔。如果它幫到了你，歡迎支持我們；每一份贊助都會用來讓 haneoka 更穩定、更新更及時。"
+      ],
+      "kofi": "Ko-fi"
     }
   },
   "admin": {

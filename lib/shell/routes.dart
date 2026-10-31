@@ -55,6 +55,7 @@ import '../rendering/provider_chart_screen.dart';
 import '../team_builder/team_builder_screen.dart';
 import '../records/tracker.dart';
 import '../home/join.dart';
+import '../home/sponsor.dart';
 import '../ui/import_screen.dart';
 import 'page.dart';
 import 'route_paths.dart';
@@ -275,6 +276,7 @@ Widget? screenFor(String route, {required ValueChanged<String> navigate}) {
     return CalendarScreen(initialQuery: uri.queryParameters);
   }
   if (route == '/join') return const JoinScreen();
+  if (route == '/sponsor') return const SponsorScreen();
   if (route == '/catalog/arena' || route.startsWith('/catalog/arena/')) {
     return ArenaScreen(
       key: ValueKey(uri.toString()),

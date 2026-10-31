@@ -124,6 +124,7 @@ final navSections = <NavSection>[
       Symbols.calendar_month_rounded,
     ),
     NavItem('/join', 'legal.join.title', Symbols.handshake_rounded),
+    NavItem('/sponsor', 'legal.sponsor.title', Symbols.favorite_rounded),
     NavItem('/download', 'download.title', Symbols.download_rounded),
   ]),
   const NavSection('library', 'navigation.library', Symbols.category_rounded, [

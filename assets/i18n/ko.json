@@ -5174,6 +5174,20 @@
       "mention": "가입 신청 시 'haneoka에서 왔다'고 적어 주세요",
       "partnerTitle": "협력 관계 안내",
       "partnerBody": "haneoka는 독립적으로 운영되는 사이트로, MoeNotes 및 개발팀 StarMoe와 소속 관계가 없습니다. 두 곳은 우호적인 협력 관계이며 위 커뮤니티를 함께 운영합니다."
+    },
+    "sponsor": {
+      "title": "후원",
+      "heroTitle": "haneoka 후원하기",
+      "afdian": "아이파뎬",
+      "patreon": "Patreon",
+      "wallTitle": "후원자",
+      "wallUpdated": "{date} 업데이트",
+      "tierEmpty": "아직 없음",
+      "pastTitle": "이전 후원자",
+      "body": [
+        "haneoka는 무료이고 광고가 없으며, 서버와 저장 공간, 매일의 리소스 업데이트 비용은 모두 저희가 부담하고 있습니다. 도움이 되셨다면 후원으로 응원해 주세요. 보내 주신 후원은 haneoka를 더 안정적으로, 더 빠르게 업데이트하는 데 쓰입니다."
+      ],
+      "kofi": "Ko-fi"
     }
   },
   "admin": {
