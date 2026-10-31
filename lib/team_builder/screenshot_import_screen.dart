@@ -14,6 +14,8 @@ import 'controller.dart';
 import 'pickers.dart';
 import 'screenshot_import.dart';
 import 'widgets.dart';
+import 'import_source_tile.dart';
+import 'screenshot_video.dart';
 
 /// Opens the dialog; recognition runs on this device.
 Future<void> openScreenshotImport(
@@ -52,6 +54,9 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
   var _policy = ExistingPolicy.keep;
   int _generation = 0;
   String _signature = '';
+
+  /// (frame, total) while a recording is read.
+  (int, int)? _frame;
 
   String _t(String key, String fallback) {
     final t = c.state.text;
@@ -173,6 +178,139 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
         _phase = _Phase.failed;
         _error = 'recognition-failed';
       });
+    }
+  }
+
+  /// A screen recording: frames every quarter second, each recognized here.
+  /// A card counts once it shows in two frames and matches clearly in one;
+  /// its level once two frames read the same value.
+  Future<void> _pickVideo() async {
+    final picked = await FilePicker.pickFiles(type: FileType.video);
+    final path = picked.firstOrNull?.path;
+    if (path == null || !mounted) return;
+    final generation = ++_generation;
+    setState(() {
+      _clearLocal();
+      _phase = _Phase.processing;
+      _error = null;
+      _frame = null;
+      _results.clear();
+      _selections.clear();
+      for (final image in _crops.values) {
+        image.dispose();
+      }
+      _crops.clear();
+    });
+    bool live() => mounted && generation == _generation;
+    final master = c.catalog!.master;
+    final seen =
+        <
+          String,
+          ({int frames, double best, Map<int, int> levels, (int, int) at})
+        >{};
+    final frames = <ScreenshotResult>[];
+    final crops = <(int, int), ui.Image>{};
+    try {
+      final reference = await recognitionReference(c.server);
+      await for (final (image, index, total) in videoFrames(path)) {
+        try {
+          if (!live()) return;
+          setState(() => _frame = (index + 1, total));
+          final result = await recognizeScreenshot(image, reference);
+          final fresh = <ScreenshotObservation>[];
+          for (final row in result.observations) {
+            final id = row.cardId;
+            if (id == null ||
+                !(row.members ? master.members : master.snaps).containsKey(
+                  id,
+                )) {
+              continue;
+            }
+            final key = '${row.members}:$id';
+            final entry = seen[key];
+            final levels = {...?entry?.levels};
+            if (row.level case final level?) {
+              levels[level] = (levels[level] ?? 0) + 1;
+            }
+            final at = entry?.at ?? (frames.length, fresh.length);
+            if (entry == null) {
+              fresh.add(row);
+              crops[at] = await observationCrop(image, row.bbox);
+            }
+            seen[key] = (
+              frames: (entry?.frames ?? 0) + 1,
+              best: row.score > (entry?.best ?? 0) ? row.score : entry!.best,
+              levels: levels,
+              at: at,
+            );
+          }
+          if (fresh.isNotEmpty) {
+            frames.add(
+              ScreenshotResult(result.width, result.height, false, fresh),
+            );
+          }
+        } finally {
+          image.dispose();
+        }
+      }
+      if (!live()) return;
+      final keep = {
+        for (final entry in seen.values)
+          if (entry.frames >= 2 && entry.best >= 0.8) entry.at: entry,
+      };
+      for (final (image, result) in frames.indexed) {
+        final rows = <ScreenshotObservation>[];
+        for (final (index, row) in result.observations.indexed) {
+          final entry = keep[(image, index)];
+          final crop = crops.remove((image, index));
+          if (entry == null) {
+            crop?.dispose();
+            continue;
+          }
+          final ranked = entry.levels.entries.toList()
+            ..sort((a, b) => b.value - a.value);
+          final agreed =
+              ranked.isNotEmpty &&
+              ranked.first.value >= 2 &&
+              (ranked.length < 2 || ranked.first.value > ranked[1].value);
+          final at = (_results.length, rows.length);
+          if (crop != null) _crops[at] = crop;
+          _selections[at] = row.cardId;
+          rows.add(
+            ScreenshotObservation(
+              bbox: row.bbox,
+              members: row.members,
+              cardId: row.cardId,
+              candidates: row.candidates,
+              level: agreed ? ranked.first.key : null,
+              score: entry.best,
+            ),
+          );
+        }
+        if (rows.isNotEmpty) {
+          _results.add(
+            ScreenshotResult(result.width, result.height, false, rows),
+          );
+        }
+      }
+      _frame = null;
+      _review();
+    } on ScreenshotError catch (error) {
+      if (!live()) return;
+      setState(() {
+        _phase = _Phase.failed;
+        _error = error.code;
+      });
+    } catch (_) {
+      if (!live()) return;
+      setState(() {
+        _phase = _Phase.failed;
+        _error = 'image-video';
+      });
+    } finally {
+      for (final image in crops.values) {
+        image.dispose();
+      }
     }
   }
 
@@ -560,18 +698,29 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
       if (_phase == _Phase.select ||
           _phase == _Phase.failed ||
           (_phase == _Phase.review && noGrid))
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: OutlinedButton.icon(
-            onPressed: _pick,
-            icon: const Icon(Symbols.add_photo_alternate_rounded),
-            label: Text(_t('chooseImages', 'Choose screenshots')),
-          ),
+        ImportSourceTile(
+          icon: Symbols.image_rounded,
+          title: _t('chooseImages', 'Choose screenshots'),
+          hint: _t('imagesHint', 'Up to 8 images of the card list'),
+          onTap: _pick,
+        ),
+      if (_phase == _Phase.select ||
+          _phase == _Phase.failed ||
+          (_phase == _Phase.review && noGrid))
+        ImportSourceTile(
+          icon: Symbols.videocam_rounded,
+          title: _t('chooseVideo', 'Choose screen recording'),
+          hint: _t('videoHint', 'Scroll through the whole list once'),
+          onTap: _pickVideo,
         ),
       if (busy) ...[
-        const LinearProgressIndicator(),
+        LinearProgressIndicator(
+          value: _frame == null ? null : _frame!.$1 / _frame!.$2,
+        ),
         Text(
-          _t(_phase.name, 'Recognizing screenshots'),
+          _frame == null
+              ? _t(_phase.name, 'Recognizing screenshots')
+              : '${_t(_phase.name, 'Recognizing screenshots')} · ${_frame!.$1} / ${_frame!.$2}',
           style: theme.textTheme.bodyMedium,
         ),
       ],

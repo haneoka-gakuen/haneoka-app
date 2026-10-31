@@ -234,6 +234,7 @@ class ScreenshotObservation {
     required this.cardId,
     required this.candidates,
     required this.level,
+    this.score = 0,
   });
   final List<int> bbox;
   final bool members;
@@ -241,6 +242,9 @@ class ScreenshotObservation {
 
   /// Candidate card ids, best first.
   final List<int> candidates;
+
+  /// The best candidate's match score.
+  final double score;
 
   /// The visible level, when the recognizer read it.
   final int? level;
@@ -345,6 +349,7 @@ Future<ScreenshotResult> recognizeScreenshot(
         cardId: cell.cardId,
         candidates: cell.candidates,
         level: cell.level,
+        score: cell.score,
       ),
   ]);
 }

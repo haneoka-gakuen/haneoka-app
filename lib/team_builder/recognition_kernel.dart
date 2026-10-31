@@ -53,12 +53,16 @@ class RecognizedCell {
     required this.bbox,
     required this.cardId,
     required this.candidates,
+    required this.score,
     required this.level,
   });
   final String kind;
   final List<int> bbox;
   final int? cardId;
   final List<int> candidates;
+
+  /// The best candidate's match score.
+  final double score;
   final int? level;
 }
 
@@ -185,7 +189,7 @@ double _dot(Float32List a, Float32List b) {
   return sum;
 }
 
-({int? cardId, List<int> candidates}) matchIdentity(
+({int? cardId, List<int> candidates, double score}) matchIdentity(
   Raster image,
   List<int> bbox,
   ReferenceKind reference,
@@ -236,7 +240,7 @@ double _dot(Float32List a, Float32List b) {
         ),
       ),
   ]..sort((a, b) => b.score.compareTo(a.score));
-  if (refined.isEmpty) return (cardId: null, candidates: const []);
+  if (refined.isEmpty) return (cardId: null, candidates: const [], score: 0.0);
   final best = refined.first;
   final accepted =
       best.score >= _acceptScore &&
@@ -244,6 +248,7 @@ double _dot(Float32List a, Float32List b) {
   return (
     cardId: accepted ? reference.cardIds[best.index] : null,
     candidates: [for (final r in refined.take(5)) reference.cardIds[r.index]],
+    score: best.score,
   );
 }
 
@@ -1017,6 +1022,7 @@ List<RecognizedCell> recognize(Raster input, LocalReference reference) {
           ],
           cardId: identity.cardId,
           candidates: identity.candidates,
+          score: identity.score,
           level: level,
         );
       }(),
