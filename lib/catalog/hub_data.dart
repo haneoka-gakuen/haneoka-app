@@ -11,7 +11,7 @@ Future<List<Map<String, Object?>>> hubData(String origin, String path) {
   final uri = Uri.parse(origin).resolve(path);
   return publicDocumentCache.read<List<Map<String, Object?>>>(
     key: pageDocumentKey(uri),
-    decodeVariant: 'destination-hub.v1',
+    decodeVariant: 'destination-hub.v2',
     decode: _decodeHub,
   );
 }
@@ -56,11 +56,33 @@ Future<List<Map<String, Object?>>> _decodeHub(
                   ?.attributes['data-i18n'],
             },
         ],
+        'look': tile.classes
+            .where((v) => v.startsWith('destination-hub__tile--look-'))
+            .map((v) => v.replaceFirst('destination-hub__tile--look-', ''))
+            .firstOrNull,
         'images': [
           for (final image in tile.querySelectorAll(
-            '.destination-hub__picture img, .destination-hub__score-media > img:first-child, .destination-hub__puzzle > img, .destination-hub__guess > img',
+            '.destination-hub__picture > img:first-child, .destination-hub__score-media > img:first-child',
           ))
             image.attributes['src'],
+        ],
+        'marks': [
+          for (final picture in tile.querySelectorAll(
+            '.destination-hub__picture',
+          ))
+            {
+              for (final (key, selector) in const [
+                ('attribute', '.destination-hub__attribute'),
+                ('rarity', '.destination-hub__rarity'),
+                ('band', '.destination-hub__character-band'),
+                ('songBand', '.destination-hub__song-marks img:first-child'),
+                (
+                  'songAttribute',
+                  '.destination-hub__song-marks img:last-child',
+                ),
+              ])
+                key: picture.querySelector(selector)?.attributes['src'],
+            },
         ],
         'team': [
           for (final slot in tile.querySelectorAll('.destination-hub__slot'))

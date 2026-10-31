@@ -1,20 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show HttpException;
 
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import '../catalog/catalog_screen.dart';
-import '../catalog/cross_server.dart';
-import '../catalog/profiles.dart';
-import '../catalog/visuals.dart';
 import '../core/app_state.dart';
 import '../core/net.dart';
-import '../help/help_screen.dart';
 import '../shell/links.dart';
 import '../shell/page.dart';
-import '../shell/routes.dart';
-import '../stories/stories.dart';
 import '../ui/app_image.dart';
 import '../ui/theme.dart';
 import '../ui/tile.dart';
@@ -29,41 +24,17 @@ const _scopeLabels = {
   'community': 'navigation.community',
 };
 
-/// A catalogue resource's search group (`searchCategory`).
-const _groups = {
-  'songs': 'navigation.songs',
-  'characters': 'navigation.characters',
-  'cards': 'navigation.cards',
-  'support-cards': 'navigation.cards',
-  'events': 'navigation.events',
-  'gacha': 'navigation.gacha',
-  'stamps': 'navigation.stamps',
-  'stickers': 'navigation.stamps',
-  'comics': 'navigation.comics',
-  'items': 'navigation.items',
-  'band-items': 'navigation.bandItems',
-};
-
-class _Entry {
-  _Entry(
-    this.group,
-    this.section,
-    this.title,
-    this.subtitle,
-    this.image,
-    this.text,
-    this.open,
-  );
-  final String group;
-  final String section;
-  final String title;
-  final String subtitle;
-  final String? image;
-
-  /// Every language's title and the subtitle, lower-cased, for matching.
-  final String text;
-  final void Function(BuildContext context) open;
-}
+const _browse = <(String, String, IconData)>[
+  ('catalog', 'navigation.catalog', Symbols.category_rounded),
+  ('songs', 'navigation.songs', Symbols.music_note_rounded),
+  ('member-cards', 'navigation.memberCards', Symbols.style_rounded),
+  ('support-cards', 'navigation.supportCards', Symbols.photo_library_rounded),
+  ('characters', 'navigation.characters', Symbols.groups_rounded),
+  ('events', 'navigation.events', Symbols.event_rounded),
+  ('gacha', 'navigation.gacha', Symbols.redeem_rounded),
+  ('stories', 'navigation.stories', Symbols.auto_stories_rounded),
+  ('community', 'navigation.community', Symbols.forum_rounded),
+];
 
 class _CommunityResults {
   const _CommunityResults(this.posts, this.nextCursor);
@@ -71,28 +42,17 @@ class _CommunityResults {
   final String? nextCursor;
 }
 
-String _all(Object? value) => switch (value) {
-  List() => value.whereType<String>().join(' '),
-  String() => value,
-  _ => '',
-};
-
-/// Search (`global-search`): the catalogue, stories and help as published
-/// for this release, matched in every language, and community posts.
-class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key});
-  @override
-  State<SearchScreen> createState() => _SearchScreenState();
-}
-
 class _SearchScreenState extends State<SearchScreen> {
-  Future<List<_Entry>>? _index;
+  Future<Map<String, Object?>>? _hits;
+  String _kind = '';
+  int _limit = 30;
+  List<String> _recent = const [];
+  static const _recentKey = 'haneoka.search.recent.v1';
   String _query = '';
   String _scope = 'all';
   Future<_CommunityResults>? _posts;
   Object? _dataKey;
   Timer? _searchTimer;
-  int _visiblePerGroup = 24;
 
   @override
   void didChangeDependencies() {
@@ -100,11 +60,17 @@ class _SearchScreenState extends State<SearchScreen> {
     final key = AppScope.of(context).publicDataKey;
     if (_dataKey != key) {
       _dataKey = key;
-      _index = _build();
+      _runCatalog();
       _posts = _query.isEmpty || _query.length > 100
           ? null
           : _community(_query);
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _readRecent();
   }
 
   @override
@@ -113,148 +79,78 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
-  Future<List<_Entry>> _build() async {
+  Future<Map<String, Object?>> _catalog(String query) async {
     final state = AppScope.of(context);
-    final api = state.api;
-    final t = state.text;
-    final visuals = await CatalogVisuals.of(api);
-    final entries = <_Entry>[];
-    final resources = [
-      for (final profile in catalogProfiles)
-        if (_groups.containsKey(profile.resource) ||
-            profile.presentation == Presentation.system)
-          profile,
-    ];
-    final documents = await Future.wait([
-      for (final profile in resources)
-        (crossCatalogIds.containsKey(profile.resource)
-                ? crossServerCollection(
-                    resource: profile.resource,
-                    selected: state.server,
-                    apis: state.catalogApis,
-                    rowsPath: profile.document,
-                  )
-                : api.catalog(profile.resource))
-            .then<Object?>((v) => v, onError: (_) => null),
-      crossServerCollection(
-        resource: 'stories',
-        selected: state.server,
-        apis: state.catalogApis,
-        rowsPath: 'episodes',
-      ).then<Object?>((v) => v, onError: (_) => null),
-      api.catalog('help').then<Object?>((v) => v, onError: (_) => null),
-    ]);
-    for (final (index, profile) in resources.indexed) {
-      final kit = CatalogKit(
-        profile,
-        t,
-        api,
-        visuals,
-        songTitles: state.songTitle,
-      );
-      Object? rows = documents[index];
-      if (profile.document != null && rows is! List) {
-        rows = readPath(rows, profile.document!);
-      }
-      final items = switch (rows) {
-        Map() => [
-          for (final MapEntry(:key, :value) in rows.entries)
-            if (value is Map)
-              {'_key': '$key', ...value.cast<String, Object?>()},
-        ],
-        List() => [
-          for (final value in rows)
-            if (value is Map) value.cast<String, Object?>(),
-        ],
-        _ => <Map<String, Object?>>[],
-      };
-      final group = _groups[profile.resource] ?? 'navigation.catalog';
-      for (final item in items) {
-        final title = kit.title(item);
-        final subtitle = kit.subtitle(item);
-        entries.add(
-          _Entry(
-            group,
-            'catalog',
-            title,
-            subtitle,
-            kit.images(item).firstOrNull,
-            [
-              for (final field in profile.title) _all(item[field]),
-              title,
-              subtitle,
-              kit.id(item),
-            ].join(' ').toLowerCase(),
-            (context) => openEntity(
-              context,
-              profile,
-              item,
-              api: state.apiFor('${item[serverKey] ?? state.server}'),
-            ),
-          ),
+    final uri = Uri.parse(state.api.origin)
+        .resolve('/api/v1/search')
+        .replace(
+          queryParameters: {
+            'q': query,
+            'server': state.server,
+            'locale': state.text.locale,
+            'limit': '$_limit',
+            if (_scope == 'catalog' || _scope == 'stories') 'section': _scope,
+            if (_kind.isNotEmpty) 'kind': _kind,
+          },
         );
+    final response = await netClient.get(uri);
+    if (response.statusCode != 200)
+      throw HttpException('${response.statusCode}');
+    return (jsonDecode(utf8.decode(response.bodyBytes)) as Map)
+        .cast<String, Object?>();
+  }
+
+  void _runCatalog() {
+    _hits = _query.isEmpty || _query.length > 200 ? null : _catalog(_query);
+  }
+
+  Future<void> _readRecent() async {
+    final prefs = await SharedPreferences.getInstance();
+    try {
+      final value = jsonDecode(prefs.getString(_recentKey) ?? '[]');
+      if (mounted && value is List) {
+        setState(() => _recent = value.whereType<String>().toList());
       }
-    }
-    final stories = documents[resources.length];
-    final episodes = switch (stories is Map ? stories['episodes'] : stories) {
-      final Map map => map.values,
-      final List list => list,
-      _ => const [],
-    };
-    for (final episode in episodes.whereType<Map>()) {
-      final title = t.text(episode['title']);
-      final chapter = t.text(episode['chapterName']);
-      entries.add(
-        _Entry(
-          'navigation.stories',
-          'stories',
-          title.isEmpty ? chapter : title,
-          chapter,
-          null,
-          '${_all(episode['title'])} ${_all(episode['chapterName'])}'
-              .toLowerCase(),
-          (context) => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => StoryReaderScreen(
-                api: state.apiFor('${episode[serverKey] ?? state.server}'),
-                episode: {
-                  ...episode.cast<String, Object?>(),
-                  'storyKey': episode['storyKey'] ?? episode['storyId'],
-                },
-              ),
-            ),
-          ),
+    } catch (_) {}
+  }
+
+  Future<void> _writeRecent(List<String> values) async {
+    final next = values.take(10).toList();
+    setState(() => _recent = next);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_recentKey, jsonEncode(next));
+  }
+
+  void _remember(String query) {
+    if (query.length < 2) return;
+    _writeRecent([query, ..._recent.where((value) => value != query)]);
+  }
+
+  /// Search text with its `<mark>` matches highlighted.
+  TextSpan _marked(String source, TextStyle? style, Color mark) {
+    final spans = <TextSpan>[];
+    String plain(String value) => value
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
+        .replaceAll('&amp;', '&');
+    var at = 0;
+    for (final match in RegExp('<mark>(.*?)</mark>').allMatches(source)) {
+      if (match.start > at) {
+        spans.add(TextSpan(text: plain(source.substring(at, match.start))));
+      }
+      spans.add(
+        TextSpan(
+          text: plain(match[1]!),
+          style: TextStyle(color: mark, fontWeight: FontWeight.w700),
         ),
       );
+      at = match.end;
     }
-    final help = documents[resources.length + 1] as Map?;
-    for (final category in switch (help?['categories']) {
-      final Map map => map.values.whereType<Map>(),
-      _ => const <Map>[],
-    }) {
-      final topics = switch (category['subcategories']) {
-        final Map map => map.values,
-        final List list => list,
-        _ => const [],
-      };
-      for (final topic in topics.whereType<Map>()) {
-        entries.add(
-          _Entry(
-            'navigation.help',
-            'help',
-            t.text(topic['title']),
-            t.text(category['title']),
-            null,
-            '${_all(topic['title'])} ${_all(topic['description'])}'
-                .toLowerCase(),
-            (context) => Navigator.of(
-              context,
-            ).push(MaterialPageRoute<void>(builder: (_) => const HelpScreen())),
-          ),
-        );
-      }
-    }
-    return entries;
+    if (at < source.length)
+      spans.add(TextSpan(text: plain(source.substring(at))));
+    return TextSpan(style: style, children: spans);
   }
 
   Future<_CommunityResults> _community(String query, {String? cursor}) async {
@@ -308,7 +204,10 @@ class _SearchScreenState extends State<SearchScreen> {
       if (_query == query) return;
       setState(() {
         _query = query;
-        _visiblePerGroup = 24;
+        _kind = '';
+        _limit = 30;
+        _runCatalog();
+        if (immediate) _remember(query);
         _posts = query.isEmpty || query.length > 100 ? null : _community(query);
       });
     }
@@ -418,73 +317,224 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                 ],
                 selected: {_scope},
-                onSelectionChanged: (value) =>
-                    setState(() => _scope = value.single),
+                onSelectionChanged: (value) => setState(() {
+                  _scope = value.single;
+                  _kind = '';
+                  _limit = 30;
+                  _runCatalog();
+                }),
               ),
             ),
           ),
+          if (_query.isEmpty) ...[
+            if (_recent.isNotEmpty) ...[
+              Row(
+                children: [
+                  Expanded(child: heading(t('common.search.recent', 'Recent'))),
+                  TextButton(
+                    onPressed: () => _writeRecent(const []),
+                    child: Text(t('common.actions.clear', 'Clear')),
+                  ),
+                ],
+              ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final query in _recent)
+                    InputChip(
+                      label: Text(query),
+                      onPressed: () => _search(query, immediate: true),
+                      onDeleted: () => _writeRecent(
+                        _recent.where((value) => value != query).toList(),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+            heading(t('common.search.browse', 'Browse')),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final (path, key, icon) in _browse)
+                  ActionChip(
+                    avatar: Icon(icon, size: 18),
+                    label: Text(t(key, key)),
+                    onPressed: () => openLink(
+                      context,
+                      path == 'community'
+                          ? '/${t.locale}/community/'
+                          : '/${state.server}/${t.locale}/$path/',
+                    ),
+                  ),
+              ],
+            ),
+          ],
           if (_query.isNotEmpty && _scope != 'community')
             FutureBuilder(
-              future: _index,
+              future: _hits,
               builder: (context, snapshot) {
-                final index = snapshot.data;
-                if (index == null) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: TextButton.icon(
+                      icon: const Icon(Symbols.refresh_rounded),
+                      label: Text(t('common.actions.retry', 'Retry')),
+                      onPressed: () => setState(_runCatalog),
+                    ),
+                  );
+                }
+                final data = snapshot.data;
+                if (data == null) {
                   return const Padding(
                     padding: EdgeInsets.all(32),
                     child: Center(child: CircularProgressIndicator()),
                   );
                 }
-                final terms = _query.toLowerCase().split(RegExp(r'\s+'));
-                final hits = [
-                  for (final entry in index)
-                    if ((_scope == 'all' || entry.section == _scope) &&
-                        terms.every(entry.text.contains))
-                      entry,
-                ];
-                final groups = <String, List<_Entry>>{};
-                for (final hit in hits) {
-                  (groups[hit.group] ??= []).add(hit);
-                }
-                if (groups.isEmpty) {
+                final hits = (data['hits'] as List? ?? const [])
+                    .whereType<Map>()
+                    .where(
+                      (hit) =>
+                          _scope != 'help' || '${hit['url']}'.contains('/help'),
+                    )
+                    .toList();
+                final kinds =
+                    ((data['kinds'] as Map?) ?? const {}).entries.toList()
+                      ..sort(
+                        (a, b) => (b.value as num).compareTo(a.value as num),
+                      );
+                final total = (data['total'] as num?)?.toInt() ?? hits.length;
+                if (hits.isEmpty) {
                   return _scope == 'all'
                       ? const SizedBox.shrink()
                       : empty(t('common.states.empty', 'Nothing found'));
                 }
+                String kindLabel(Object? kind) {
+                  final key = '$kind'.replaceAllMapped(
+                    RegExp('-([a-z])'),
+                    (m) => m[1]!.toUpperCase(),
+                  );
+                  final value = t('navigation.$key', '');
+                  return value.isEmpty ? '$kind' : value;
+                }
+
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    for (final MapEntry(:key, :value) in groups.entries) ...[
-                      heading('${t(key, key)}  ${value.length}'),
-                      for (final entry in value.take(_visiblePerGroup))
-                        row(
-                          entry.image == null
-                              ? Icon(
-                                  entry.section == 'help'
-                                      ? Symbols.help_rounded
-                                      : Symbols.auto_stories_rounded,
-                                  color: scheme.onSurfaceVariant,
-                                )
-                              : AppImage(
-                                  candidates: [entry.image!],
-                                  fit: BoxFit.cover,
-                                ),
-                          entry.title,
-                          entry.subtitle,
-                          () => entry.open(context),
-                        ),
-                      if (value.length > _visiblePerGroup)
-                        Align(
-                          alignment: AlignmentDirectional.centerStart,
-                          child: TextButton.icon(
-                            icon: const Icon(Symbols.expand_more_rounded),
-                            label: Text(
-                              t('common.actions.loadMore', 'Load more'),
+                    heading(
+                      t('common.search.results', '{count} results', {
+                        'count': total,
+                      }),
+                    ),
+                    if (kinds.length > 1 || _kind.isNotEmpty)
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          for (final entry in kinds)
+                            FilterChip(
+                              label: Text(
+                                '${kindLabel(entry.key)} ${entry.value}',
+                              ),
+                              selected: _kind == entry.key,
+                              onSelected: (_) => setState(() {
+                                _kind = _kind == entry.key
+                                    ? ''
+                                    : '${entry.key}';
+                                _limit = 30;
+                                _runCatalog();
+                              }),
                             ),
-                            onPressed: () =>
-                                setState(() => _visiblePerGroup += 24),
+                        ],
+                      ),
+                    for (final hit in hits)
+                      InkWell(
+                        onTap: () {
+                          _remember(_query);
+                          openLink(context, '${hit['url']}');
+                        },
+                        borderRadius: BorderRadius.circular(Corner.medium),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 8,
+                            horizontal: 4,
+                          ),
+                          child: Row(
+                            spacing: 16,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(
+                                  Corner.small,
+                                ),
+                                child: Container(
+                                  width: 56,
+                                  height: 56,
+                                  color: scheme.surfaceContainerHighest,
+                                  child: hit['image'] is String
+                                      ? AppImage(
+                                          candidates: [
+                                            state.api
+                                                .asset('${hit['image']}')
+                                                .toString(),
+                                          ],
+                                          fit: BoxFit.cover,
+                                        )
+                                      : Icon(
+                                          Symbols.search_rounded,
+                                          color: scheme.onSurfaceVariant,
+                                        ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      kindLabel(hit['kind']),
+                                      style: theme.textTheme.labelSmall,
+                                    ),
+                                    Text.rich(
+                                      _marked(
+                                        '${hit['title'] ?? ''}',
+                                        theme.textTheme.titleSmall,
+                                        scheme.primary,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if ('${hit['excerpt'] ?? ''}'.isNotEmpty)
+                                      Text.rich(
+                                        _marked(
+                                          '${hit['excerpt']}',
+                                          theme.textTheme.bodyMedium?.copyWith(
+                                            color: scheme.onSurfaceVariant,
+                                          ),
+                                          scheme.primary,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                    ],
+                      ),
+                    if (hits.length < total && _limit < 50)
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: TextButton.icon(
+                          icon: const Icon(Symbols.expand_more_rounded),
+                          label: Text(
+                            t('common.actions.loadMore', 'Load more'),
+                          ),
+                          onPressed: () => setState(() {
+                            _limit = 50;
+                            _runCatalog();
+                          }),
+                        ),
+                      ),
                   ],
                 );
               },

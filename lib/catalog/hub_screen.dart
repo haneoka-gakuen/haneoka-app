@@ -579,49 +579,325 @@ class _HubArt extends StatelessWidget {
         ),
       );
     }
+    return _LookArt(
+      look: '${data['look'] ?? ''}',
+      visual: '$visual',
+      images: images,
+      marks: (data['marks'] as List? ?? const []).cast<Map>(),
+      image: image,
+    );
+  }
+}
+
+/// A tile's artwork in its look, as `destination-hub.css` draws it.
+class _LookArt extends StatelessWidget {
+  const _LookArt({
+    required this.look,
+    required this.visual,
+    required this.images,
+    required this.marks,
+    required this.image,
+  });
+  final String look, visual;
+  final List<String> images;
+  final List<Map> marks;
+  final Widget Function(Object? value, {BoxFit fit}) image;
+
+  Map _marks(int index) =>
+      index < marks.length ? marks[index] : const <String, Object?>{};
+
+  /// Attribute and rarity on cards, band and attribute on jackets.
+  List<Widget> _overlay(int index, double size) {
+    final marks = _marks(index);
+    return [
+      if (marks['attribute'] != null)
+        Positioned(
+          left: 2,
+          top: 2,
+          width: size,
+          height: size,
+          child: image(marks['attribute']),
+        ),
+      if (marks['rarity'] != null)
+        Positioned(
+          right: 2,
+          bottom: 2,
+          width: size * 1.6,
+          height: size,
+          child: image(marks['rarity']),
+        ),
+      if (marks['band'] != null)
+        Positioned(
+          left: 0,
+          bottom: 0,
+          width: size,
+          height: size,
+          child: image(marks['band']),
+        ),
+      if (marks['songBand'] != null)
+        Positioned(
+          left: 2,
+          bottom: 2,
+          width: size,
+          height: size,
+          child: image(marks['songBand']),
+        ),
+      if (marks['songAttribute'] != null)
+        Positioned(
+          right: 2,
+          bottom: 2,
+          width: size,
+          height: size,
+          child: image(marks['songAttribute']),
+        ),
+    ];
+  }
+
+  Widget _card(
+    int index,
+    double radius, {
+    BoxFit fit = BoxFit.cover,
+    ShapeBorder? shape,
+    double mark = 22,
+  }) => Stack(
+    fit: StackFit.expand,
+    children: [
+      ClipPath(
+        clipper: ShapeBorderClipper(
+          shape:
+              shape ??
+              RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(radius),
+              ),
+        ),
+        child: image(images[index], fit: fit),
+      ),
+      ..._overlay(index, mark),
+    ],
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final count = images.length;
     return LayoutBuilder(
       builder: (context, box) {
-        final portrait = ['portraits', 'models'].contains(visual),
-            landscape = ['landscape', 'banners'].contains(visual);
-        final w = math.min(
-          box.maxWidth * (images.length == 1 ? .88 : .58),
-          landscape
-              ? 320.0
-              : portrait
-              ? 120.0
-              : 136.0,
-        );
-        final h = math.min(
-          box.maxHeight - 16,
-          portrait
-              ? w * 1.45
-              : landscape
-              ? w * .62
-              : w,
-        );
-        return Stack(
+        final width = box.maxWidth, height = box.maxHeight;
+        double centered(int index, double step) =>
+            (index - (count - 1) / 2) * step;
+        Widget fan({
+          required double w,
+          required double h,
+          required double step,
+          required double angle,
+          double lift = 0,
+          BoxFit fit = BoxFit.cover,
+          double radius = 12,
+          ShapeBorder? shape,
+          Decoration? frame,
+          EdgeInsets inset = EdgeInsets.zero,
+        }) => Stack(
           clipBehavior: Clip.hardEdge,
           children: [
-            for (final i in images.indexed.toList().reversed)
+            for (var i = count - 1; i >= 0; i--)
               Positioned(
-                left:
-                    (box.maxWidth - w) / 2 +
-                    (i.$1 - (images.length - 1) / 2) * w * .28,
-                top: (box.maxHeight - h) / 2 + ((i.$1 % 2) * 6),
+                left: (width - w) / 2 + centered(i, step),
+                top: (height - h) / 2 + lift * centered(i, 1) * centered(i, 1),
                 width: w,
                 height: h,
                 child: Transform.rotate(
-                  angle: images.length == 1
-                      ? 0
-                      : (i.$1 - (images.length - 1) / 2) * .11,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: image(i.$2, fit: BoxFit.contain),
+                  angle: centered(i, angle),
+                  child: Container(
+                    decoration: frame,
+                    padding: inset,
+                    child: _card(i, radius, fit: fit, shape: shape),
                   ),
                 ),
               ),
           ],
         );
+        switch (look) {
+          case 'arc':
+            final h = height * .92, w = h * .72;
+            return fan(
+              w: w,
+              h: h,
+              step: count > 1 ? (width - w) / (count - 1) * .9 : 0,
+              angle: .08,
+              lift: h * .03,
+            );
+          case 'records':
+            final side = height * .84;
+            return Stack(
+              clipBehavior: Clip.hardEdge,
+              children: [
+                for (var i = count - 1; i >= 0; i--) ...[
+                  Positioned(
+                    left: 12 + i * side * .62 + side * .3,
+                    top: (height - side) / 2 + side * .04,
+                    width: side * .92,
+                    height: side * .92,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: colors.surfaceContainerHighest,
+                        border: Border.all(
+                          color: colors.outlineVariant,
+                          width: 6,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 12 + i * side * .62,
+                    top: (height - side) / 2,
+                    width: side,
+                    height: side,
+                    child: _card(i, 12),
+                  ),
+                ],
+              ],
+            );
+          case 'cookies':
+            final side = math.min(
+              height * .84,
+              width / math.max(count, 1) * 1.25,
+            );
+            return fan(
+              w: side,
+              h: side,
+              step: count > 1 ? (width - side) / (count - 1) : 0,
+              angle: 0,
+              shape: const CircleBorder(),
+            );
+          case 'polaroid':
+            final h = height * .84, w = h * .82;
+            return fan(
+              w: w,
+              h: h,
+              step: count > 1 ? math.min((width - w) / (count - 1), w * .7) : 0,
+              angle: .1,
+              frame: BoxDecoration(
+                color: colors.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              inset: const EdgeInsets.fromLTRB(6, 6, 6, 18),
+              radius: 2,
+            );
+          case 'panels':
+            return Padding(
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                spacing: 4,
+                children: [
+                  for (var i = 0; i < count; i++)
+                    Expanded(flex: i == 0 ? 2 : 1, child: _card(i, 8)),
+                ],
+              ),
+            );
+          case 'bleed':
+            return ShaderMask(
+              blendMode: BlendMode.dstIn,
+              shaderCallback: (rect) => const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.black, Colors.transparent],
+                stops: [.55, 1],
+              ).createShader(rect),
+              child: SizedBox.expand(
+                child: image(images.first, fit: BoxFit.cover),
+              ),
+            );
+          case 'capsule':
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+              child: Column(
+                spacing: 6,
+                children: [
+                  for (var i = 0; i < math.min(count, 2); i++)
+                    Expanded(
+                      child: _card(i, 999, shape: const StadiumBorder()),
+                    ),
+                ],
+              ),
+            );
+          case 'scatter':
+            final side = math.min(height * .72, width * .46);
+            return fan(
+              w: side,
+              h: side,
+              step: count > 1 ? (width - side) / (count - 1) : 0,
+              angle: .16,
+              fit: BoxFit.contain,
+            );
+          case 'shelf':
+            final side = math.min(height * .7, width / math.max(count, 1));
+            return Stack(
+              children: [
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  top: height * .78,
+                  height: 6,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: colors.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+                for (var i = 0; i < count; i++)
+                  Positioned(
+                    left: (width - side * count) / 2 + i * side,
+                    top: height * .78 - side,
+                    width: side,
+                    height: side,
+                    child: image(images[i]),
+                  ),
+              ],
+            );
+          case 'stage':
+            final w = width / math.max(count, 1);
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: Alignment.topCenter,
+                        radius: 1,
+                        colors: [
+                          colors.primary.withValues(alpha: .24),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                for (var i = 0; i < count; i++)
+                  Positioned(
+                    left: i * w,
+                    top: 0,
+                    bottom: 0,
+                    width: w,
+                    child: image(images[i]),
+                  ),
+              ],
+            );
+          default:
+            final portrait = ['portraits', 'models'].contains(visual);
+            final w = math.min(
+              width * (count == 1 ? .88 : .58),
+              portrait ? 120.0 : 136.0,
+            );
+            return fan(
+              w: w,
+              h: math.min(height - 16, portrait ? w * 1.45 : w),
+              step: w * .28,
+              angle: .11,
+              fit: BoxFit.contain,
+            );
+        }
       },
     );
   }
