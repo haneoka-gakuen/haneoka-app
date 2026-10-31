@@ -35,6 +35,7 @@ import 'song_score_targets.dart';
 import 'song_video.dart';
 import 'system_detail.dart';
 import 'visuals.dart';
+import 'song_chart_analysis.dart';
 
 const _difficultyNames = ['EASY', 'NORMAL', 'HARD', 'EXPERT', 'SPECIAL'];
 const _rankNames = ['', 'E', 'D', 'C', 'B', 'A', 'S', 'SS'];
@@ -681,6 +682,21 @@ class _Page {
           SongSkillPoints(
             key: ValueKey(file),
             source: kit.api.asset(file).toString(),
+          ),
+      if (ready &&
+          kit.api is! ProviderApi &&
+          const ['jp', 'intl'].contains(kit.api.server) &&
+          chosen != null)
+        if (canonicalChart?['file'] case final String file when file.isNotEmpty)
+          SongChartAnalysisSection(
+            key: ValueKey('analysis:$file'),
+            api: kit.api,
+            source: kit.api.asset(file).toString(),
+            musicId:
+                (record['musicId'] as num?)?.toInt() ??
+                int.tryParse('${record['_key']}') ??
+                0,
+            difficulty: chosen,
           ),
       GekisouStages(song: record, metrics: gekisou),
       if (kit.api is! ProviderApi &&

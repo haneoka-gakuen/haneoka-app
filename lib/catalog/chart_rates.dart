@@ -34,11 +34,79 @@ class ChartRates {
             required: (row[1] as num).toInt(),
             battleRequired: (row[2] as num).toInt(),
           ),
-      ];
+      ],
+      gekisou = value['gekisou'] is Map
+          ? GekisouRates.fromJson(value['gekisou'] as Map)
+          : null;
   final double base, skip;
   final int notes;
   final List<List<double>> windows;
   final List<ScoreRank> ranks;
+
+  /// Gekisou Live, on songs with three missions.
+  final GekisouRates? gekisou;
+}
+
+/// A Gekisou Live's per-power score without rank bonuses, as parts [outside
+/// the ranges, range 1, 2, 3]: at no Just and at every Just the play allows.
+class GekisouRates {
+  GekisouRates.fromJson(Map value)
+    : missions = _ints(value['missions']),
+      percents = [for (final row in value['percents'] as List) _ints(row)],
+      base = [for (final row in value['base'] as List) _doubles(row)],
+      events = [
+        for (final run in value['events'] as List)
+          [for (final row in run as List) _doubles(row)],
+      ],
+      notes = _ints(value['notes']),
+      just = _ints(value['just']);
+
+  /// Mission type of each range: 1 COMBO, 2 LUCK, 3 JUST, 4 All.
+  final List<int> missions;
+
+  /// Rank bonus percent as [range][rank - 1].
+  final List<List<int>> percents;
+
+  /// [no Just, all Just] → parts without skills.
+  final List<List<double>> base;
+
+  /// [no Just, all Just] → [skill event] → parts a +100 % five-second score
+  /// skill adds.
+  final List<List<List<double>>> events;
+  final List<int> notes, just;
+
+  static List<int> _ints(Object? row) => [
+    for (final v in row as List) (v as num).toInt(),
+  ];
+  static List<double> _doubles(Object? row) => [
+    for (final v in row as List) (v as num).toDouble(),
+  ];
+
+  /// Per-power score at a placement in each range, a Just share, a general
+  /// score factor (Great share) and the five skills in percent.
+  double rate(
+    List<int> ranks,
+    double just,
+    double general,
+    List<double> skills,
+  ) {
+    double lerp(double low, double high) => low + (high - low) * just;
+    var total = 0.0;
+    for (var part = 0; part < 4; part++) {
+      var value = lerp(base[0][part], base[1][part]);
+      for (var event = 0; event < 5; event++) {
+        value +=
+            (event < skills.length ? skills[event] : 0) /
+            100 *
+            lerp(events[0][event][part], events[1][event][part]);
+      }
+      final bonus = part == 0
+          ? 0
+          : percents[part - 1][(ranks[part - 1] - 1).clamp(0, 4)];
+      total += value * (1 + bonus / 100);
+    }
+    return total * general;
+  }
 }
 
 class RateEvent {
