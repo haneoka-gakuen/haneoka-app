@@ -302,8 +302,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 days.last,
               ).where((o) => o.facets.any(_categories.contains)).toList();
         return ShellPage(
-          title:
-              '${label('title', 'Calendar')} / ${DateFormat.yMMMM(t.locale).format(_selected)}',
+          title: DateFormat.yMMMM(t.locale).format(_selected),
           actions: [
             BarAction(
               icon: Symbols.chevron_left_rounded,
@@ -382,6 +381,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
             candidates: [AppScope.of(context).api.asset(source).toString()],
           ),
   );
+  Widget _glyph(String? source, double size) => source == null
+      ? SizedBox.square(dimension: size)
+      : GameGlyph(
+          AppScope.of(context).api.asset(source).toString(),
+          size: size,
+        );
   String? _missionImage(Json arena, Object? rule) {
     final id = ((rule as Map?)?['missions'] as List?)?.firstOrNull;
     final value = (arena['missions'] as Map?)?['$id'];
@@ -476,7 +481,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               children: [
                 const Icon(Symbols.swords_rounded, size: 18),
                 Text(
-                  label('arena', 'Gekiso Arena'),
+                  label('arena', 'GEKISO Arena'),
                   style: theme.textTheme.titleSmall,
                 ),
               ],
@@ -499,7 +504,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        _mark(_missionImage(arena, rule), 20),
+                        _glyph(_missionImage(arena, rule), 20),
                         Text(_mission(rule), style: theme.textTheme.labelSmall),
                       ],
                     ),
@@ -617,7 +622,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                     spacing: 2,
                                     children: [
                                       _mark('${leagues[index]['image']}', 20),
-                                      _mark(_missionImage(arena, rule), 18),
+                                      _glyph(_missionImage(arena, rule), 18),
                                     ],
                                   ),
                             ],
@@ -778,6 +783,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                         .length,
                                     mark: _mark,
                                     missionImage: _missionImage,
+                                    glyph: _glyph,
                                     onTap: () =>
                                         setState(() => _selected = date),
                                   ),
@@ -826,7 +832,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             color: _missionColor(scheme, id),
                           ),
                         ),
-                        _mark(
+                        _glyph(
                           _missionImage(arena, {
                             'missions': [id],
                           }),
@@ -994,6 +1000,7 @@ class _Cell extends StatelessWidget {
     required this.overflow,
     required this.mark,
     required this.missionImage,
+    required this.glyph,
     required this.onTap,
   });
   final DateTime date;
@@ -1004,6 +1011,7 @@ class _Cell extends StatelessWidget {
   final int overflow;
   final Widget Function(String?, double) mark;
   final String? Function(Json, Object?) missionImage;
+  final Widget Function(String?, double) glyph;
   final VoidCallback onTap;
 
   @override
@@ -1069,7 +1077,7 @@ class _Cell extends StatelessWidget {
                                               '${leagues[index]['image']}',
                                               16,
                                             ),
-                                            mark(
+                                            glyph(
                                               missionImage(arena!, rule),
                                               16,
                                             ),
@@ -1080,12 +1088,12 @@ class _Cell extends StatelessWidget {
                           )
                         : Row(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            spacing: 2,
+                            spacing: 1,
                             children: [
                               for (final rule in rules)
                                 Container(
-                                  width: 6,
-                                  height: 6,
+                                  width: 5,
+                                  height: 5,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     color: _missionColor(

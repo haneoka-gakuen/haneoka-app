@@ -177,7 +177,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sec_friendships => 'Friendships';
 
   @override
-  String get sec_bandItems => 'Band items';
+  String get sec_bandItems => 'Band Items';
 
   @override
   String get sec_items => 'Items';
@@ -195,7 +195,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sec_events => 'Events';
 
   @override
-  String get sec_challengeLives => 'Challenge lives';
+  String get sec_challengeLives => 'Challenge LIVE';
 
   @override
   String get sec_gacha => 'Gacha';
@@ -261,7 +261,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sec_memory => 'Memories';
 
   @override
-  String get sec_liveBoost => 'Live boost';
+  String get sec_liveBoost => 'LIVE Boost';
 
   @override
   String get sec_liveSkip => 'Live skip';
@@ -273,7 +273,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sec_offlineBonus => 'Offline bonus';
 
   @override
-  String get sec_arena => 'Arena';
+  String get sec_arena => 'GEKISO Arena';
 
   @override
   String get playerRank => 'Player rank';
@@ -436,10 +436,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cleared => 'Cleared';
 
   @override
-  String get fullCombo => 'Full combo';
+  String get fullCombo => 'FULL COMBO';
 
   @override
-  String get allPerfect => 'All perfect';
+  String get allPerfect => 'ALL PERFECT';
 
   @override
   String ofSongs(String total) {
@@ -565,7 +565,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importToTeamHint =>
-      'Review and import cards, snapshots, character levels and band items directly from this save.';
+      'Review and import cards, snapshots, character levels and Band Items directly from this save.';
 
   @override
   String get saveAccountMismatch =>

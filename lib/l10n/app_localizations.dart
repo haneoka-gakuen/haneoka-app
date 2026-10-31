@@ -436,7 +436,7 @@ abstract class AppLocalizations {
   /// No description provided for @sec_bandItems.
   ///
   /// In en, this message translates to:
-  /// **'Band items'**
+  /// **'Band Items'**
   String get sec_bandItems;
 
   /// No description provided for @sec_items.
@@ -472,7 +472,7 @@ abstract class AppLocalizations {
   /// No description provided for @sec_challengeLives.
   ///
   /// In en, this message translates to:
-  /// **'Challenge lives'**
+  /// **'Challenge LIVE'**
   String get sec_challengeLives;
 
   /// No description provided for @sec_gacha.
@@ -604,7 +604,7 @@ abstract class AppLocalizations {
   /// No description provided for @sec_liveBoost.
   ///
   /// In en, this message translates to:
-  /// **'Live boost'**
+  /// **'LIVE Boost'**
   String get sec_liveBoost;
 
   /// No description provided for @sec_liveSkip.
@@ -628,7 +628,7 @@ abstract class AppLocalizations {
   /// No description provided for @sec_arena.
   ///
   /// In en, this message translates to:
-  /// **'Arena'**
+  /// **'GEKISO Arena'**
   String get sec_arena;
 
   /// No description provided for @playerRank.
@@ -916,13 +916,13 @@ abstract class AppLocalizations {
   /// No description provided for @fullCombo.
   ///
   /// In en, this message translates to:
-  /// **'Full combo'**
+  /// **'FULL COMBO'**
   String get fullCombo;
 
   /// No description provided for @allPerfect.
   ///
   /// In en, this message translates to:
-  /// **'All perfect'**
+  /// **'ALL PERFECT'**
   String get allPerfect;
 
   /// No description provided for @ofSongs.
@@ -1150,7 +1150,7 @@ abstract class AppLocalizations {
   /// No description provided for @importToTeamHint.
   ///
   /// In en, this message translates to:
-  /// **'Review and import cards, snapshots, character levels and band items directly from this save.'**
+  /// **'Review and import cards, snapshots, character levels and Band Items directly from this save.'**
   String get importToTeamHint;
 
   /// No description provided for @saveAccountMismatch.

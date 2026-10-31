@@ -25,7 +25,7 @@ class ArenaTab extends StatelessWidget {
       controller: c,
       leading: ToolSection(
         icon: Symbols.swords_rounded,
-        title: c.tb('arena.tab', 'Gekiso Arena'),
+        title: c.tb('arena.tab', 'GEKISO Arena'),
         children: [
           DropdownButtonFormField<String>(
             initialValue: c.server,

@@ -420,7 +420,10 @@ class _ArenaDetailState extends State<ArenaDetail> with WidgetsBindingObserver {
 
   Widget _missionMark(int id, {double size = 24}) =>
       switch (objectRow(widget.images['missions'])['$id']) {
-        final Object source => _art(source, size: size),
+        final Object source => GameGlyph(
+          AppScope.of(context).api.asset('$source').toString(),
+          size: size,
+        ),
         _ => const SizedBox.shrink(),
       };
   Widget _ruleMarks(Doc? rule, {double size = 24}) {
@@ -439,6 +442,34 @@ class _ArenaDetailState extends State<ArenaDetail> with WidgetsBindingObserver {
             _missionMark(id, size: size),
         ],
       ),
+    );
+  }
+
+  /// The stage attribute over the sections' rule (`arenaRuleMarks`).
+  Widget _ruleLines(Doc? rule) {
+    if (rule == null) return const Text('—');
+    final missions = intListOf(rule['missions']).toSet();
+    final style = Theme.of(context).textTheme.labelMedium;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: 4,
+      children: [
+        Text(_attribute(intOf(rule['musicType'])), style: style),
+        Row(
+          spacing: 4,
+          children: [
+            for (final id in missions) _missionMark(id, size: 20),
+            Expanded(
+              child: Text(
+                _ruleText(rule),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: style,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -488,17 +519,32 @@ class _ArenaDetailState extends State<ArenaDetail> with WidgetsBindingObserver {
                   icon: const Icon(Symbols.chevron_left_rounded),
                 ),
                 Expanded(
-                  child: Column(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    spacing: 8,
                     children: [
-                      Text(
-                        _name(season['title']),
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.titleLarge,
+                      Flexible(
+                        child: Text(
+                          _name(season['title']),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleLarge,
+                        ),
                       ),
-                      Text(
-                        _text('status.$status'),
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: theme.colorScheme.primary,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 2,
+                        ),
+                        decoration: ShapeDecoration(
+                          shape: const StadiumBorder(),
+                          color: theme.colorScheme.secondaryContainer,
+                        ),
+                        child: Text(
+                          _text('status.$status'),
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: theme.colorScheme.onSecondaryContainer,
+                          ),
                         ),
                       ),
                     ],
@@ -514,6 +560,9 @@ class _ArenaDetailState extends State<ArenaDetail> with WidgetsBindingObserver {
               ],
             ),
             Wrap(
+              direction: MediaQuery.sizeOf(context).width < 600
+                  ? Axis.vertical
+                  : Axis.horizontal,
               spacing: 16,
               runSpacing: 4,
               children: [
@@ -544,7 +593,7 @@ class _ArenaDetailState extends State<ArenaDetail> with WidgetsBindingObserver {
               ],
             ),
             SizedBox(
-              height: 112,
+              height: 148,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: _leagues.length,
@@ -557,11 +606,11 @@ class _ArenaDetailState extends State<ArenaDetail> with WidgetsBindingObserver {
                       identical(league, _league) ||
                       league['id'] == _league['id'];
                   return SizedBox(
-                    width: 168,
+                    width: 148,
                     child: Material(
                       color: selected
                           ? theme.colorScheme.secondaryContainer
-                          : theme.colorScheme.surfaceContainerLow,
+                          : theme.colorScheme.surfaceContainerLowest,
                       borderRadius: BorderRadius.circular(16),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(16),
@@ -572,11 +621,10 @@ class _ArenaDetailState extends State<ArenaDetail> with WidgetsBindingObserver {
                           _ranking = null;
                         }),
                         child: Padding(
-                          padding: const EdgeInsets.all(10),
+                          padding: const EdgeInsets.all(12),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            spacing: 4,
+                            spacing: 6,
                             children: [
                               Row(
                                 spacing: 8,
@@ -592,14 +640,14 @@ class _ArenaDetailState extends State<ArenaDetail> with WidgetsBindingObserver {
                                   ),
                                 ],
                               ),
-                              _ruleMarks(shown, size: 20),
+                              _ruleLines(shown),
                               if (shown != null)
                                 Text(
                                   _range(
                                     intOf(shown['startAt']),
                                     intOf(shown['endAt']) + 1000,
                                   ),
-                                  maxLines: 1,
+                                  maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: theme.textTheme.labelSmall,
                                 ),
@@ -627,22 +675,50 @@ class _ArenaDetailState extends State<ArenaDetail> with WidgetsBindingObserver {
       _Tab.ranks: Symbols.military_tech_rounded,
       _Tab.rules: Symbols.gavel_rounded,
     };
-    return SizedBox(
-      height: 48,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: [
-          for (final tab in _Tab.values)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                avatar: Icon(icons[tab], size: 18),
-                showCheckmark: false,
-                label: Text(_text('tabs.${tab.name}')),
-                selected: _tab == tab,
-                onSelected: (_) => setState(() => _tab = tab),
-              ),
+    final theme = Theme.of(context), scheme = theme.colorScheme;
+    Widget item(_Tab tab) => Material(
+      color: _tab == tab ? scheme.secondaryContainer : Colors.transparent,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => setState(() => _tab = tab),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              spacing: 6,
+              children: [
+                Icon(icons[tab], size: 18),
+                Flexible(
+                  child: Text(
+                    _text('tabs.${tab.name}'),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.labelLarge,
+                  ),
+                ),
+              ],
             ),
+          ),
+        ),
+      ),
+    );
+    final phone = MediaQuery.sizeOf(context).width < 600;
+    final rows = [
+      for (var start = 0; start < _Tab.values.length; start += phone ? 3 : 6)
+        _Tab.values.skip(start).take(phone ? 3 : 6).toList(),
+    ];
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        children: [
+          for (final row in rows)
+            Row(children: [for (final tab in row) Expanded(child: item(tab))]),
         ],
       ),
     );
@@ -655,97 +731,127 @@ class _ArenaDetailState extends State<ArenaDetail> with WidgetsBindingObserver {
     final league = _league, state = _ruleNow(league);
     final shown = state.rule ?? state.next.firstOrNull;
     final server = widget.server ?? AppScope.of(context).server;
-    return DetailSection(
-      icon: Symbols.flag_rounded,
-      title: _name(league['name']),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: 8,
-        children: [
-          Text(
-            state.rule != null
-                ? _text('currentRule')
-                : shown != null
-                ? _text('nextRule')
-                : _text('noSchedule'),
-          ),
-          if (shown != null) ...[
+    final build = FilledButton.icon(
+      onPressed: () => openLink(
+        context,
+        Uri(
+          path: '/team-builder',
+          queryParameters: {
+            'tab': 'arena',
+            'league': '${league['id']}',
+            'server': server,
+          },
+        ).toString(),
+      ),
+      icon: const Icon(Symbols.groups_rounded),
+      label: Text(_text('buildTeam')),
+    );
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 12,
+          children: [
             Row(
-              spacing: 16,
+              spacing: 12,
               children: [
-                Column(
-                  children: [
-                    Text(
-                      _text('stageAttribute'),
-                      style: theme.textTheme.labelSmall,
-                    ),
-                    Text(
-                      _attribute(intOf(shown['musicType'])),
-                      style: theme.textTheme.titleMedium,
-                    ),
-                  ],
-                ),
-                for (final (index, value) in intListOf(
-                  shown['missions'],
-                ).indexed)
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          _text('section', {'index': index + 1}),
-                          style: theme.textTheme.labelSmall,
-                        ),
-                        _missionMark(value, size: 36),
-                        Text(
-                          _mission(value),
-                          style: theme.textTheme.labelLarge,
-                        ),
-                      ],
-                    ),
+                _art(league['image'], size: 40),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _name(league['name']),
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      Text(
+                        state.rule != null
+                            ? _text('currentRule')
+                            : shown != null
+                            ? _text('nextRule')
+                            : _text('noSchedule'),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
                   ),
+                ),
+                build,
               ],
             ),
-            Text(
-              [
-                _range(intOf(shown['startAt']), intOf(shown['endAt'])),
-                if (state.rule != null)
-                  _remaining(intOf(state.rule!['endAt']) + 1000),
-              ].join(' / '),
-              style: theme.textTheme.bodyMedium,
-            ),
-          ],
-          if (state.rule != null)
-            for (final entry in state.next)
-              Row(
+            if (shown != null) ...[
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      _range(
-                        intOf(entry['startAt']),
-                        intOf(entry['endAt']) + 1000,
-                      ),
-                      style: theme.textTheme.bodySmall,
-                    ),
+                  Text(
+                    _text('stageAttribute'),
+                    style: theme.textTheme.labelSmall,
                   ),
-                  _ruleMarks(entry, size: 20),
+                  Text(
+                    _attribute(intOf(shown['musicType'])),
+                    style: theme.textTheme.titleMedium,
+                  ),
                 ],
               ),
-          FilledButton.icon(
-            onPressed: () => openLink(
-              context,
-              Uri(
-                path: '/team-builder',
-                queryParameters: {
-                  'tab': 'arena',
-                  'league': '${league['id']}',
-                  'server': server,
-                },
-              ).toString(),
-            ),
-            icon: const Icon(Symbols.groups_rounded),
-            label: Text(_text('buildTeam')),
-          ),
-        ],
+              Row(
+                spacing: 8,
+                children: [
+                  for (final (index, value) in intListOf(
+                    shown['missions'],
+                  ).indexed)
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHigh,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          spacing: 4,
+                          children: [
+                            Text(
+                              _text('section', {'index': index + 1}),
+                              style: theme.textTheme.labelSmall,
+                            ),
+                            _missionMark(value, size: 36),
+                            Text(
+                              _mission(value),
+                              style: theme.textTheme.labelLarge,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              Text(
+                [
+                  _range(intOf(shown['startAt']), intOf(shown['endAt'])),
+                  if (state.rule != null)
+                    _remaining(intOf(state.rule!['endAt']) + 1000),
+                ].join(' / '),
+                style: theme.textTheme.bodyMedium,
+              ),
+            ],
+            if (state.rule != null)
+              for (final entry in state.next)
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _range(
+                          intOf(entry['startAt']),
+                          intOf(entry['endAt']) + 1000,
+                        ),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                    _ruleMarks(entry, size: 20),
+                  ],
+                ),
+          ],
+        ),
       ),
     );
   }

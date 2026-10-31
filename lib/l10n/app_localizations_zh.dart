@@ -139,7 +139,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get highScoreRating => '高分评级';
 
   @override
-  String get clears => '通关歌曲';
+  String get clears => '通关乐曲';
 
   @override
   String get exportTeam => '复制到配队工具';
@@ -171,7 +171,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sec_snapshots => '留影';
 
   @override
-  String get sec_characters => '角色等级';
+  String get sec_characters => '角色评级';
 
   @override
   String get sec_friendships => '羁绊';
@@ -183,13 +183,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sec_items => '道具';
 
   @override
-  String get sec_songs => '歌曲成绩';
+  String get sec_songs => '乐曲成绩';
 
   @override
-  String get sec_ratings => '评级歌曲';
+  String get sec_ratings => '评级乐曲';
 
   @override
-  String get sec_challengeSongs => '挑战歌曲';
+  String get sec_challengeSongs => '挑战乐曲';
 
   @override
   String get sec_events => '活动';
@@ -273,7 +273,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sec_offlineBonus => '离线奖励';
 
   @override
-  String get sec_arena => '竞技场';
+  String get sec_arena => '激奏舞台';
 
   @override
   String get playerRank => '玩家等级';
@@ -282,7 +282,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sec_songUnlocks => '乐曲解锁';
 
   @override
-  String get sec_challengeUnlocks => '挑战歌曲解锁';
+  String get sec_challengeUnlocks => '挑战乐曲解锁';
 
   @override
   String get sec_friendshipRewards => '羁绊奖励';
@@ -301,7 +301,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get importIntro =>
-      'Haneoka 读取游戏保存在设备上的存档，展示你的等级、卡牌、歌曲通关和道具。存档只留在本机；导出时不会包含你的昵称和账号 ID。';
+      'Haneoka 读取游戏保存在设备上的存档，展示你的等级、卡牌、乐曲通关和道具。存档只留在本机；导出时不会包含你的昵称和账号 ID。';
 
   @override
   String get versionQuestion => '你玩的是哪个版本？';
@@ -426,7 +426,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get profileOverview => '概览';
 
   @override
-  String get songClears => '歌曲通关';
+  String get songClears => '乐曲通关';
 
   @override
   String get cleared => '通关';
@@ -508,7 +508,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get linkSignInFirst => '登录 Haneoka 账号后即可关联此玩家。';
 
   @override
-  String get linkExplain => '只会上传玩家 ID、名称、等级、评级、持有数量和歌曲通关数，存档本身仅保存在本设备。';
+  String get linkExplain => '只会上传玩家 ID、名称、等级、评级、持有数量和乐曲通关数，存档本身仅保存在本设备。';
 
   @override
   String get linked => '已关联';
@@ -555,7 +555,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importToTeamBuilder => '导入配队';
 
   @override
-  String get importToTeamHint => '直接使用此游戏账号的成员卡、留影、角色等级和乐队道具，预览后确认导入。';
+  String get importToTeamHint => '直接使用此游戏账号的成员卡、留影、角色评级和乐队道具，预览后确认导入。';
 
   @override
   String get saveAccountMismatch => '读取到的存档属于其他游戏账号或服务器，请选择此游戏账号的存档。';
@@ -722,7 +722,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get highScoreRating => '高分評級';
 
   @override
-  String get clears => '通關歌曲';
+  String get clears => '通關樂曲';
 
   @override
   String get exportTeam => '複製到配隊工具';
@@ -748,10 +748,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
-  String get sec_memberCards => '成員';
+  String get sec_memberCards => '團員';
 
   @override
-  String get sec_snapshots => '留影';
+  String get sec_snapshots => '快照';
 
   @override
   String get sec_characters => '角色等級';
@@ -766,13 +766,13 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get sec_items => '道具';
 
   @override
-  String get sec_songs => '歌曲成績';
+  String get sec_songs => '樂曲成績';
 
   @override
-  String get sec_ratings => '評級歌曲';
+  String get sec_ratings => '評級樂曲';
 
   @override
-  String get sec_challengeSongs => '挑戰歌曲';
+  String get sec_challengeSongs => '挑戰樂曲';
 
   @override
   String get sec_events => '活動';
@@ -781,7 +781,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get sec_challengeLives => '挑戰演出';
 
   @override
-  String get sec_gacha => '招募';
+  String get sec_gacha => '轉蛋';
 
   @override
   String get sec_stories => '已讀故事';
@@ -805,7 +805,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get sec_monthlyPass => '月卡';
 
   @override
-  String get sec_loginBonuses => '登入獎勵';
+  String get sec_loginBonuses => '登入報酬';
 
   @override
   String get sec_costumes => '服裝';
@@ -853,22 +853,22 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get sec_vip => 'T.G.W CARD';
 
   @override
-  String get sec_offlineBonus => '離線獎勵';
+  String get sec_offlineBonus => '離線報酬';
 
   @override
-  String get sec_arena => '競技場';
+  String get sec_arena => '激奏舞台';
 
   @override
   String get playerRank => '玩家等級';
 
   @override
-  String get sec_songUnlocks => '樂曲解鎖';
+  String get sec_songUnlocks => '樂曲開放';
 
   @override
-  String get sec_challengeUnlocks => '挑戰歌曲解鎖';
+  String get sec_challengeUnlocks => '挑戰樂曲開放';
 
   @override
-  String get sec_friendshipRewards => '羈絆獎勵';
+  String get sec_friendshipRewards => '羈絆報酬';
 
   @override
   String get sec_stampFavorites => '收藏貼圖';
@@ -884,7 +884,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get importIntro =>
-      'Haneoka 讀取遊戲保存在裝置上的存檔，顯示你的等級、卡牌、歌曲通關與道具。存檔只留在本機；匯出時不包含你的暱稱與帳號 ID。';
+      'Haneoka 讀取遊戲保存在裝置上的存檔，顯示你的等級、卡牌、樂曲通關與道具。存檔只留在本機；匯出時不包含你的暱稱與帳號 ID。';
 
   @override
   String get versionQuestion => '你玩的是哪個版本？';
@@ -1009,7 +1009,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get profileOverview => '概覽';
 
   @override
-  String get songClears => '歌曲通關';
+  String get songClears => '樂曲通關';
 
   @override
   String get cleared => '通關';
@@ -1091,7 +1091,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get linkSignInFirst => '登入 Haneoka 帳號後即可關聯此玩家。';
 
   @override
-  String get linkExplain => '只會上傳玩家 ID、名稱、等級、評級、持有數量和歌曲通關數，存檔本身僅保存在本裝置。';
+  String get linkExplain => '只會上傳玩家 ID、名稱、等級、評級、持有數量和樂曲通關數，存檔本身僅保存在本裝置。';
 
   @override
   String get linked => '已關聯';
@@ -1138,7 +1138,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get importToTeamBuilder => '匯入配隊';
 
   @override
-  String get importToTeamHint => '直接使用此遊戲帳號的成員卡、留影、角色等級和樂團道具，預覽後確認匯入。';
+  String get importToTeamHint => '直接使用此遊戲帳號的團員卡、快照、角色等級和樂團道具，預覽後確認匯入。';
 
   @override
   String get saveAccountMismatch => '讀取到的存檔屬於其他遊戲帳號或伺服器，請選擇此遊戲帳號的存檔。';

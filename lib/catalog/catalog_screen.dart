@@ -299,7 +299,7 @@ class CatalogKit {
     final raw = firstOf(item, profile.title);
     final value = kind == Presentation.song && songTitles != null
         ? songTitles!(raw)
-        : plain(raw);
+        : plain(raw).replaceAll(RegExp(r'\[[^\]]+\]'), '').trim();
     return value.isEmpty ? '—' : value;
   }
 
@@ -650,7 +650,7 @@ class CatalogKit {
           sort(
             'gekisouSkill',
             'gekisouSkill',
-            'Gekisou skill',
+            'GEKISO skill',
             (item) => skill(item, 'gekisou'),
           ),
         ] else ...[
@@ -663,7 +663,7 @@ class CatalogKit {
           sort(
             'gekisouSupportSkill',
             'gekisouSupportSkill',
-            'Gekiso support skill',
+            'GEKISO Support Skill',
             (item) => skill(item, 'gekisouSupport'),
           ),
         ],
@@ -720,12 +720,12 @@ class CatalogKit {
         idSort,
         titleSort,
         sort('availability', 'availability', 'Ending soonest', (item) {
-          // Ending soonest leads; standing offers follow, newest ids first.
+          // Ending soonest leads, then standing offers, then ended ones.
+          final start = firstTime(item['startAt']);
           final end = firstTime(item['endAt']);
-          if (end > 0) return end;
-          return 9007199254740991 -
-              (num.tryParse(id(item).replaceAll(RegExp(r'\D'), '')) ?? 0) *
-                  1000;
+          final now = DateTime.now().millisecondsSinceEpoch;
+          if (end <= 0) return 1e15 - start;
+          return end > now ? end : 2e15 - start;
         }),
         release,
       ],

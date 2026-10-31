@@ -135,8 +135,10 @@ class _CommunityChartsScreenState extends State<CommunityChartsScreen> {
             absoluteUrl('${row['coverUrl']}'),
         ],
         marks: [
-          TileMark.text(MarkAt.end, '${row['difficulty']}'.toUpperCase()),
-          TileMark.text(MarkAt.bottomEnd, '${row['level']}'),
+          TileMark.text(
+            MarkAt.end,
+            '${row['difficulty']} ${row['level']}'.toUpperCase(),
+          ),
         ],
         onTap: () => _open(context, row),
       ),

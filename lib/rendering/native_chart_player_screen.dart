@@ -403,7 +403,7 @@ class _NativeChartPlayerScreenState extends State<NativeChartPlayerScreen>
                       DropdownMenuItem(
                         value: 'gekisou',
                         child: Text(
-                          t('media.chartPlayer.gekisouLive', 'Gekisou Live'),
+                          t('media.chartPlayer.gekisouLive', 'GEKISO Live'),
                         ),
                       ),
                     ],

@@ -645,7 +645,7 @@ class _CardEditor extends StatelessWidget {
           ),
           if ((catalog.master.members[id]?.gekisoSkillId ?? 0) != 0)
             steps(
-              c.tb('gekisoSkill', 'Gekiso skill'),
+              c.tb('gekisoSkill', 'GEKISO skill'),
               'gsk',
               row?.gekisoSkill,
               limits.gekisoSkillLevel,

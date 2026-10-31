@@ -93,6 +93,22 @@ ThemeData haneokaTheme(
       toolbarHeight: ShellMetrics.topBar,
       titleSpacing: 16,
     ),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      selectedIcon: const SizedBox.shrink(),
+      style: ButtonStyle(
+        side: const WidgetStatePropertyAll(BorderSide.none),
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? scheme.secondary
+              : scheme.surfaceContainerHigh,
+        ),
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? scheme.onSecondary
+              : scheme.onSurfaceVariant,
+        ),
+      ),
+    ),
     cardTheme: CardThemeData(
       color: scheme.surfaceContainerLow,
       elevation: 0,

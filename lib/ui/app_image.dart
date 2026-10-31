@@ -352,3 +352,21 @@ class _AppImageState extends State<AppImage> {
     );
   }
 }
+
+/// A monochrome game glyph tinted with the theme (`gameGlyph`).
+class GameGlyph extends StatelessWidget {
+  const GameGlyph(this.source, {super.key, required this.size});
+  final String source;
+  final double size;
+  @override
+  Widget build(BuildContext context) => SizedBox.square(
+    dimension: size,
+    child: ColorFiltered(
+      colorFilter: ColorFilter.mode(
+        Theme.of(context).colorScheme.primary,
+        BlendMode.srcIn,
+      ),
+      child: AppImage(candidates: [source]),
+    ),
+  );
+}

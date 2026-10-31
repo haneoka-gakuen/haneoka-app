@@ -202,6 +202,44 @@ class _MosaicTile extends StatelessWidget {
         onTap: compound ? null : () => navigate('${links.first['route']}'),
         child: Column(
           children: [
+            if (!compound)
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  12,
+                  12,
+                  data['columns'] == 6 ? 8 : 4,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        label(links.first),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: data['columns'] == 6
+                            ? Theme.of(context).textTheme.titleLarge
+                            : Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                    if (data['columns'] == 6)
+                      Container(
+                        width: 32,
+                        height: 32,
+                        margin: const EdgeInsets.only(left: 8),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: colors.secondaryContainer,
+                        ),
+                        child: Icon(
+                          Symbols.arrow_forward_rounded,
+                          size: 20,
+                          color: colors.onSecondaryContainer,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             Expanded(
               child: ExcludeSemantics(
                 child: _HubArt(data: data, icon: icon),
@@ -220,28 +258,6 @@ class _MosaicTile extends StatelessWidget {
                         icon: Icon(item(link)?.icon ?? icon, size: 20),
                         label: Text(label(link)),
                       ),
-                  ],
-                ),
-              )
-            else
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        label(links.first),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: (data['columns'] == 6
-                            ? (MediaQuery.sizeOf(context).width <= 700
-                                  ? Theme.of(context).textTheme.titleLarge
-                                  : Theme.of(context).textTheme.headlineSmall)
-                            : Theme.of(context).textTheme.titleMedium),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(Symbols.arrow_forward_rounded, size: 22),
                   ],
                 ),
               ),

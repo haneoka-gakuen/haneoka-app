@@ -212,8 +212,18 @@ class _ProgressionScreenState extends State<ProgressionScreen> {
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
-                dataRowMinHeight: 64,
-                dataRowMaxHeight: 64,
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                clipBehavior: Clip.antiAlias,
+                headingRowColor: WidgetStatePropertyAll(
+                  Theme.of(context).colorScheme.surfaceContainerHigh,
+                ),
+                dataRowMinHeight: 56,
+                dataRowMaxHeight: 56,
                 columns: [
                   for (final key in headings)
                     DataColumn(label: Text(label(key)), numeric: true),

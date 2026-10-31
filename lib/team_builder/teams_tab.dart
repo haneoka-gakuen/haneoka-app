@@ -663,7 +663,7 @@ class _TeamsTabState extends State<TeamsTab> {
               value: s.manualScoreMode,
               options: [
                 Choice('score', c.tb('goalScore', 'Live score')),
-                Choice('gekiso', c.tb('goalGekiso', 'Gekiso score')),
+                Choice('gekiso', c.tb('goalGekiso', 'GEKISO score')),
               ],
               onSelected: (value) =>
                   c.updateSettings({'manualScoreMode': value}),

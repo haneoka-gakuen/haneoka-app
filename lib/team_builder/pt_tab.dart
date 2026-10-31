@@ -99,7 +99,7 @@ class _PtTabState extends State<PtTab> {
                 items: [
                   for (final (value, label) in [
                     ('solo', t('solo', 'Solo')),
-                    ('gekiso', t('gekiso', 'Gekiso')),
+                    ('gekiso', t('gekiso', 'GEKISO')),
                     ('challenge', c.tb('routeChallenge', 'Challenge live')),
                     ('skip', c.tb('routeSkip', 'Skip')),
                   ])
@@ -521,7 +521,7 @@ class _PtTabState extends State<PtTab> {
       'tables': t('eventTables', 'Event consumption tables'),
       'consumption': c.tb('boosts', 'Boosts per live'),
       'challenge-consumption': t('challengeCost', 'CP per challenge'),
-      'gekiso-input': t('gekiso', 'Gekisou'),
+      'gekiso-input': t('gekiso', 'GEKISO'),
       'minBonus': c.tb('minBonus', 'Minimum event bonus (%)'),
       'member': c.tb('members', 'Members'),
       'snap': c.tb('snapshots', 'Snapshots'),
@@ -540,7 +540,7 @@ class _PtTabState extends State<PtTab> {
       'awake': c.tb('training', 'Training'),
       'rank': c.tb('awakening', 'Awakening'),
       'liveSkillLevel': c.tb('liveSkill', 'Live skill'),
-      'gekisoSkillLevel': c.tb('gekisoSkill', 'Gekisou skill'),
+      'gekisoSkillLevel': c.tb('gekisoSkill', 'GEKISO skill'),
       'cr': c.tb('characterRanks', 'Character ranks'),
       'bi': c.tb('bandItems', 'Band items'),
     };

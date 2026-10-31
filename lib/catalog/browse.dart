@@ -565,7 +565,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
     if (widget.rail != null && !side)
       SliverToBoxAdapter(
         child: SizedBox(
-          height: 102,
+          height: 108,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),

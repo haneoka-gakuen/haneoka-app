@@ -250,7 +250,7 @@ String? exclusiveServer(Map row) {
   ),
   'intl' => (
     'assets/settings/bilibili-circle.svg',
-    text('catalog.availability.catalogInternationalOnly', 'International only'),
+    text('catalog.availability.catalogInternationalOnly', 'Global only'),
   ),
   _ => null,
 };

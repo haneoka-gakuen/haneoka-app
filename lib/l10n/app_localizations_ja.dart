@@ -273,7 +273,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get sec_offlineBonus => 'オフラインボーナス';
 
   @override
-  String get sec_arena => 'アリーナ';
+  String get sec_arena => '撃奏アリーナ';
 
   @override
   String get playerRank => 'プレイヤーランク';
@@ -432,10 +432,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get cleared => 'クリア';
 
   @override
-  String get fullCombo => 'フルコンボ';
+  String get fullCombo => 'FULL COMBO';
 
   @override
-  String get allPerfect => 'オールパーフェクト';
+  String get allPerfect => 'ALL PERFECT';
 
   @override
   String ofSongs(String total) {

@@ -206,7 +206,7 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
       (
         _Tab.comparison,
         Symbols.music_note_rounded,
-        c.tb('sc.tab', 'Gekiso songs'),
+        c.tb('sc.tab', 'GEKISO songs'),
         null,
       ),
       (

@@ -191,7 +191,7 @@ class _SongChartAnalysisState extends State<SongChartAnalysis> {
     final gekisou = widget.rates?.gekisou;
     return DetailSection(
       icon: Symbols.trending_up_rounded,
-      title: _text('sections', 'Gekisou sections'),
+      title: _text('sections', 'GEKISO sections'),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
@@ -351,7 +351,7 @@ class _SongChartAnalysisState extends State<SongChartAnalysis> {
                 _gekisou ? 1 : 0,
                 (v) => setState(() => _gekisou = v == 1),
                 label: (v) => v == 1
-                    ? _text('gekisouLive', 'Gekisou Live')
+                    ? _text('gekisouLive', 'GEKISO Live')
                     : _text('freeLive', 'Free Live'),
               ),
             ),

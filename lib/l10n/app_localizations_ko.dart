@@ -139,7 +139,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get highScoreRating => '하이스코어 레이팅';
 
   @override
-  String get clears => '클리어 악곡';
+  String get clears => '클리어 곡';
 
   @override
   String get exportTeam => '팀 빌더용 복사';
@@ -183,13 +183,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get sec_items => '아이템';
 
   @override
-  String get sec_songs => '악곡 기록';
+  String get sec_songs => '곡 기록';
 
   @override
   String get sec_ratings => '레이팅 대상곡';
 
   @override
-  String get sec_challengeSongs => '챌린지 악곡';
+  String get sec_challengeSongs => '챌린지 곡';
 
   @override
   String get sec_events => '이벤트';
@@ -198,7 +198,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get sec_challengeLives => '챌린지 라이브';
 
   @override
-  String get sec_gacha => '가챠';
+  String get sec_gacha => '뽑기';
 
   @override
   String get sec_stories => '읽은 스토리';
@@ -222,7 +222,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get sec_monthlyPass => '먼슬리 패스';
 
   @override
-  String get sec_loginBonuses => '로그인 보너스';
+  String get sec_loginBonuses => '로그인 보상';
 
   @override
   String get sec_costumes => '의상';
@@ -273,16 +273,16 @@ class AppLocalizationsKo extends AppLocalizations {
   String get sec_offlineBonus => '오프라인 보너스';
 
   @override
-  String get sec_arena => '아레나';
+  String get sec_arena => '격주 아레나';
 
   @override
   String get playerRank => '플레이어 랭크';
 
   @override
-  String get sec_songUnlocks => '악곡 해금';
+  String get sec_songUnlocks => '곡 해제';
 
   @override
-  String get sec_challengeUnlocks => '챌린지 악곡 해금';
+  String get sec_challengeUnlocks => '챌린지 곡 해제';
 
   @override
   String get sec_friendshipRewards => '인연 보상';
@@ -434,10 +434,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get cleared => '클리어';
 
   @override
-  String get fullCombo => '풀 콤보';
+  String get fullCombo => 'FULL COMBO';
 
   @override
-  String get allPerfect => '올 퍼펙트';
+  String get allPerfect => 'ALL PERFECT';
 
   @override
   String ofSongs(String total) {

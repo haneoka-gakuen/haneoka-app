@@ -224,7 +224,7 @@ class GekisouStages extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${t.label('gekisouSegment', 'Gekisou stage')} ${index + 1}',
+                      '${t.label('gekisouSegment', 'GEKISO stage')} ${index + 1}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.labelSmall?.copyWith(
@@ -245,7 +245,7 @@ class GekisouStages extends StatelessWidget {
     if (cells.isEmpty) return const SizedBox.shrink();
     return DetailSection(
       icon: Symbols.bolt_rounded,
-      title: t.label('gekisouStages', 'Gekisou stages'),
+      title: t.label('gekisouStages', 'GEKISO stages'),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -606,7 +606,7 @@ class SongSkillPoints extends StatelessWidget {
         final notesLabel = t('catalog.analysis.fields.n', 'Notes');
         final stage = t(
           'catalog.analysis.fields.gekisouSegment',
-          'Gekisou stage',
+          'GEKISO stage',
         );
         return DetailSection(
           icon: Symbols.bolt_rounded,

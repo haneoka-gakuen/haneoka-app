@@ -486,7 +486,7 @@ class _SongMetaScreenState extends State<SongMetaScreen> {
                 ),
                 BarChoice(
                   icon: Symbols.bolt_rounded,
-                  label: label('metaModeGekisou', 'Gekisou'),
+                  label: label('metaModeGekisou', 'GEKISO'),
                   selected: _gekisou,
                   onSelected: () => setState(() {
                     _gekisou = true;

@@ -351,11 +351,11 @@ class CardFilterPanel extends StatelessWidget {
                 ? const [
                     ('leader', 'Leader skill'),
                     ('live', 'Live skill'),
-                    ('gekiso', 'Gekiso skill'),
+                    ('gekiso', 'GEKISO skill'),
                   ]
                 : const [
                     ('support', 'Support skill'),
-                    ('gekisouSupport', 'Gekiso support skill'),
+                    ('gekisouSupport', 'GEKISO support skill'),
                   ])) ...[
           const SizedBox(height: 12),
           ToolField(

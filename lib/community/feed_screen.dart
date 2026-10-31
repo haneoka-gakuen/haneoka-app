@@ -525,15 +525,30 @@ class _SignInPrompt extends StatelessWidget {
   final VoidCallback onSignIn;
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(48),
-    child: Center(
-      child: FilledButton.icon(
-        onPressed: onSignIn,
-        icon: const Icon(Symbols.login_rounded),
-        label: Text(
-          AppScope.of(context).text('account.page.signIn', 'Sign in'),
+    padding: const EdgeInsets.all(24),
+    child: Column(
+      spacing: 16,
+      children: [
+        const CircleAvatar(
+          radius: 24,
+          child: Icon(Symbols.account_circle_rounded),
         ),
-      ),
+        Text(
+          communityLabel(
+            context,
+            'signInToViewPersonal',
+            'Sign in to see your posts, bookmarks and notifications',
+          ),
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        FilledButton(
+          onPressed: onSignIn,
+          child: Text(
+            AppScope.of(context).text('account.page.signIn', 'Sign in'),
+          ),
+        ),
+      ],
     ),
   );
 }

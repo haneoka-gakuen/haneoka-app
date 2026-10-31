@@ -24,7 +24,7 @@ const _goals = [
 
 String goalText(TeamBuilderController c, GoalKind goal) => switch (goal) {
   GoalKind.score => c.tb('goalScore', 'Live score'),
-  GoalKind.gekiso => c.tb('goalGekiso', 'Gekiso score'),
+  GoalKind.gekiso => c.tb('goalGekiso', 'GEKISO score'),
   GoalKind.event => c.tb('goalEvent', 'Event rewards'),
   GoalKind.plan => c.tb('goalPlan', 'Event resource plan'),
   GoalKind.power => c.tb('goalPower', 'Highest power'),

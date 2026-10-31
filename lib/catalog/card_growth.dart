@@ -420,7 +420,7 @@ class _CardGrowthViewState extends State<CardGrowthView> {
             onChanged: (v) => setState(() => _live = v),
           ),
           LevelSwitch(
-            label: t.label('gekisouSkill', 'Gekisou Skill'),
+            label: t.label('gekisouSkill', 'GEKISO Skill'),
             levels: gekisous,
             value: gekisou,
             onChanged: (v) => setState(() => _gekisou = v),

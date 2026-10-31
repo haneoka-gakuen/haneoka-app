@@ -350,7 +350,7 @@ class _HomeScreenState extends State<HomeScreen> {
     'birthdays' => t('home.dashboard.birthdaysTitle', 'Birthday countdown'),
     'community' => t('home.dashboard.communityTitle', 'Trending community'),
     'fanInfo' => 'bandori.fans',
-    _ => t('catalog.arena.title', 'Gekiso Arena'),
+    _ => t('catalog.arena.title', 'GEKISO Arena'),
   };
 
   /// Module order and visibility (`home-layout-dialog`).
@@ -577,7 +577,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (season == null) {
       return _Module(
         icon: Symbols.emoji_events_rounded,
-        title: t('catalog.arena.title', 'Gekiso Arena'),
+        title: t('catalog.arena.title', 'GEKISO Arena'),
         child: Center(child: Text(t('common.states.unavailable'))),
       );
     }
@@ -622,9 +622,11 @@ class _HomeScreenState extends State<HomeScreen> {
         spacing: 3,
         children: [
           mark(visuals.musicTypeMark(value?['musicType']), size),
-          if (compact)
-            for (final id in ids) mark(missions['$id'], size)
-          else
+          if (compact) ...[
+            for (final id in ids)
+              if (missions['$id'] case final Object source)
+                GameGlyph(api.asset('$source').toString(), size: size),
+          ] else
             Flexible(
               child: Text(
                 same
@@ -642,7 +644,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final leagues = dataRows(season['leagues']);
     return _Module(
       icon: Symbols.emoji_events_rounded,
-      title: t('catalog.arena.title', 'Gekiso Arena'),
+      title: t('catalog.arena.title', 'GEKISO Arena'),
       viewAll: t('home.dashboard.viewAll', 'View all'),
       onViewAll: open,
       framed: true,
