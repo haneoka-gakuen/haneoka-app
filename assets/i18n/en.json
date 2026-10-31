@@ -5896,7 +5896,7 @@
       "chooseDevice": "Choose device / wireless pairing",
       "iosDirectTitle": "Import from this device",
       "iosDirectSummary": "Reads Our Notes Documents directly when this installation already has container access.",
-      "iosDirectSteps": "Use the dedicated TrollStore build on a supported device, or an already-authorized jailbreak installation. Tap Read save. Haneoka reads the matching game containers and keeps the game files intact.",
+      "iosDirectSteps": "Tap Read save to find the game save on this device. The game files stay as they are.",
       "iosDirectAvailable": "Container access available",
       "iosDirectRestricted": "This installation cannot read another app’s private files. Export the Our Notes saves or backup on a computer, then import the exported files.",
       "adbFailed": "Could not read devices. Check debugging authorization and reconnect.",

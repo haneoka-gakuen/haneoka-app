@@ -5896,7 +5896,7 @@
       "chooseDevice": "選擇裝置／無線配對",
       "iosDirectTitle": "從本機直接匯入",
       "iosDirectSummary": "在此安裝已具備應用程式容器存取權限時，直接讀取 Our Notes 的 Documents。",
-      "iosDirectSteps": "在相容裝置使用專用 TrollStore 版本，或已授予容器存取權限的越獄安裝。點選「讀取存檔」，自動尋找對應遊戲的存檔；遊戲檔案保持原樣。",
+      "iosDirectSteps": "點擊「讀取存檔」，自動尋找這台裝置上的遊戲存檔；遊戲檔案保持原樣。",
       "iosDirectAvailable": "已具備應用程式容器存取權限",
       "iosDirectRestricted": "此安裝無法讀取其他 App 的私有檔案。請先透過電腦匯出 Our Notes 存檔或備份，再匯入匯出的檔案。",
       "adbFailed": "無法讀取裝置，請檢查偵錯授權或重新連接。",

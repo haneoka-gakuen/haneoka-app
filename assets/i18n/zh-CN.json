@@ -5896,7 +5896,7 @@
       "chooseDevice": "选择设备／无线配对",
       "iosDirectTitle": "从本机直接导入",
       "iosDirectSummary": "在此安装已经有应用容器访问权限时，直接读取 Our Notes 的 Documents。",
-      "iosDirectSteps": "在兼容设备上使用专用 TrollStore 版本，或已经授予容器访问权限的越狱安装。点击“读取存档”，自动查找对应游戏的存档；游戏文件保持原样。",
+      "iosDirectSteps": "点击“读取存档”，自动查找这台设备上的游戏存档；游戏文件保持原样。",
       "iosDirectAvailable": "已具备应用容器访问权限",
       "iosDirectRestricted": "该安装无法读取其他应用的私有文件。请先通过电脑导出 Our Notes 存档或备份，再导入导出的文件。",
       "adbFailed": "无法读取设备，请检查调试授权或重新连接。",

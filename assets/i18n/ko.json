@@ -5896,7 +5896,7 @@
       "chooseDevice": "기기 선택 / 무선 페어링",
       "iosDirectTitle": "이 기기에서 직접 가져오기",
       "iosDirectSummary": "앱 컨테이너 접근 권한이 있는 설치에서 Our Notes Documents를 직접 읽습니다.",
-      "iosDirectSteps": "지원 기기에서 전용 TrollStore 빌드 또는 컨테이너 접근이 허용된 탈옥 설치를 사용하세요. 세이브 읽기를 누르면 게임을 자동으로 찾습니다. 게임 파일은 유지됩니다.",
+      "iosDirectSteps": "저장 데이터 읽기를 누르면 이 기기에서 게임 저장 데이터를 찾습니다. 게임 파일은 그대로 유지됩니다.",
       "iosDirectAvailable": "앱 컨테이너 접근 가능",
       "iosDirectRestricted": "이 설치에서는 다른 앱의 비공개 파일을 읽을 수 없습니다. 컴퓨터에서 Our Notes 저장 데이터나 백업을 내보낸 후 내보낸 파일을 가져오세요.",
       "adbFailed": "기기를 읽지 못했습니다. 디버깅 승인을 확인하고 다시 연결하세요.",

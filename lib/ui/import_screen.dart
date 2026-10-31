@@ -1,4 +1,5 @@
 import '../core/site_date.dart';
+
 import 'dart:async';
 import 'dart:io';
 
@@ -501,44 +502,6 @@ class _ImportScreenState extends State<ImportScreen> {
       ],
       if (Platform.isIOS)
         _Method(
-          icon: Symbols.phone_iphone_rounded,
-          title: AppScope.of(context)
-              .text('app.import.iosDirectTitle', 'Import from this device'),
-          summary: AppScope.of(context).text(
-            'app.import.iosDirectSummary',
-            'Reads Our Notes Documents directly when this installation already has container access.',
-          ),
-          steps: AppScope.of(context).text(
-            'app.import.iosDirectSteps',
-            'Use the dedicated TrollStore build on a supported device, or an already-authorized jailbreak installation. Tap Read save. Haneoka reads the matching game containers and does not modify the game.',
-          ),
-          status: _iosAccess == IosDirectAccess.available
-              ? AppScope.of(context).text(
-                  'app.import.iosDirectAvailable',
-                  'Container access available',
-                )
-              : AppScope.of(context).text(
-                  'app.import.iosDirectRestricted',
-                  'This installation cannot read another app’s private files. Export the Our Notes saves or backup on a computer, then import the exported files.',
-                ),
-          actions: [
-            FilledButton.icon(
-              onPressed: _busy ? null : () => _run(IosDirectSaveSource.read),
-              icon: const Icon(Symbols.download_rounded),
-              label: Text(t.readSave),
-            ),
-            TextButton.icon(
-              onPressed: () => launchUrl(
-                Uri.parse('https://github.com/opa334/TrollStore'),
-                mode: LaunchMode.externalApplication,
-              ),
-              icon: const Icon(Symbols.open_in_new_rounded),
-              label: const Text('TrollStore'),
-            ),
-          ],
-        ),
-      if (Platform.isIOS)
-        _Method(
           icon: Symbols.folder_special_rounded,
           title: AppScope.of(
             context,
@@ -547,11 +510,22 @@ class _ImportScreenState extends State<ImportScreen> {
             'app.import.advancedSummary',
             'Export the game account folder using a compatible file manager.',
           ),
-          steps: AppScope.of(context).text(
-            'app.import.advancedSteps',
-            'In Filza or Apps Manager, find Our Notes by its bundle ID, open its data container, and copy Documents/<account> to a ZIP in Files. Then choose that ZIP below or share it to Haneoka. For SFTP, copy the same folder to your computer. Check each tool’s supported device and iOS versions on its official page.',
-          ),
+          steps: _iosAccess == IosDirectAccess.available
+              ? AppScope.of(context).text(
+                  'app.import.iosDirectSteps',
+                  'Tap Read save to find the game save on this device. The game files stay as they are.',
+                )
+              : AppScope.of(context).text(
+                  'app.import.advancedSteps',
+                  'In Filza or Apps Manager, find Our Notes by its bundle ID, open its data container, and copy Documents/<account> to a ZIP in Files. Then choose that ZIP below or share it to Haneoka. For SFTP, copy the same folder to your computer. Check each tool’s supported device and iOS versions on its official page.',
+                ),
           actions: [
+            if (_iosAccess == IosDirectAccess.available)
+              FilledButton.icon(
+                onPressed: _busy ? null : () => _run(IosDirectSaveSource.read),
+                icon: const Icon(Symbols.download_rounded),
+                label: Text(t.readSave),
+              ),
             for (final (title, url) in const [
               ('TrollStore', 'https://github.com/opa334/TrollStore'),
               ('Filza', 'https://www.tigisoftware.com/default/?p=439'),
@@ -1069,10 +1043,7 @@ class AccountCard extends StatelessWidget {
                       ],
                     ),
                     Text(
-                      [
-                        ?save.regionName,
-                        'ID ${save.profileId}',
-                      ].join(' · '),
+                      [?save.regionName, 'ID ${save.profileId}'].join(' · '),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
