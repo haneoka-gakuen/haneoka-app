@@ -300,6 +300,7 @@ Future<LocalReference> _loadReference(String server) async {
       final (sheet, entry) = sheets[name]!;
       final tile = (entry['tile'] as List).cast<int>();
       return referenceKind(
+        name,
         sheet,
         tile[0],
         tile[1],

@@ -23,11 +23,15 @@ class Mask {
 
 class ReferenceKind {
   const ReferenceKind(
+    this.kind,
     this.tileWidth,
     this.tileHeight,
     this.cardIds,
     this.vectors,
   );
+
+  /// `members` or `snapshots`.
+  final String kind;
   final int tileWidth, tileHeight;
   final List<int> cardIds;
   final List<Float32List> vectors;
@@ -61,7 +65,19 @@ class RecognizedCell {
 const _workingSide = 2048;
 const _acceptScore = 0.6;
 const _acceptMargin = 0.06;
-const _maskTop = 0.12, _maskBottom = 0.89, _maskLeft = 0.09, _maskRight = 0.9;
+
+/// Art inside a cell that no badge, mark or Lv label covers:
+/// top, bottom, left, right.
+const _masks = {
+  'members': (0.18, 0.8, 0.1, 0.72),
+  'snapshots': (0.22, 0.74, 0.1, 0.84),
+};
+
+/// Cell width ÷ height, frame included, as the card lists draw them.
+const _aspects = {'members': (0.74, 0.86), 'snapshots': (1.68, 1.96)};
+
+/// Cells narrower than this have their Lv digits read enlarged.
+const _levelCellWidth = {'members': 200, 'snapshots': 280};
 
 class _Weights {
   _Weights(this.index, this.weight);
@@ -131,11 +147,11 @@ Float32List sampleRegion(
 }
 
 /// Zero-mean, unit-length colour vector over the identity mask.
-Float32List tileVector(Float32List rgb, int width, int height) {
-  final top = (height * _maskTop).round(),
-      bottom = (height * _maskBottom).round();
-  final left = (width * _maskLeft).round(),
-      right = (width * _maskRight).round();
+Float32List tileVector(Float32List rgb, int width, int height, String kind) {
+  final (maskTop, maskBottom, maskLeft, maskRight) = _masks[kind]!;
+  final top = (height * maskTop).round(),
+      bottom = (height * maskBottom).round();
+  final left = (width * maskLeft).round(), right = (width * maskRight).round();
   final out = Float32List((bottom - top) * (right - left) * 3);
   final mean = [0.0, 0.0, 0.0];
   var n = 0;
@@ -177,15 +193,20 @@ double _dot(Float32List a, Float32List b) {
   final tw = reference.tileWidth, th = reference.tileHeight;
   final x = bbox[0].toDouble(), y = bbox[1].toDouble();
   final w = bbox[2].toDouble(), h = bbox[3].toDouble();
-  final base = tileVector(sampleRegion(image, x, y, w, h, tw, th), tw, th);
+  final base = tileVector(
+    sampleRegion(image, x, y, w, h, tw, th),
+    tw,
+    th,
+    reference.kind,
+  );
   final coarse = [
     for (var i = 0; i < reference.vectors.length; i++)
       (index: i, score: _dot(base, reference.vectors[i])),
   ]..sort((a, b) => b.score.compareTo(a.score));
   final shifted = <Float32List>[];
-  for (final scale in const [0.96, 1.0, 1.04]) {
-    for (final dy in const [-0.03, -0.015, 0.0, 0.015, 0.03]) {
-      for (final dx in const [-0.03, -0.015, 0.0, 0.015, 0.03]) {
+  for (final scale in const [0.94, 0.97, 1.0, 1.03, 1.06]) {
+    for (final dy in const [-0.04, -0.02, 0.0, 0.02, 0.04]) {
+      for (final dx in const [-0.04, -0.02, 0.0, 0.02, 0.04]) {
         final sw = w * scale, sh = h * scale;
         final sx = x + (w - sw) / 2 + dx * w, sy = y + (h - sh) / 2 + dy * h;
         if (sx < 0 ||
@@ -195,7 +216,12 @@ double _dot(Float32List a, Float32List b) {
           continue;
         }
         shifted.add(
-          tileVector(sampleRegion(image, sx, sy, sw, sh, tw, th), tw, th),
+          tileVector(
+            sampleRegion(image, sx, sy, sw, sh, tw, th),
+            tw,
+            th,
+            reference.kind,
+          ),
         );
       }
     }
@@ -406,14 +432,6 @@ double _enclosedRatio(Int32List labels, int W, _Component c) {
   return (c.w * c.h - outside) / (c.w * c.h);
 }
 
-double _iou(List<int> a, List<int> b) {
-  final x = math.max(a[0], b[0]), y = math.max(a[1], b[1]);
-  final r = math.min(a[0] + a[2], b[0] + b[2]),
-      d = math.min(a[1] + a[3], b[1] + b[3]);
-  final v = math.max(0, r - x) * math.max(0, d - y);
-  return v / (a[2] * a[3] + b[2] * b[3] - v + 1e-8);
-}
-
 double _median(Iterable<num> values) {
   final sorted = [for (final v in values) v.toDouble()]..sort();
   final mid = sorted.length >> 1;
@@ -440,22 +458,31 @@ double _median(Iterable<num> values) {
 
 typedef CellProposal = ({String kind, List<int> bbox});
 
-/// Card cell proposals from closed edge outlines, regularised into the member grid.
+Float32List _gray(Raster image) {
+  final g = Float32List(image.width * image.height);
+  for (var i = 0, p = 0; i < g.length; i++, p += 4) {
+    g[i] =
+        0.299 * image.data[p] +
+        0.587 * image.data[p + 1] +
+        0.114 * image.data[p + 2];
+  }
+  return g;
+}
+
+/// Card cell proposals. Columns come from width-consistent closed outlines;
+/// rows are the textured runs inside those columns, since outlines merge rows
+/// wherever a badge crosses a border. The cell shape gives the card kind.
 List<CellProposal> grid(Raster image) {
   final W = image.width, H = image.height;
+  final g = _gray(image);
   final edge = canny(image, 50, 120);
   final closed = _morph(_morph(edge, W, H, 1, true), W, H, 1, false);
-  final candidates = <CellProposal>[];
+  final seeds = <List<int>>[];
   void consider(Int32List labels, _Component c) {
-    if (math.min(c.w, c.h) < 32 || c.w > W * 0.4 || c.h > H * 0.7) return;
+    if (math.min(c.w, c.h) < 32 || c.w > W * 0.4 || c.h > H * 0.9) return;
     final ratio = c.w / c.h;
-    final kind = ratio > 0.68 && ratio < 0.85
-        ? 'members'
-        : ratio > 1.65 && ratio < 1.95
-        ? 'snapshots'
-        : null;
-    if (kind != null && _enclosedRatio(labels, W, c) > 0.82) {
-      candidates.add((kind: kind, bbox: [c.x, c.y, c.w, c.h]));
+    if (ratio > 0.6 && ratio < 2.2 && _enclosedRatio(labels, W, c) > 0.82) {
+      seeds.add([c.x, c.y, c.w, c.h]);
     }
   }
 
@@ -469,117 +496,186 @@ List<CellProposal> grid(Raster image) {
       consider(holes.labels, c);
     }
   }
-  candidates.sort(
-    (a, b) => (b.bbox[2] * b.bbox[3]).compareTo(a.bbox[2] * a.bbox[3]),
-  );
-  final kept = <CellProposal>[];
-  for (final box in candidates) {
-    if (!kept.any((other) => _iou(box.bbox, other.bbox) > 0.7)) kept.add(box);
-  }
-  if (kept.isEmpty) return const [];
-  final groups = <List<CellProposal>>[];
-  for (final box in kept) {
-    final group = groups.where(
-      (g) =>
-          g.first.kind == box.kind &&
-          (g.first.bbox[2] - box.bbox[2]).abs() < box.bbox[2] * 0.15 &&
-          (g.first.bbox[3] - box.bbox[3]).abs() < box.bbox[3] * 0.15,
-    );
-    if (group.isNotEmpty) {
-      group.first.add(box);
-    } else {
-      groups.add([box]);
-    }
-  }
-  final dominant = groups.reduce((a, b) => b.length > a.length ? b : a);
-  final kind = dominant.first.kind;
-  var boxes = dominant;
-  if (kind == 'members' && dominant.length >= 3) {
-    final width = _median(dominant.map((b) => b.bbox[2])).truncate();
-    final height = _median(dominant.map((b) => b.bbox[3])).truncate();
-    final xs = {for (final b in dominant) b.bbox[0]}.toList()..sort();
-    final ys = {for (final b in dominant) b.bbox[1]}.toList()..sort();
-    final steps = [
-      for (var i = 1; i < xs.length; i++)
-        if (xs[i] - xs[i - 1] >= width * 0.9 && xs[i] - xs[i - 1] < width * 1.5)
-          xs[i] - xs[i - 1],
-    ];
-    if (steps.isNotEmpty) {
-      final fitX = _fit([for (final b in dominant) b.bbox[0]], _median(steps));
-      final y0 = _median(ys).truncate();
-      final x0 = fitX.origin.round();
-      final columns = ((xs.last - fitX.origin) / fitX.pitch).round() + 1;
-      final right = math.min(
-        W,
-        (fitX.origin + (columns - 1) * fitX.pitch).round() + width,
-      );
-      final profile = Float32List(H);
-      for (var y = 0; y < H; y++) {
-        var sum = 0;
-        for (var x = math.max(0, x0); x < right; x++) {
-          sum += edge[y * W + x];
-        }
-        profile[y] = sum.toDouble();
-      }
-      double smooth(int y) {
-        var sum = 0.0;
-        for (var k = -2; k <= 2; k++) {
-          if (y + k >= 0 && y + k < H) sum += profile[y + k];
-        }
-        return sum / 5;
-      }
 
-      var pitchY = 0, bestScore = -1.0;
-      for (
-        var candidate = (height * 1.02).round();
-        candidate <= (height * 1.35).round();
-        candidate++
-      ) {
-        var score = 0.0;
-        for (var y = y0 % candidate; y <= H - height; y += candidate) {
-          score += smooth(math.min(H - 1, y + height - 1));
-        }
-        if (score > bestScore) {
-          bestScore = score;
-          pitchY = candidate;
-        }
-      }
-      final fitY = _fit([
-        for (final b in dominant) b.bbox[1],
-      ], pitchY.toDouble());
-      final rows = <int>[];
-      for (var row = (-fitY.origin / fitY.pitch).floor(); ; row++) {
-        final y = (fitY.origin + row * fitY.pitch).round();
-        if (y + height > H) break;
-        if (y >= 0) rows.add(y);
-      }
-      if (rows.length > 1) {
-        boxes = [
-          for (final y in rows)
-            for (var column = 0; column < columns; column++)
-              () {
-                final bbox = [
-                  (fitX.origin + column * fitX.pitch).round(),
-                  y,
-                  width,
-                  height,
-                ];
-                final seed = dominant.where((b) => _iou(b.bbox, bbox) > 0.6);
-                return (
-                  kind: kind,
-                  bbox: seed.isEmpty ? bbox : seed.first.bbox,
-                );
-              }(),
-        ].where((b) => b.bbox[0] >= 0 && b.bbox[0] + b.bbox[2] <= W).toList();
-      }
+  // Widest group of seeds sharing a width and a horizontal lattice.
+  ({int width, List<int> xs, List<List<int>> boxes})? best;
+  for (final seed in seeds) {
+    final group = [
+      for (final b in seeds)
+        if ((b[2] - seed[2]).abs() <= seed[2] * 0.05) b,
+    ];
+    final xs = {for (final b in group) b[0]}.toList()..sort();
+    final lattice = [
+      for (final x in xs)
+        if (xs.any((o) {
+          final d = (o - x).abs();
+          return o != x &&
+              d >= seed[2] * 0.95 &&
+              d < seed[2] * 1.5 * math.max(1, (d / (seed[2] * 1.1)).round());
+        }))
+          x,
+    ];
+    if (lattice.length < 2) continue;
+    final width = _median(group.map((b) => b[2])).round();
+    if (best == null ||
+        lattice.length > best.xs.length ||
+        (lattice.length == best.xs.length && width > best.width)) {
+      best = (width: width, xs: lattice, boxes: group);
     }
   }
-  int rowKey(CellProposal b) =>
-      (b.bbox[1] / math.max(1, b.bbox[3] * 0.4)).round();
-  return boxes.toList()..sort((a, b) {
-    final row = rowKey(a).compareTo(rowKey(b));
-    return row != 0 ? row : a.bbox[0].compareTo(b.bbox[0]);
-  });
+  if (best == null) return const [];
+  final width = best.width;
+  final steps = [
+    for (var i = 1; i < best.xs.length; i++) best.xs[i] - best.xs[i - 1],
+  ];
+  final unit = steps.where((d) => d >= width * 0.95).reduce(math.min);
+  final fitX = _fit(
+    best.xs,
+    _median(steps.map((d) => d / math.max(1, (d / unit).round()))),
+  );
+  final yTop = math.max(0, best.boxes.map((b) => b[1]).reduce(math.min));
+  final yBottom = math.min(
+    H,
+    best.boxes.map((b) => b[1] + b[3]).reduce(math.max),
+  );
+  double vertical(int x) {
+    if (x < 1 || x >= W - 1) return 0;
+    var hit = 0;
+    for (var y = yTop; y < yBottom; y++) {
+      if ((g[y * W + x + 1] - g[y * W + x - 1]).abs() > 40) hit++;
+    }
+    return hit / math.max(1, yBottom - yTop);
+  }
+
+  double border(int x) =>
+      math.max(vertical(x - 1), math.max(vertical(x), vertical(x + 1)));
+  double columnStrength(int x) => (border(x) + border(x + width - 1)) / 2;
+  int at(int k) => (fitX.origin + k * fitX.pitch).round();
+  final floor =
+      _median([
+        for (final x in best.xs)
+          columnStrength(at(((x - fitX.origin) / fitX.pitch).round())),
+      ]) *
+      0.5;
+  var first = ((best.xs.first - fitX.origin) / fitX.pitch).round();
+  var last = ((best.xs.last - fitX.origin) / fitX.pitch).round();
+  while (at(first - 1) >= 0 && columnStrength(at(first - 1)) >= floor) {
+    first--;
+  }
+  while (at(last + 1) + width <= W && columnStrength(at(last + 1)) >= floor) {
+    last++;
+  }
+  final columns = [for (var k = first; k <= last; k++) at(k)];
+
+  // Share of each scanline, per column and overall, that crosses a horizontal edge.
+  final profile = Float32List(H);
+  final perColumn = [for (final _ in columns) Float32List(H)];
+  for (var y = 1; y < H - 1; y++) {
+    var total = 0;
+    for (var c = 0; c < columns.length; c++) {
+      var hit = 0;
+      for (var x = columns[c]; x < columns[c] + width; x++) {
+        if ((g[(y + 1) * W + x] - g[(y - 1) * W + x]).abs() > 40) hit++;
+      }
+      perColumn[c][y] = hit / width;
+      total += hit;
+    }
+    profile[y] = total / (columns.length * width);
+  }
+  double at0(Float32List list, int y) => y >= 0 && y < H ? list[y] : 0;
+  double line(int y) => math.max(
+    at0(profile, y - 1),
+    math.max(at0(profile, y), at0(profile, y + 1)),
+  );
+  // Card art is textured; the blurred background between rows is not. A smooth
+  // patch of art blanks one card, a gap between rows blanks every column.
+  double texture(int y) {
+    var textured = 0;
+    for (final column in perColumn) {
+      var sum = 0.0;
+      for (var d = -3; d <= 3; d++) {
+        sum += at0(column, y + d);
+      }
+      if (sum / 7 > 0.01) textured++;
+    }
+    return textured / columns.length;
+  }
+
+  final runs = <(int, int)>[];
+  for (var y = 0, start = -1; y <= H; y++) {
+    final inside = y < H && texture(y) >= 0.3;
+    if (inside && start < 0) start = y;
+    if (!inside && start >= 0) {
+      runs.add((start, y - 1));
+      start = -1;
+    }
+  }
+  // A smooth patch of art also dips; a gap between rows is bounded by borders.
+  double near(int y) => math.max(line(y - 2), math.max(line(y), line(y + 2)));
+  // A card split by a smooth patch rejoins to about one card; two rows never fit.
+  final cap = width / _aspects['members']!.$1 * 1.05;
+  final tallest = math.min(
+    cap,
+    runs
+            .map((r) => (r.$2 - r.$1).toDouble())
+            .where((n) => n <= cap)
+            .fold(0.0, math.max) *
+        1.15,
+  );
+  for (var i = runs.length - 1; i > 0; i--) {
+    if (near(runs[i - 1].$2) < 0.2 &&
+        near(runs[i].$1) < 0.2 &&
+        runs[i].$2 - runs[i - 1].$1 <= tallest) {
+      runs.replaceRange(i - 1, i + 1, [(runs[i - 1].$1, runs[i].$2)]);
+    }
+  }
+  // Nothing hangs below a card, so a run ends at the card's bottom; badges can
+  // rise above the top, so the top is the strongest border near the run start.
+  final cards = [
+    for (final (start, end) in runs)
+      if (end < H - 2 && end - start >= width * 0.4)
+        () {
+          var top = start;
+          for (var y = start; y <= start + (end - start) * 0.2; y++) {
+            if (line(y) > line(top)) top = y;
+          }
+          return (top: top, bottom: end + 1);
+        }(),
+  ];
+  if (cards.isEmpty) return const [];
+  final height = _median(cards.map((c) => c.bottom - c.top)).round();
+  final ratio = width / height;
+  final kind = const ['members', 'snapshots'].where((k) {
+    final (low, high) = _aspects[k]!;
+    return ratio >= low * 0.95 && ratio <= high * 1.05;
+  }).firstOrNull;
+  if (kind == null) return const [];
+  // A run shorter than a card is a row cut by the list's edge or header.
+  return [
+    for (final c in cards)
+      if (c.bottom - c.top >= height * 0.92 && c.bottom - height >= 0)
+        if (() {
+          // A whole card has its top frame one card height above its bottom.
+          var frame = 0.0;
+          for (var d = -4; d <= 4; d++) {
+            frame = math.max(frame, line(c.bottom - height + d));
+          }
+          return frame >= line(c.top) * 0.6;
+        }())
+          for (var column = 0; column < columns.length; column++)
+            if (() {
+              // An empty slot at the end of the list shows only the blurred background.
+              var sum = 0.0;
+              for (var y = c.bottom - height; y < c.bottom; y++) {
+                sum += perColumn[column][y];
+              }
+              return sum / height > 0.01;
+            }())
+              (
+                kind: kind,
+                bbox: [columns[column], c.bottom - height, width, height],
+              ),
+  ];
 }
 
 // Level reader: port of scripts/recognize/levels.py.
@@ -742,7 +838,9 @@ _LevelRead _readOne(
   final (_, l, v) = anchors.reduce((a, b) => b.$1 > a.$1 ? b : a);
   final bottom = l.y + l.h;
   final digits =
-      <({String character, double score, double margin, int x, int w})>[];
+      <
+        ({String character, double score, double margin, int x, int y, int w})
+      >[];
   for (final c in cs) {
     if (c.x < v.x + v.w + 1 ||
         c.h < l.h * 0.8 ||
@@ -757,16 +855,21 @@ _LevelRead _readOne(
     if (digits.isNotEmpty && c.x - digits.last.x - digits.last.w > l.h * 0.75) {
       break;
     }
+    // Digits of one number share their top as well as their baseline.
+    if (digits.isNotEmpty && (c.y - digits.last.y).abs() > 2) break;
     if (digits.isEmpty && c.x - (v.x + v.w) > l.h * 1.35) continue;
     final ranked = [
       for (final character in '0123456789'.split(''))
         (character, _similarity(c.mask, font[character]!)),
     ]..sort((a, b) => b.$2.compareTo(a.$2));
+    // Art next to the label can pass the shape tests; it never resembles a digit.
+    if (digits.isNotEmpty && ranked[0].$2 < 0.45) break;
     digits.add((
       character: ranked[0].$1,
       score: ranked[0].$2,
       margin: ranked[0].$2 - ranked[1].$2,
       x: c.x,
+      y: c.y,
       w: c.w,
     ));
     if (digits.length >= 3) break;
@@ -785,24 +888,57 @@ _LevelRead _readOne(
 }
 
 int? readLevel(Raster image, Map<String, Mask> font, Set<int> allowed) {
-  final variants = [
-    for (final t in const [190, 200, 210]) _readOne(image, font, allowed, t),
-  ];
-  final strong = variants.where((r) => r.value != null);
-  final weak = variants.where(
-    (r) =>
-        r.candidate != null &&
+  // Every read of an allowed level with digit-like evidence votes; one of
+  // them must also be strong, and no other level may draw as many votes.
+  final votes = <int, List<_LevelRead>>{};
+  for (final t in const [180, 190, 200, 210, 220]) {
+    final r = _readOne(image, font, allowed, t);
+    if (r.candidate != null &&
         allowed.contains(r.candidate) &&
         (r.score ?? 0) > 0.45 &&
-        (r.margin ?? 0) > 0.02,
-  );
-  final counts = <int, int>{};
-  for (final r in weak) {
-    counts[r.candidate!] = (counts[r.candidate!] ?? 0) + 1;
+        (r.margin ?? 0) > 0.02) {
+      (votes[r.candidate!] ??= []).add(r);
+    }
   }
-  final valid = strong.where((r) => (counts[r.value!] ?? 0) >= 2).toList();
-  if (valid.isEmpty || counts.length > 1) return null;
-  return valid.reduce((a, b) => b.quality > a.quality ? b : a).value;
+  final ranked = votes.entries.toList()
+    ..sort((a, b) => b.value.length.compareTo(a.value.length));
+  if (ranked.isEmpty) return null;
+  final winner = ranked.first;
+  if (winner.value.length < 2 ||
+      (ranked.length > 1 && ranked[1].value.length >= winner.value.length) ||
+      !winner.value.any((r) => r.value != null)) {
+    return null;
+  }
+  return winner.key;
+}
+
+/// Bilinear enlargement.
+Raster _enlarge(Raster image, int width, int height) {
+  final sx = width / image.width, sy = height / image.height;
+  final data = Uint8List(width * height * 4);
+  for (var y = 0; y < height; y++) {
+    final fy = math.min(
+      image.height - 1.0,
+      math.max(0.0, (y + 0.5) / sy - 0.5),
+    );
+    final y0 = fy.floor(), y1 = math.min(image.height - 1, y0 + 1);
+    final ty = fy - y0;
+    for (var x = 0; x < width; x++) {
+      final fx = math.min(
+        image.width - 1.0,
+        math.max(0.0, (x + 0.5) / sx - 0.5),
+      );
+      final x0 = fx.floor(), x1 = math.min(image.width - 1, x0 + 1);
+      final tx = fx - x0;
+      for (var c = 0; c < 4; c++) {
+        int at(int xx, int yy) => image.data[(yy * image.width + xx) * 4 + c];
+        final top = at(x0, y0) * (1 - tx) + at(x1, y0) * tx;
+        final bottom = at(x0, y1) * (1 - tx) + at(x1, y1) * tx;
+        data[(y * width + x) * 4 + c] = (top * (1 - ty) + bottom * ty).round();
+      }
+    }
+  }
+  return Raster(width, height, data);
 }
 
 Raster downscale(Raster image, int width, int height) {
@@ -827,16 +963,15 @@ Raster downscale(Raster image, int width, int height) {
 
 /// Recognise one screenshot; boxes are in the input raster's coordinates.
 List<RecognizedCell> recognize(Raster input, LocalReference reference) {
-  final scale = math.min(
-    1.0,
-    _workingSide / math.max(input.width, input.height),
-  );
+  // Thresholds are set for a list about this wide, so small screenshots are
+  // enlarged too.
+  final scale = _workingSide / math.max(input.width, input.height);
+  final workingWidth = (input.width * scale).round();
+  final workingHeight = (input.height * scale).round();
   final working = scale < 1
-      ? downscale(
-          input,
-          (input.width * scale).round(),
-          (input.height * scale).round(),
-        )
+      ? downscale(input, workingWidth, workingHeight)
+      : scale > 1
+      ? _enlarge(input, workingWidth, workingHeight)
       : input;
   return [
     for (final proposal in grid(working).take(100))
@@ -851,13 +986,23 @@ List<RecognizedCell> recognize(Raster input, LocalReference reference) {
         int? level;
         final glyphs = reference.glyphs, allowed = reference.allowed;
         if (glyphs != null && allowed != null) {
-          final patch = _crop(
+          var patch = _crop(
             working,
             x,
             y,
             w,
             math.min(working.height - y, h + (h * 0.08).round()),
           );
+          // Small cells leave the Lv digits only a few pixels tall; read them
+          // enlarged.
+          final factor = (_levelCellWidth[proposal.kind]! / w).ceil();
+          if (factor > 1) {
+            patch = _enlarge(
+              patch,
+              patch.width * factor,
+              patch.height * factor,
+            );
+          }
           level = readLevel(patch, glyphs, allowed[proposal.kind]!);
         }
         final left = math.max(0, (x / scale).round()),
@@ -880,12 +1025,13 @@ List<RecognizedCell> recognize(Raster input, LocalReference reference) {
 
 /// Cut a reference sheet into normalised identity vectors.
 ReferenceKind referenceKind(
+  String kind,
   Raster sheet,
   int tileWidth,
   int tileHeight,
   int columns,
   List<int> cardIds,
-) => ReferenceKind(tileWidth, tileHeight, cardIds, [
+) => ReferenceKind(kind, tileWidth, tileHeight, cardIds, [
   for (var i = 0; i < cardIds.length; i++)
     tileVector(
       sampleRegion(
@@ -899,6 +1045,7 @@ ReferenceKind referenceKind(
       ),
       tileWidth,
       tileHeight,
+      kind,
     ),
 ]);
 
