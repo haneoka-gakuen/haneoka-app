@@ -1,3 +1,13 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../account/haneoka_account.dart';
+import '../core/api.dart';
+import '../save/game_save.dart' show gameRegionNames;
+import '../ui/detail.dart';
+import '../ui/tile.dart' show pagePadding;
 import '../core/site_date.dart';
 import '../save/game_save.dart' show regionOfProfile;
 
@@ -9,7 +19,6 @@ import '../core/app_state.dart';
 import '../shell/page.dart';
 import '../ui/app_image.dart';
 import '../ui/card_artwork.dart';
-import '../ui/detail.dart';
 import '../ui/theme.dart';
 import '../ui/tile.dart';
 import 'records.dart';
@@ -28,6 +37,15 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
   late String? _region = widget.region;
   late String? _id = widget.profileId;
   Future<(Map, CardCatalog)>? _data;
+  List<Map> _recent = const [];
+  static const _recentKey = 'haneoka.player-profile.recent.v1';
+  static const _profileRetries = 12;
+
+  @override
+  void initState() {
+    super.initState();
+    _readRecent();
+  }
 
   @override
   void didChangeDependencies() {
@@ -37,15 +55,120 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
     if (_id != null) _data ??= _load();
   }
 
+  /// A first read queues the player, so a pending answer is read again.
+  Future<Object?> _profile(HaneokaApi api, String path) async {
+    for (var attempt = 0; ; attempt++) {
+      try {
+        return await api.live(path);
+      } on HttpException catch (error) {
+        if (attempt >= _profileRetries || !error.message.contains('503')) {
+          rethrow;
+        }
+        await Future<void>.delayed(const Duration(seconds: 5));
+      }
+    }
+  }
+
   Future<(Map, CardCatalog)> _load() async {
     final api = AppScope.of(context).apiFor(_region == 'jp' ? 'jp' : 'intl');
+    final region = _region!, id = _id!;
     final (profile, cards) = await (
-      api.live(
-        '/api/v1/game/records/$_region/players/${Uri.encodeComponent(_id!)}',
+      _profile(
+        api,
+        '/api/v1/game/records/$region/players/${Uri.encodeComponent(id)}',
       ),
       CardCatalog.of(api),
     ).wait;
-    return (profile as Map, cards);
+    _remember(
+      region,
+      id,
+      '${(profile as Map)['profile'] is Map ? (profile['profile'] as Map)['name'] ?? '' : ''}',
+    );
+    return (profile, cards);
+  }
+
+  Future<void> _readRecent() async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = jsonDecode(prefs.getString(_recentKey) ?? '[]');
+    if (mounted && value is List) {
+      setState(() => _recent = value.whereType<Map>().toList());
+    }
+  }
+
+  Future<void> _remember(String region, String id, String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    final next = [
+      {'region': region, 'id': id, 'name': name},
+      ..._recent.where((row) => row['id'] != id || row['region'] != region),
+    ].take(10).toList();
+    await prefs.setString(_recentKey, jsonEncode(next));
+    if (mounted) setState(() => _recent = next);
+  }
+
+  Widget _landing(BuildContext context) {
+    final t = AppScope.of(context).text;
+    final theme = Theme.of(context);
+    Widget group(String title, IconData icon, List<Map> rows) => rows.isEmpty
+        ? const SizedBox.shrink()
+        : DetailSection(
+            icon: icon,
+            title: title,
+            child: Column(
+              children: [
+                for (final row in rows)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      '${row['name'] ?? ''}'.isEmpty
+                          ? '${row['id']}'
+                          : '${row['name']}',
+                    ),
+                    subtitle: Text(
+                      [
+                        ?gameRegionNames[row['region']],
+                        '${row['id']}',
+                      ].join(' · '),
+                    ),
+                    trailing: const Icon(Symbols.chevron_right_rounded),
+                    onTap: () => setState(() {
+                      _region = '${row['region']}';
+                      _id = '${row['id']}';
+                      _data = _load();
+                    }),
+                  ),
+              ],
+            ),
+          );
+    final linked = [
+      for (final player in HaneokaAccount.instance.players)
+        if (regionOfProfile(player.profileId) case final region?)
+          {'region': region, 'id': player.profileId, 'name': player.name},
+    ];
+    return ListView(
+      padding: pagePadding(context),
+      children: [
+        group(
+          t('tools.playerProfile.linked', 'Linked game accounts'),
+          Symbols.link_rounded,
+          linked,
+        ),
+        group(
+          t('tools.playerProfile.recent', 'Recent players'),
+          Symbols.history_rounded,
+          _recent,
+        ),
+        if (linked.isEmpty && _recent.isEmpty)
+          Padding(
+            padding: const EdgeInsets.all(48),
+            child: Center(
+              child: Text(
+                t('tools.playerProfile.queryIdle', 'Enter a player ID'),
+                style: theme.textTheme.titleSmall,
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   void _search(String value) {
@@ -92,26 +215,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
         ),
       ],
       body: _data == null
-          ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: scheme.surfaceContainerHigh,
-                    child: Icon(
-                      Symbols.person_search_rounded,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    t('tools.playerProfile.queryIdle', 'Enter a player ID'),
-                    style: theme.textTheme.titleSmall,
-                  ),
-                ],
-              ),
-            )
+          ? _landing(context)
           : FutureBuilder(
               future: _data,
               builder: (context, snapshot) {

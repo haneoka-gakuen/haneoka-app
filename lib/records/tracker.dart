@@ -34,6 +34,7 @@ class _EventTrackerScreenState extends State<EventTrackerScreen>
     with WidgetsBindingObserver {
   String? _region;
   String? _challenge;
+  String? _board;
   Future<(Map, Map?, Map, CatalogVisuals)>? _data;
   Timer? _clock;
   Timer? _poll;
@@ -237,6 +238,23 @@ class _EventTrackerScreenState extends State<EventTrackerScreen>
               : '';
           final image = info?['image'];
           final padding = pagePadding(context);
+          final boards = <(String, String)>[
+            if (event['totalRankingEnabled'] == true)
+              ('total', t('tools.eventTracker.totalTab', 'Total')),
+            if ((event['challenges'] as List? ?? const []).isNotEmpty)
+              ('challenge', t('tools.eventTracker.challengeTab', 'Songs')),
+            if (event['pointRankingEnabled'] == true)
+              ('points', t('tools.eventTracker.pointTab', 'Points')),
+          ];
+          if (boards.isEmpty) {
+            boards.add((
+              'challenge',
+              t('tools.eventTracker.challengeTab', 'Songs'),
+            ));
+          }
+          final board = boards.any((row) => row.$1 == _board)
+              ? _board!
+              : boards.first.$1;
           void openPlayer(String id) => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) =>
@@ -310,57 +328,77 @@ class _EventTrackerScreenState extends State<EventTrackerScreen>
                     style: theme.textTheme.bodySmall,
                   ),
                 ),
-              const SizedBox(height: 24),
-              DetailSection(
-                icon: Symbols.bar_chart_rounded,
-                title: t(
-                  'tools.eventTracker.challengeRanking',
-                  'Challenge song ranking',
-                ),
-                child: challenges.isEmpty
-                    ? Text(t('tools.eventTracker.noChallenges', ''))
-                    : LayoutBuilder(
-                        builder: (context, constraints) {
-                          final columns = constraints.maxWidth < 600 ? 2 : 4;
-                          final width =
-                              (constraints.maxWidth - 8 * (columns - 1)) /
-                              columns;
-                          return Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              for (final challenge in challenges)
-                                SizedBox(
-                                  width: width,
-                                  child: Builder(
-                                    builder: (context) {
-                                      final song =
-                                          (songs['${challenge['musicId']}']
-                                                  as Map?)
-                                              ?.cast<String, Object?>() ??
-                                          {'musicId': challenge['musicId']};
-                                      final active = challenge == selected;
-                                      return Tile(
-                                        selected: active,
-                                        title: songKit.title(song),
-                                        subtitle: songKit.subtitle(song),
-                                        adornments: songKit.adornments(song),
-                                        images: songKit.images(song),
-                                        marks: songKit.marks(song),
-                                        onTap: () => setState(
-                                          () =>
-                                              _challenge = '${challenge['id']}',
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                            ],
-                          );
-                        },
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 48,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    for (final (key, label) in boards)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          showCheckmark: false,
+                          label: Text(label),
+                          selected: board == key,
+                          onSelected: (_) => setState(() => _board = key),
+                        ),
                       ),
+                  ],
+                ),
               ),
-              if (selected != null)
+              const SizedBox(height: 8),
+              if (board == 'challenge')
+                DetailSection(
+                  icon: Symbols.bar_chart_rounded,
+                  title: t(
+                    'tools.eventTracker.challengeRanking',
+                    'Challenge song ranking',
+                  ),
+                  child: challenges.isEmpty
+                      ? Text(t('tools.eventTracker.noChallenges', ''))
+                      : LayoutBuilder(
+                          builder: (context, constraints) {
+                            final columns = constraints.maxWidth < 600 ? 2 : 4;
+                            final width =
+                                (constraints.maxWidth - 8 * (columns - 1)) /
+                                columns;
+                            return Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (final challenge in challenges)
+                                  SizedBox(
+                                    width: width,
+                                    child: Builder(
+                                      builder: (context) {
+                                        final song =
+                                            (songs['${challenge['musicId']}']
+                                                    as Map?)
+                                                ?.cast<String, Object?>() ??
+                                            {'musicId': challenge['musicId']};
+                                        final active = challenge == selected;
+                                        return Tile(
+                                          selected: active,
+                                          title: songKit.title(song),
+                                          subtitle: songKit.subtitle(song),
+                                          adornments: songKit.adornments(song),
+                                          images: songKit.images(song),
+                                          marks: songKit.marks(song),
+                                          onTap: () => setState(
+                                            () => _challenge =
+                                                '${challenge['id']}',
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
+                        ),
+                ),
+              if (board == 'challenge' && selected != null)
                 RankingList(
                   key: _rankings,
                   region: _region!,
@@ -368,8 +406,7 @@ class _EventTrackerScreenState extends State<EventTrackerScreen>
                       '/api/v1/game/records/$_region/events/${event['id']}/challenges/${selected['id']}/ranking',
                   onPlayer: openPlayer,
                 ),
-              const SizedBox(height: 24),
-              if (event['totalRankingEnabled'] == true) ...[
+              if (board == 'total') ...[
                 DetailSection(
                   icon: Symbols.leaderboard_rounded,
                   title: t('tools.eventTracker.totalRanking'),
@@ -391,8 +428,7 @@ class _EventTrackerScreenState extends State<EventTrackerScreen>
                 ),
                 const SizedBox(height: 24),
               ],
-              if (current['provider'] != 'official' ||
-                  event['pointRankingEnabled'] == true)
+              if (board == 'points')
                 DetailSection(
                   icon: Symbols.leaderboard_rounded,
                   title: t(
