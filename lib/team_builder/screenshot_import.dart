@@ -1,23 +1,24 @@
 /// Screenshot recognition import (`team-builder/recognition-client.ts`,
 /// `screenshot-import.ts`, `screenshot-import-session.ts`,
-/// `screenshot-image.ts`): screenshots are cropped and encoded on the
-/// device, recognized by the website's private job endpoint for the signed-in
-/// account, and each recognized card is reviewed before the box changes.
+/// `screenshot-image.ts`): screenshots are cropped and recognized on the
+/// device against the release's reference sheets, and each recognized card is
+/// reviewed before the box changes.
 /// Screenshots only show cards and levels; other fields stay as they are.
 library;
 
 import 'dart:async';
+import 'dart:isolate';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:crypto/crypto.dart';
-
-import '../account/haneoka_account.dart';
+import '../core/document_cache.dart';
+import '../core/resource_file_cache.dart';
 import 'box.dart';
 import 'box_import.dart';
 import 'engine/master.dart';
 import 'engine/num.dart';
+import 'recognition_kernel.dart';
 
 /// Percent cut from each side, as the website's crop sliders.
 class ScreenshotCrop {
@@ -253,172 +254,98 @@ class ScreenshotResult {
   final List<ScreenshotObservation> observations;
 }
 
-final _uuid = RegExp(
-  r'^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$',
-  caseSensitive: false,
-);
-final _hash = RegExp(r'^[a-f0-9]{64}$');
+final _references = <String, Future<LocalReference>>{};
 
-String uuid4() {
-  final random = math.Random.secure();
-  final bytes = [for (var i = 0; i < 16; i++) random.nextInt(256)];
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  final hex = [for (final b in bytes) b.toRadixString(16).padLeft(2, '0')]
-      .join();
-  return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-'
-      '${hex.substring(16, 20)}-${hex.substring(20)}';
-}
-
-/// The recognition identity: the loaded release the website's recognizer
-/// holds references for.
-typedef RecognitionContext = ({
-  String owner,
-  String server,
-  String releaseId,
-  String sourceId,
-});
-
-/// `createRecognitionClient` over the signed-in account's bearer session.
-class RecognitionClient {
-  RecognitionClient(this.context, [HaneokaAccount? account])
-    : _account = account ?? HaneokaAccount.instance;
-  final RecognitionContext context;
-  final HaneokaAccount _account;
-
-  String _path([String? id]) {
-    final query = Uri(
-      queryParameters: {
-        'server': context.server,
-        'releaseId': context.releaseId,
-        'sourceId': context.sourceId,
-      },
-    ).query;
-    return '/api/v1/team-builder/recognition/jobs${id == null ? '' : '/$id'}?$query';
-  }
-
-  Map<String, String> get _headers => {
-    'X-Haneoka-Expected-User': context.owner,
-  };
-
-  Doc _job(Object? body, String id) {
-    if (!_uuid.hasMatch(id)) throw const ScreenshotError('recognition-job-id');
-    final job = objectRow(objectRow(body)['job']);
-    final jobContext = objectRow(job['context']);
-    if (job['id'] != id ||
-        !const {
-          'queued',
-          'processing',
-          'ready',
-          'failed',
-        }.contains(job['state']) ||
-        jobContext['server'] != context.server ||
-        jobContext['releaseId'] != context.releaseId ||
-        jobContext['sourceId'] != context.sourceId ||
-        !_hash.hasMatch('${jobContext['referenceId']}')) {
-      throw const ScreenshotError('recognition-job-context-mismatch');
-    }
-    return job;
-  }
-
-  Future<Doc> submit(Uint8List png, String id) async => _job(
-    await _account.request(
-      'POST',
-      _path(),
-      bytes: png,
-      headers: {
-        ..._headers,
-        'Content-Type': 'image/png',
-        'Idempotency-Key': id,
-        'X-Image-Sha256': sha256.convert(png).toString(),
-      },
-    ),
-    id,
-  );
-
-  Future<Doc> poll(String id) async =>
-      _job(await _account.request('GET', _path(id), headers: _headers), id);
-
-  Future<void> cancel(String id) async {
-    try {
-      await _account.request('DELETE', _path(id), headers: _headers);
-    } on AccountError catch (error) {
-      if (error.code != 'http_404') rethrow;
-    }
-  }
-}
-
-/// `normalizeRecognitionResult` for a one-image job.
-ScreenshotResult normalizeRecognition(Doc job) {
-  final result = objectRow(job['result']);
-  final context = objectRow(job['context']);
-  final identity = objectRow(result['identity']);
-  final images = result['images'];
-  final observations = result['observations'];
-  if (job['state'] != 'ready' ||
-      result['schema'] != 'haneoka-card-recognition-result-v1' ||
-      ![
-        'server',
-        'releaseId',
-        'sourceId',
-      ].every((key) => identity[key] == context[key]) ||
-      (result['referenceId'] != null &&
-          result['referenceId'] != context['referenceId']) ||
-      images is! List ||
-      images.length != 1 ||
-      observations is! List ||
-      observations.length > 100) {
-    throw const ScreenshotError('recognition-result-context');
-  }
-  final image = objectRow(images.single);
-  final size = image['size'];
-  if (image['coordinateSpace'] != 'exif_normalized_original' ||
-      !_hash.hasMatch('${image['sha256']}') ||
-      size is! List ||
-      size.length != 2 ||
-      size.any((v) => v is! int || v < 128 || v > 4096) ||
-      (size[0] as int) * (size[1] as int) > 8000000) {
-    throw const ScreenshotError('recognition-result-image');
-  }
-  final width = size[0] as int, height = size[1] as int;
-  final rows = <ScreenshotObservation>[];
-  for (final raw in observations) {
-    final row = objectRow(raw);
-    final bbox = row['bbox'];
-    final kind = row['kind'];
-    final fields = objectRow(row['fields']);
-    final level = objectRow(fields['level']);
-    final candidates = row['candidates'];
-    if (row['imageId'] != image['id'] ||
-        (kind != 'members' && kind != 'snapshots') ||
-        bbox is! List ||
-        bbox.length != 4 ||
-        bbox.any((v) => v is! int || v < 0) ||
-        (bbox[2] as int) < 1 ||
-        (bbox[3] as int) < 1 ||
-        (bbox[0] as int) + (bbox[2] as int) > width ||
-        (bbox[1] as int) + (bbox[3] as int) > height ||
-        candidates is! List ||
-        candidates.length > 5) {
-      throw const ScreenshotError('recognition-result-observation');
-    }
-    final value = level['status'] == 'recognized' ? level['value'] : null;
-    rows.add(
-      ScreenshotObservation(
-        bbox: [for (final v in bbox) v as int],
-        members: kind == 'members',
-        cardId: row['cardId'] is int ? row['cardId'] as int : null,
-        candidates: [
-          for (final candidate in candidates)
-            if (objectRow(candidate)['cardId'] is int &&
-                (objectRow(candidate)['cardId'] as int) > 0)
-              objectRow(candidate)['cardId'] as int,
-        ],
-        level: value is int && value >= 1 ? value : null,
-      ),
+/// The release's reference sheets and Lv glyphs for [server], loaded once.
+Future<LocalReference> recognitionReference(String server) =>
+    _references.putIfAbsent(
+      server,
+      () => _loadReference(server).catchError((Object _) {
+        _references.remove(server);
+        throw const ScreenshotError('recognition-reference-unavailable');
+      }),
     );
+
+Future<LocalReference> _loadReference(String server) async {
+  final base = Uri.parse(
+    'https://haneoka.org/runtime/$server/card-recognition/',
+  );
+  Future<Uint8List> read(String name) => resourceFileCache.readBytes(
+    base.resolve(name),
+    kind: ResourceFileKind.renderResource,
+  );
+  final document = objectRow(await decodePublicJson(await read('local.json')));
+  if (document['schema'] != 'haneoka-card-recognition-local-v1') {
+    throw const ScreenshotError('recognition-reference-unavailable');
   }
-  return ScreenshotResult(width, height, image['status'] == 'needs_crop', rows);
+  final kinds = objectRow(document['kinds']);
+  final sheets = <String, (Raster, Doc)>{};
+  for (final kind in const ['members', 'snapshots']) {
+    final entry = objectRow(kinds[kind]);
+    final codec = await ui.instantiateImageCodec(
+      await read('${entry['sheet']}'),
+    );
+    final image = (await codec.getNextFrame()).image;
+    codec.dispose();
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    sheets[kind] = (
+      Raster(image.width, image.height, bytes!.buffer.asUint8List()),
+      entry,
+    );
+    image.dispose();
+  }
+  final reader = document['levelReader'];
+  return Isolate.run(() {
+    ReferenceKind kind(String name) {
+      final (sheet, entry) = sheets[name]!;
+      final tile = (entry['tile'] as List).cast<int>();
+      return referenceKind(
+        sheet,
+        tile[0],
+        tile[1],
+        entry['columns'] as int,
+        (entry['cardIds'] as List).cast<int>(),
+      );
+    }
+
+    final levels = reader is Map ? reader : null;
+    return LocalReference(
+      kind('members'),
+      kind('snapshots'),
+      levels == null
+          ? null
+          : glyphMasks({
+              for (final e in (levels['glyphs'] as Map).entries)
+                '${e.key}': (e.value as List).cast<String>(),
+            }),
+      levels == null
+          ? null
+          : {
+              for (final e in (levels['allowedLevels'] as Map).entries)
+                '${e.key}': (e.value as List).cast<int>().toSet(),
+            },
+    );
+  });
+}
+
+/// Recognizes one prepared screenshot on this device.
+Future<ScreenshotResult> recognizeScreenshot(
+  ui.Image image,
+  LocalReference reference,
+) async {
+  final bytes = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+  final raster = Raster(image.width, image.height, bytes!.buffer.asUint8List());
+  final cells = await Isolate.run(() => recognize(raster, reference));
+  return ScreenshotResult(image.width, image.height, cells.isEmpty, [
+    for (final cell in cells)
+      ScreenshotObservation(
+        bbox: cell.bbox,
+        members: cell.kind == 'members',
+        cardId: cell.cardId,
+        candidates: cell.candidates,
+        level: cell.level,
+      ),
+  ]);
 }
 
 class ScreenshotCard {

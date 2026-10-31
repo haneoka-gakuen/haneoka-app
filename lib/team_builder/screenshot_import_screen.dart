@@ -9,34 +9,17 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
-import '../account/haneoka_account.dart';
 import 'box_import.dart';
 import 'controller.dart';
-import 'engine/num.dart';
 import 'pickers.dart';
 import 'screenshot_import.dart';
 import 'widgets.dart';
 
-/// Opens the dialog, or says why it cannot: recognition runs for a
-/// signed-in account only.
+/// Opens the dialog; recognition runs on this device.
 Future<void> openScreenshotImport(
   BuildContext context,
   TeamBuilderController c,
 ) async {
-  final account = HaneokaAccount.instance;
-  if (!account.signedIn) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          c.tb(
-            'screenshotsNeedSignIn',
-            'Screenshot recognition needs a signed-in account.',
-          ),
-        ),
-      ),
-    );
-    return;
-  }
   await Navigator.of(context).push<void>(
     MaterialPageRoute(
       fullscreenDialog: true,
@@ -45,16 +28,7 @@ Future<void> openScreenshotImport(
   );
 }
 
-enum _Phase {
-  select,
-  preview,
-  preparing,
-  uploading,
-  queued,
-  processing,
-  review,
-  failed,
-}
+enum _Phase { select, preview, preparing, processing, review, failed }
 
 class _ScreenshotImportScreen extends StatefulWidget {
   const _ScreenshotImportScreen({required this.c});
@@ -76,9 +50,7 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
   List<ScreenshotCard> _cards = const [];
   final _choices = <String, ScreenshotChoice>{};
   var _policy = ExistingPolicy.keep;
-  final _jobs = <String>{};
   int _generation = 0;
-  RecognitionClient? _client;
   String _signature = '';
 
   String _t(String key, String fallback) {
@@ -98,7 +70,6 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
   @override
   void dispose() {
     ++_generation;
-    _cancelJobs();
     _clearLocal();
     for (final image in _crops.values) {
       image.dispose();
@@ -111,28 +82,6 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
       local.image.dispose();
     }
     _local.clear();
-  }
-
-  void _cancelJobs() {
-    final client = _client;
-    if (client == null) return;
-    for (final id in _jobs.toList()) {
-      client.cancel(id).then((_) => _jobs.remove(id), onError: (_) {});
-    }
-  }
-
-  RecognitionClient? _recognition() {
-    final identity = objectRow(c.catalog?.data['identity']);
-    final owner = '${HaneokaAccount.instance.user?['id'] ?? ''}';
-    final releaseId = '${identity['releaseId'] ?? ''}';
-    final sourceId = '${identity['sourceId'] ?? ''}';
-    if (owner.isEmpty || releaseId.isEmpty || sourceId.isEmpty) return null;
-    return RecognitionClient((
-      owner: owner,
-      server: c.server,
-      releaseId: releaseId,
-      sourceId: sourceId,
-    ));
   }
 
   Future<void> _pick() async {
@@ -167,19 +116,9 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
     }
   }
 
-  /// `files` of the session: one recognition job at a time, each deleted
-  /// once read.
+  /// `files` of the session: each screenshot is recognized on this device.
   Future<void> _upload() async {
-    final client = _client = _recognition();
-    if (client == null) {
-      setState(() {
-        _phase = _Phase.failed;
-        _error = 'unavailable';
-      });
-      return;
-    }
     final generation = ++_generation;
-    final deadline = DateTime.now().add(const Duration(minutes: 3));
     setState(() {
       _phase = _Phase.preparing;
       _error = null;
@@ -196,44 +135,25 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
         final (prepared, png) = await prepareScreenshot(local);
         try {
           if (!live()) return;
-          final id = uuid4();
-          _jobs.add(id);
-          setState(() => _phase = _Phase.uploading);
-          var job = await client.submit(png, id);
-          while (job['state'] == 'queued' || job['state'] == 'processing') {
-            if (!live()) return;
-            setState(
-              () => _phase = job['state'] == 'queued'
-                  ? _Phase.queued
-                  : _Phase.processing,
-            );
-            if (DateTime.now().isAfter(deadline)) {
-              throw const ScreenshotError('image-timeout');
-            }
-            await Future<void>.delayed(const Duration(seconds: 1));
-            if (!live()) return;
-            job = await client.poll(id);
-          }
-          if (job['state'] != 'ready') {
-            throw ScreenshotError(
-              '${objectRow(job['error'])['code'] ?? 'recognition-failed'}',
-            );
-          }
-          final result = normalizeRecognition(job);
-          if (result.width != prepared.width ||
-              result.height != prepared.height) {
-            throw const ScreenshotError(
-              'recognition-image-coordinate-mismatch',
-            );
-          }
+          setState(() => _phase = _Phase.processing);
+          final result = await recognizeScreenshot(
+            prepared,
+            await recognitionReference(c.server),
+          );
+          if (!live()) return;
           final image = _results.length;
           for (final (index, row) in result.observations.indexed) {
             _crops[(image, index)] = await observationCrop(prepared, row.bbox);
-            _selections[(image, index)] = row.cardId;
+            final master = c.catalog!.master;
+            _selections[(image, index)] =
+                row.cardId != null &&
+                    (row.members ? master.members : master.snaps).containsKey(
+                      row.cardId,
+                    )
+                ? row.cardId
+                : null;
           }
           _results.add(result);
-          await client.cancel(id);
-          _jobs.remove(id);
         } finally {
           prepared.dispose();
         }
@@ -243,14 +163,12 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
       _review();
     } on ScreenshotError catch (error) {
       if (!live()) return;
-      _cancelJobs();
       setState(() {
         _phase = _Phase.failed;
         _error = error.code;
       });
     } catch (_) {
       if (!live()) return;
-      _cancelJobs();
       setState(() {
         _phase = _Phase.failed;
         _error = 'recognition-failed';
@@ -269,8 +187,7 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
     final keep = {for (final card in cards) card.key};
     _choices.removeWhere((key, _) => !keep.contains(key));
     for (final card in cards) {
-      final choice = _choices[card.key];
-      if (choice == null) continue;
+      final choice = _choice(card);
       if (choice.level case ValueChoice(:final value)
           when !(choice.manual
                   ? screenshotLevels(c.catalog!.master, card)
@@ -286,7 +203,9 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
     });
   }
 
-  ScreenshotChoice _choice(String key) => _choices[key] ??= ScreenshotChoice();
+  ScreenshotChoice _choice(ScreenshotCard card) =>
+      _choices[card.key] ??= ScreenshotChoice()
+        ..include = card.observedLevels.length <= 1;
 
   bool get _canConfirm {
     if (!_choices.values.any((choice) => choice.include)) return false;
@@ -360,7 +279,7 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
     if (code.startsWith('image-')) {
       return _t(code, _t('failedMessage', 'Screenshot recognition failed'));
     }
-    if (code == 'unavailable') {
+    if (code == 'unavailable' || code == 'recognition-reference-unavailable') {
       return _t(
         'unavailable',
         'Screenshot recognition is unavailable for the loaded card data.',
@@ -490,7 +409,7 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
   Widget _cardEntry(ScreenshotCard card) {
     final theme = Theme.of(context);
     final catalog = c.catalog!;
-    final choice = _choice(card.key);
+    final choice = _choice(card);
     final (defaultLevel, source) = screenshotLevelDefault(card, _policy);
     final conflict = source == LevelSource.conflict;
     final defaultLabel = switch (source) {
@@ -628,12 +547,7 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final busy = const {
-      _Phase.preparing,
-      _Phase.uploading,
-      _Phase.queued,
-      _Phase.processing,
-    }.contains(_phase);
+    final busy = const {_Phase.preparing, _Phase.processing}.contains(_phase);
     final noGrid =
         _results.isNotEmpty && _results.every((result) => result.noGrid);
     final unmatched = [
@@ -734,7 +648,6 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
       _ when busy => OutlinedButton(
         onPressed: () {
           ++_generation;
-          _cancelJobs();
           setState(() {
             _clearLocal();
             _phase = _Phase.select;
