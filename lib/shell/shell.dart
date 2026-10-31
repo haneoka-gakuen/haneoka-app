@@ -632,7 +632,12 @@ class _DrawerState extends State<_Drawer> {
                   SizedBox(width: widget.modal ? 4 : 12),
                   BrandMark(decoration: AppScope.of(context).shownDecoration),
                   const SizedBox(width: 12),
-                  Text('haneoka', style: theme.textTheme.titleLarge),
+                  Text(
+                    AppScope.of(context).shownSeed == 'season-april-fools'
+                        ? 'hanasakigawa'
+                        : 'haneoka',
+                    style: theme.textTheme.titleLarge,
+                  ),
                 ],
               ),
             ),

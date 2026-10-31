@@ -15,6 +15,7 @@ import 'pickers.dart';
 import 'screenshot_import.dart';
 import 'widgets.dart';
 import 'import_source_tile.dart';
+import 'recognition_kernel.dart' show DetailFields;
 import 'screenshot_video.dart';
 
 /// Opens the dialog; recognition runs on this device.
@@ -183,7 +184,8 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
 
   /// A screen recording: frames every quarter second, each recognized here.
   /// A card counts once it shows in two frames and matches clearly in one;
-  /// its level once two frames read the same value.
+  /// its level once two frames read the same value. A detail screen is one
+  /// card held still, so one frame of it is enough for both.
   Future<void> _pickVideo() async {
     final picked = await FilePicker.pickFiles(type: FileType.video);
     final path = picked.firstOrNull?.path;
@@ -206,7 +208,13 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
     final seen =
         <
           String,
-          ({int frames, double best, Map<int, int> levels, (int, int) at})
+          ({
+            int frames,
+            double best,
+            Map<int, int> levels,
+            (int, int) at,
+            Map<String, Map<int, int>>? fields,
+          })
         >{};
     final frames = <ScreenshotResult>[];
     final crops = <(int, int), ui.Image>{};
@@ -230,7 +238,25 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
             final entry = seen[key];
             final levels = {...?entry?.levels};
             if (row.level case final level?) {
-              levels[level] = (levels[level] ?? 0) + 1;
+              levels[level] =
+                  (levels[level] ?? 0) + (row.detail != null ? 2 : 1);
+            }
+            final fields = row.detail == null && entry?.fields == null
+                ? null
+                : {...?entry?.fields};
+            if (row.detail case final detail?) {
+              for (final (field, value) in [
+                ('cap', detail.cap),
+                ('training', detail.training),
+                ('awakening', detail.awakening),
+                ('liveSkillLevel', detail.liveSkillLevel),
+                ('gekisoSkillLevel', detail.gekisoSkillLevel),
+              ]) {
+                if (value == null) continue;
+                final counts = {...?fields![field]};
+                counts[value] = (counts[value] ?? 0) + 1;
+                fields[field] = counts;
+              }
             }
             final at = entry?.at ?? (frames.length, fresh.length);
             if (entry == null) {
@@ -242,6 +268,7 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
               best: row.score > (entry?.best ?? 0) ? row.score : entry!.best,
               levels: levels,
               at: at,
+              fields: fields,
             );
           }
           if (fresh.isNotEmpty) {
@@ -256,7 +283,8 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
       if (!live()) return;
       final keep = {
         for (final entry in seen.values)
-          if (entry.frames >= 2 && entry.best >= 0.8) entry.at: entry,
+          if ((entry.fields != null || entry.frames >= 2) && entry.best >= 0.8)
+            entry.at: entry,
       };
       for (final (image, result) in frames.indexed) {
         final rows = <ScreenshotObservation>[];
@@ -284,6 +312,7 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
               candidates: row.candidates,
               level: agreed ? ranked.first.key : null,
               score: entry.best,
+              detail: _agreedDetail(entry.fields),
             ),
           );
         }
@@ -662,6 +691,14 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
                           _t('levelUnknown', 'Level not recognized'),
                           style: theme.textTheme.labelSmall,
                         ),
+                      if (card.observedPractice.isNotEmpty)
+                        Text(
+                          [
+                            for (final e in card.observedPractice.entries)
+                              '${_t('practice_${e.key}', e.key)} ${e.value}',
+                          ].join(' · '),
+                          style: theme.textTheme.labelSmall,
+                        ),
                     ],
                   ),
                 ),
@@ -836,4 +873,25 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
             ),
     );
   }
+}
+
+/// Each detail field's most frequent reading across frames.
+DetailFields? _agreedDetail(Map<String, Map<int, int>>? fields) {
+  if (fields == null) return null;
+  int? most(String field) {
+    final ranked = (fields[field] ?? const <int, int>{}).entries.toList()
+      ..sort((a, b) => b.value - a.value);
+    return ranked.isNotEmpty &&
+            (ranked.length < 2 || ranked.first.value > ranked[1].value)
+        ? ranked.first.key
+        : null;
+  }
+
+  return DetailFields(
+    cap: most('cap') ?? 0,
+    training: most('training'),
+    awakening: most('awakening'),
+    liveSkillLevel: most('liveSkillLevel'),
+    gekisoSkillLevel: most('gekisoSkillLevel'),
+  );
 }

@@ -87,7 +87,7 @@ ThemeData haneokaTheme(
         ? Colors.transparent
         : scheme.surfaceContainer,
     appBarTheme: AppBarTheme(
-      backgroundColor: scheme.surfaceContainer,
+      backgroundColor: backdrop ? Colors.transparent : scheme.surfaceContainer,
       surfaceTintColor: Colors.transparent,
       scrolledUnderElevation: 0,
       toolbarHeight: ShellMetrics.topBar,
@@ -112,7 +112,7 @@ ThemeData haneokaTheme(
       ),
     ),
     navigationRailTheme: NavigationRailThemeData(
-      backgroundColor: scheme.surfaceContainer,
+      backgroundColor: backdrop ? Colors.transparent : scheme.surfaceContainer,
       indicatorColor: scheme.secondaryContainer,
       minWidth: ShellMetrics.rail,
     ),

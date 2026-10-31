@@ -17,6 +17,20 @@ class SiteText {
     return SiteText._(locale, jsonDecode(raw) as Map<String, Object?>);
   }
 
+  /// Names joined as `Intl.ListFormat` joins them on the website.
+  String list(Iterable<String> values) {
+    final names = values.where((name) => name.isNotEmpty).toList();
+    if (names.length < 2) return names.firstOrNull ?? '';
+    final head = names.sublist(0, names.length - 1), last = names.last;
+    return switch (locale) {
+      'ja' => names.join('、'),
+      'ko' => '${head.join(', ')} 및 $last',
+      'zh-CN' || 'zh-TW' => '${head.join('、')}和$last',
+      _ when names.length == 2 => '${head.first} and $last',
+      _ => '${head.join(', ')}, and $last',
+    };
+  }
+
   /// A dotted message path, with `{name}` values filled in.
   String call(
     String path, [

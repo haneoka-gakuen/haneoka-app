@@ -300,9 +300,8 @@ class TeamCatalog extends ChangeNotifier {
   int attribute(bool members, int id) => intOf(card(members, id)['attribute']);
   String cardImage(bool members, int id) => asset(card(members, id)['image']);
 
-  String cardSubtitle(bool members, int id) => [
-    for (final character in characterIds(members, id)) characterName(character),
-  ].where((name) => name.isNotEmpty).join(' · ');
+  String cardSubtitle(bool members, int id) =>
+      t.list(characterIds(members, id).map(characterName));
 
   GrowthLimits? memberLimits(int id, int? awake) {
     final card = master.members[id];

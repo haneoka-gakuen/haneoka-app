@@ -38,8 +38,17 @@ class ReferenceKind {
 }
 
 class LocalReference {
-  const LocalReference(this.members, this.snapshots, this.glyphs, this.allowed);
+  const LocalReference(
+    this.members,
+    this.snapshots,
+    this.glyphs,
+    this.allowed, {
+    this.art,
+  });
   final ReferenceKind members, snapshots;
+
+  /// Member art as the detail screen shows it.
+  final ReferenceKind? art;
   final Map<String, Mask>? glyphs;
 
   /// Allowed levels by kind (`members`, `snapshots`).
@@ -55,6 +64,7 @@ class RecognizedCell {
     required this.candidates,
     required this.score,
     required this.level,
+    this.detail,
   });
   final String kind;
   final List<int> bbox;
@@ -64,6 +74,23 @@ class RecognizedCell {
   /// The best candidate's match score.
   final double score;
   final int? level;
+
+  /// Present when the card came from its detail screen.
+  final DetailFields? detail;
+}
+
+class DetailFields {
+  const DetailFields({
+    required this.cap,
+    this.training,
+    this.awakening,
+    this.liveSkillLevel,
+    this.gekisoSkillLevel,
+  });
+
+  /// The level cap shown beside the level.
+  final int cap;
+  final int? training, awakening, liveSkillLevel, gekisoSkillLevel;
 }
 
 const _workingSide = 2048;
@@ -73,6 +100,7 @@ const _acceptMargin = 0.06;
 /// Art inside a cell that no badge, mark or Lv label covers:
 /// top, bottom, left, right.
 const _masks = {
+  'art': (0.0, 1.0, 0.0, 1.0),
   'members': (0.18, 0.8, 0.1, 0.72),
   'snapshots': (0.22, 0.74, 0.1, 0.84),
 };
@@ -967,6 +995,263 @@ Raster downscale(Raster image, int width, int height) {
 }
 
 /// Recognise one screenshot; boxes are in the input raster's coordinates.
+// Detail screen reader: the single-card screens of a Box recording.
+
+class _Digits {
+  const _Digits(this.value, this.score, this.margin, this.x, this.right);
+  final int value, x, right;
+  final double score, margin;
+}
+
+/// One run of same-height digits starting at the left of [row].
+_Digits? _digitRun(List<_Blob> row, Map<String, Mask> font, double height) {
+  final digits = <(String, double, double, _Blob)>[];
+  for (final c in row) {
+    if (c.h < height * 0.8 || c.h > height * 1.25) continue;
+    if (digits.isNotEmpty) {
+      final last = digits.last.$4;
+      if (c.x - last.x - last.w > height * 0.5) break;
+    }
+    final ranked = [
+      for (final character in '0123456789'.split(''))
+        (character, _similarity(c.mask, font[character]!)),
+    ]..sort((a, b) => b.$2.compareTo(a.$2));
+    digits.add((ranked[0].$1, ranked[0].$2, ranked[0].$2 - ranked[1].$2, c));
+  }
+  if (digits.isEmpty) return null;
+  return _Digits(
+    int.parse(digits.map((d) => d.$1).join()),
+    digits.map((d) => d.$2).reduce(math.min),
+    digits.map((d) => d.$3).reduce(math.min),
+    digits.first.$4.x,
+    digits.last.$4.x + digits.last.$4.w,
+  );
+}
+
+/// Every L-v pair in the blobs, left to right.
+List<(_Blob, _Blob)> _prefixes(List<_Blob> cs, Map<String, Mask> font) {
+  final found = <(_Blob, _Blob)>[];
+  for (final l in cs) {
+    if (l.h < 6 ||
+        !(l.w / l.h > 0.2 && l.w / l.h < 1) ||
+        _similarity(l.mask, font['L']!) < 0.5) {
+      continue;
+    }
+    for (final c in cs) {
+      if (c.x >= l.x + l.w &&
+          c.x < l.x + l.w + l.h * 0.95 &&
+          c.h / l.h > 0.42 &&
+          c.h / l.h < 0.9 &&
+          (c.y + c.h - (l.y + l.h)).abs() <= 3 &&
+          _similarity(c.mask, font['v']!) > 0.4) {
+        found.add((l, c));
+        break;
+      }
+    }
+  }
+  return found;
+}
+
+class _DetailHeader {
+  const _DetailHeader(this.level, this.cap, this.x, this.bottom, this.unit);
+  final int level, cap;
+
+  /// The Lv prefix in image pixels; the rest of the screen is measured from it.
+  final int x, bottom, unit;
+}
+
+_DetailHeader? _detailHeader(
+  Raster image,
+  Map<String, Mask> font,
+  int threshold,
+) {
+  final left = (image.width * 0.4).round(), top = (image.height * 0.04).round();
+  final roi = _crop(
+    image,
+    left,
+    top,
+    (image.width * 0.42).round(),
+    (image.height * 0.28).round(),
+  );
+  final cs = _blobs(roi, threshold);
+  for (final (l, v) in _prefixes(cs, font)) {
+    final bottom = l.y + l.h;
+    final row = [
+      for (final c in cs)
+        if (c.x > v.x + v.w && (c.y + c.h - bottom).abs() <= 4) c,
+    ];
+    final tall = [
+      for (final c in row)
+        if (c.h >= l.h * 1.3 && c.h <= l.h * 2.6) c,
+    ];
+    if (tall.isEmpty) continue;
+    final height = tall.map((c) => c.h).reduce(math.max);
+    final level = _digitRun(tall, font, height.toDouble());
+    if (level == null || level.score < 0.55 || level.margin < 0.03) continue;
+    // A slash separates the level from its smaller cap.
+    final rest = [
+      for (final c in row)
+        if (c.x > level.right &&
+            c.x < level.right + l.h * 4 &&
+            c.h < height * 0.85)
+          c,
+    ].skip(1).toList();
+    final cap = _digitRun(rest, font, l.h.toDouble());
+    if (cap == null || cap.score < 0.5) continue;
+    return _DetailHeader(level.value, cap.value, left + l.x, top + bottom, l.h);
+  }
+  return null;
+}
+
+/// The training digit sits inside its ring of stars, right of the header.
+int? _detailTraining(
+  Raster image,
+  _DetailHeader header,
+  Map<String, Mask> font,
+  int threshold,
+) {
+  final unit = header.unit;
+  final left = (header.x + unit * 17).round();
+  final top = math.max(0, (header.bottom - unit * 3).round());
+  final roi = _crop(
+    image,
+    left,
+    top,
+    math.min((unit * 4.5).round(), image.width - left),
+    unit * 5,
+  );
+  final tall = [
+    for (final blob in _blobs(roi, threshold))
+      if (blob.h >= unit * 1.1 && blob.h <= unit * 2) blob,
+  ]..sort((a, b) => b.h - a.h);
+  if (tall.isEmpty) return null;
+  final ranked = [
+    for (final digit in const [0, 1, 2, 3, 4, 5, 6])
+      (digit, _similarity(tall.first.mask, font['$digit']!)),
+  ]..sort((a, b) => b.$2.compareTo(a.$2));
+  return ranked[0].$2 > 0.55 && ranked[0].$2 - ranked[1].$2 > 0.03
+      ? ranked[0].$1
+      : null;
+}
+
+/// Awakening is a star of five facets: lit facets count ranks.
+int? _detailAwakening(Raster image, _DetailHeader header) {
+  final unit = header.unit;
+  final cx = header.x + unit * 31.4, cy = header.bottom - unit * 0.95;
+  var lit = 0;
+  for (var facet = 0; facet < 5; facet++) {
+    final angle = (-90 + facet * 72) * math.pi / 180;
+    final fx = (cx + math.cos(angle) * unit * 0.9).round();
+    final fy = (cy + math.sin(angle) * unit * 0.9).round();
+    if (fx < 2 || fy < 2 || fx + 3 > image.width || fy + 3 > image.height) {
+      return null;
+    }
+    var red = 0;
+    for (var dy = -2; dy <= 2; dy++) {
+      for (var dx = -2; dx <= 2; dx++) {
+        red += image.data[((fy + dy) * image.width + fx + dx) * 4];
+      }
+    }
+    if (red / 25 > 100) lit++;
+  }
+  return lit;
+}
+
+/// Skill rows carry "Lv. n/5"; the panel lists leader, live, then Gekisou.
+(int, int)? _detailSkills(
+  Raster image,
+  _DetailHeader header,
+  Map<String, Mask> font,
+) {
+  final unit = header.unit;
+  final left = header.x + unit * 28, top = header.bottom;
+  final roi = _crop(
+    image,
+    left,
+    top,
+    math.min(unit * 9, image.width - left),
+    image.height - top,
+  );
+  // The row label is dimmer than the header.
+  final cs = _blobs(roi, 150);
+  final rows = <int>[];
+  final found = _prefixes(cs, font)..sort((a, b) => a.$1.y - b.$1.y);
+  for (final (l, v) in found) {
+    final base = l.y + l.h;
+    final row = [
+      for (final c in cs)
+        if (c.x > v.x + v.w + 1 &&
+            c.h >= l.h * 1.05 &&
+            c.h <= l.h * 1.5 &&
+            (c.y + c.h - base).abs() <= 3)
+          c,
+    ];
+    if (row.length < 3) continue;
+    final digit = _digitRun(row.sublist(0, 1), font, row[0].h.toDouble());
+    final most = _digitRun(row.sublist(2, 3), font, row[2].h.toDouble());
+    if (digit != null &&
+        most != null &&
+        digit.score > 0.5 &&
+        most.score > 0.5 &&
+        digit.value >= 1 &&
+        digit.value <= most.value) {
+      rows.add(digit.value);
+    }
+  }
+  return rows.length == 3 ? (rows[1], rows[2]) : null;
+}
+
+/// The art shown on each detail screen, in fractions of the screen height.
+const _detailArt = {
+  'members': [0.083, 0.207, 0.912, 0.456],
+  'snapshots': [0.198, 0.211, 0.903, 0.48],
+};
+
+/// A detail screen's card and fields, or null on any other screen.
+RecognizedCell? readDetail(Raster image, LocalReference reference) {
+  final font = reference.glyphs;
+  if (image.width < image.height * 1.25 || font == null) return null;
+  final reads = <(_DetailHeader, int)>[];
+  for (final threshold in const [170, 185, 200, 215, 230]) {
+    final header = _detailHeader(image, font, threshold);
+    if (header != null) reads.add((header, threshold));
+  }
+  if (reads.isEmpty) return null;
+  final (header, threshold) = reads[reads.length ~/ 2];
+  if (header.level > header.cap ||
+      reads.any((r) => r.$1.level != header.level || r.$1.cap != header.cap)) {
+    return null;
+  }
+  // The Snapshot screen sets its header lower, beside the framed art.
+  final kind = header.bottom > image.height * 0.195 ? 'snapshots' : 'members';
+  final members = kind == 'members';
+  final box = [
+    for (final value in _detailArt[kind]!) (value * image.height).round(),
+  ];
+  final art = members ? reference.art : reference.snapshots;
+  final identity = art == null
+      ? (cardId: null, candidates: const <int>[], score: 0.0)
+      : matchIdentity(image, box, art);
+  final skills = members ? _detailSkills(image, header, font) : null;
+  return RecognizedCell(
+    kind: kind,
+    bbox: box,
+    cardId: identity.cardId,
+    candidates: identity.candidates,
+    score: identity.score,
+    level: header.level,
+    detail: DetailFields(
+      cap: header.cap,
+      training: members
+          ? _detailTraining(image, header, font, threshold)
+          : null,
+      awakening: members ? _detailAwakening(image, header) : null,
+      liveSkillLevel: skills?.$1,
+      gekisoSkillLevel: skills?.$2,
+    ),
+  );
+}
+
 List<RecognizedCell> recognize(Raster input, LocalReference reference) {
   // Thresholds are set for a list about this wide, so small screenshots are
   // enlarged too.
@@ -978,6 +1263,28 @@ List<RecognizedCell> recognize(Raster input, LocalReference reference) {
       : scale > 1
       ? _enlarge(input, workingWidth, workingHeight)
       : input;
+  final detail = readDetail(working, reference);
+  if (detail != null) {
+    final box = detail.bbox;
+    final left = math.max(0, (box[0] / scale).round()),
+        top = math.max(0, (box[1] / scale).round());
+    return [
+      RecognizedCell(
+        kind: detail.kind,
+        bbox: [
+          left,
+          top,
+          math.min(input.width - left, (box[2] / scale).round()),
+          math.min(input.height - top, (box[3] / scale).round()),
+        ],
+        cardId: detail.cardId,
+        candidates: detail.candidates,
+        score: detail.score,
+        level: detail.level,
+        detail: detail.detail,
+      ),
+    ];
+  }
   return [
     for (final proposal in grid(working).take(100))
       () {

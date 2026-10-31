@@ -235,6 +235,7 @@ class ScreenshotObservation {
     required this.candidates,
     required this.level,
     this.score = 0,
+    this.detail,
   });
   final List<int> bbox;
   final bool members;
@@ -248,6 +249,9 @@ class ScreenshotObservation {
 
   /// The visible level, when the recognizer read it.
   final int? level;
+
+  /// Read from the card's detail screen.
+  final DetailFields? detail;
 }
 
 class ScreenshotResult {
@@ -284,8 +288,12 @@ Future<LocalReference> _loadReference(String server) async {
   }
   final kinds = objectRow(document['kinds']);
   final sheets = <String, (Raster, Doc)>{};
-  for (final kind in const ['members', 'snapshots']) {
-    final entry = objectRow(kinds[kind]);
+  final art = objectRow(kinds['members'])['art'];
+  for (final (kind, entry) in [
+    ('members', objectRow(kinds['members'])),
+    ('snapshots', objectRow(kinds['snapshots'])),
+    if (art != null) ('art', objectRow(art)),
+  ]) {
     final codec = await ui.instantiateImageCodec(
       await read('${entry['sheet']}'),
     );
@@ -329,6 +337,7 @@ Future<LocalReference> _loadReference(String server) async {
               for (final e in (levels['allowedLevels'] as Map).entries)
                 '${e.key}': (e.value as List).cast<int>().toSet(),
             },
+      art: sheets.containsKey('art') ? kind('art') : null,
     );
   });
 }
@@ -350,6 +359,7 @@ Future<ScreenshotResult> recognizeScreenshot(
         candidates: cell.candidates,
         level: cell.level,
         score: cell.score,
+        detail: cell.detail,
       ),
   ]);
 }
@@ -364,6 +374,10 @@ class ScreenshotCard {
   /// (image, observation index) of every crop showing this card.
   final List<(int, int)> observations = [];
   final List<int> observedLevels = [];
+
+  /// Box fields a detail screen showed, by `training`, `awakening`,
+  /// `liveSkillLevel` and `gekisoSkillLevel`.
+  final Map<String, int> observedPractice = {};
   int? get existingLevel => ownedValue(owned, 'level');
 }
 
@@ -389,6 +403,40 @@ enum LevelSource { saved, conflict, observed, unknown }
     return (card.observedLevels.first, LevelSource.observed);
   }
   return (null, LevelSource.unknown);
+}
+
+/// The detail fields this card can hold. A Snapshot shows no awakening rank,
+/// but each rank has its own level cap.
+Map<String, int> detailPractice(
+  EngineMaster master,
+  bool members,
+  int cardId,
+  DetailFields detail,
+) {
+  if (!members) {
+    final group = master.snaps[cardId]?.rankGroup;
+    final ranks = [
+      for (final e in (master.snapRanks[group] ?? const {}).entries)
+        if (e.value.limitLevel == detail.cap) e.key,
+    ];
+    return ranks.length == 1 ? {'awakening': ranks.first} : const {};
+  }
+  final ranges = practiceRanges(
+    master,
+    true,
+    cardId,
+    training: detail.training,
+  );
+  return {
+    for (final (field, value) in [
+      ('training', detail.training),
+      ('awakening', detail.awakening),
+      ('liveSkillLevel', detail.liveSkillLevel),
+      ('gekisoSkillLevel', detail.gekisoSkillLevel),
+    ])
+      if (value != null && (ranges[field]?.contains(value) ?? false))
+        field: value,
+  };
 }
 
 /// `previewScreenshotImportBatch`: crops showing the same card converge on
@@ -422,6 +470,12 @@ List<ScreenshotCard> previewScreenshots(
       if (level != null && !card.observedLevels.contains(level)) {
         card.observedLevels.add(level);
       }
+      if (observation.detail case final detail?) {
+        final practice = detailPractice(master, card.members, chosen, detail);
+        for (final field in practice.entries) {
+          card.observedPractice.putIfAbsent(field.key, () => field.value);
+        }
+      }
     }
   }
   return cards.values.toList();
@@ -445,6 +499,13 @@ List<int> screenshotLevels(EngineMaster master, ScreenshotCard card) =>
       awakening: ownedValue(card.owned, 'awakening'),
     )['level'] ??
     const [];
+
+const _practiceBoxField = {
+  'training': 'awk',
+  'awakening': 'rnk',
+  'liveSkillLevel': 'sk',
+  'gekisoSkillLevel': 'gsk',
+};
 
 /// `applyConfirmedScreenshotImport` as box writes.
 List<(String, Object?)> applyScreenshots(
@@ -491,6 +552,14 @@ List<(String, Object?)> applyScreenshots(
         throw const ScreenshotError('screenshot-practice-review');
       }
       out.add(('$p.${card.cardId}.lvl', level));
+    }
+    for (final MapEntry(key: field, :value) in card.observedPractice.entries) {
+      final saved = ownedValue(card.owned, field);
+      if (saved == null ||
+          policy == ExistingPolicy.overwrite ||
+          (policy == ExistingPolicy.updates && value > saved)) {
+        out.add(('$p.${card.cardId}.${_practiceBoxField[field]}', value));
+      }
     }
   }
   return out;

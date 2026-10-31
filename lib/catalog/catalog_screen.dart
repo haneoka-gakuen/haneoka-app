@@ -348,7 +348,7 @@ class CatalogKit {
   String bandName(Object? id) =>
       t.text(visuals?.bands[(id as num?)?.toInt()]?['bandName']);
 
-  String names(List<int> ids) => ids.map(characterName).join(', ');
+  String names(List<int> ids) => t.list(ids.map(characterName));
 
   String subtitle(Entry item) => switch (kind) {
     Presentation.member ||
