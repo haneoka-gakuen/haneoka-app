@@ -604,7 +604,8 @@ class _DrawerState extends State<_Drawer> {
     );
 
     return ColoredBox(
-      color: AppScope.of(context).seasonBackdrop
+      // The modal drawer lies over the page and stays solid.
+      color: AppScope.of(context).seasonBackdrop && !widget.modal
           ? Colors.transparent
           : scheme.surfaceContainer,
       child: SafeArea(
