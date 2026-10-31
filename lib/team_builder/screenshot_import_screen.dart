@@ -747,7 +747,10 @@ class _ScreenshotImportScreenState extends State<_ScreenshotImportScreen> {
         ImportSourceTile(
           icon: Symbols.videocam_rounded,
           title: _t('chooseVideo', 'Choose screen recording'),
-          hint: _t('videoHint', 'Scroll through the whole list once'),
+          hint: _t(
+            'videoHint',
+            'Scroll through the whole list once, then page through each card\'s details at a steady pace',
+          ),
           onTap: _pickVideo,
         ),
       if (busy) ...[
