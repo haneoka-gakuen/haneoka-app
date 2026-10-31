@@ -218,6 +218,20 @@ class RewardPlanControls extends StatelessWidget {
               if (parsed != null) c.updateSettings({'minComboBonus': parsed});
             },
           ),
+          if (c.hasMission(3, s.songs))
+            TextFormField(
+              key: const ValueKey('reward-just-window'),
+              initialValue: s.justWindowMs == 0 ? '' : '${s.justWindowMs}',
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: c.tb('justWindow', 'Ideal JUST tap window'),
+                prefixText: '±',
+                suffixText: 'ms',
+                hintText: c.tb('unlimitedCombo', 'No minimum'),
+              ),
+              onChanged: (value) =>
+                  c.updateSettings({'justWindowMs': int.tryParse(value) ?? 0}),
+            ),
         ],
       ],
     );

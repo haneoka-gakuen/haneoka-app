@@ -95,6 +95,7 @@ class PtController {
       goal: EventGoal(
         ptOnly: true,
         minComboBonus: s.minComboBonus,
+        minJustWindowMs: host.hasMission(3, s.songs) ? s.justWindowMs : 0,
         measure: measure,
         route: RouteKind.live,
         eventId: s.eventId ?? -1,

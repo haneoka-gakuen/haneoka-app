@@ -265,6 +265,7 @@ class TeamBuilderController extends ChangeNotifier {
       'ptCycle': job.cycle != null,
       'ptMode': goal.gekiso == null ? 'solo' : 'gekiso',
       'minComboBonus': goal.minComboBonus,
+      'justWindowMs': goal.minJustWindowMs,
     }).forGoal(GoalKind.event);
     return ComparedResult(
       hit: EngineHit.fromJson(hit.toJson()),
@@ -622,6 +623,20 @@ class TeamBuilderController extends ChangeNotifier {
     );
   }
 
+  String engineErrorText(String? reason) => switch (reason) {
+    null => 'engine-error',
+    'just-window-input' => tb('invalidCombo', 'Enter a positive integer'),
+    'just-window-timing' => tb(
+      'justWindowTiming',
+      'JUST tap timing data is missing',
+    ),
+    'just-window-random' => tb(
+      'justWindowRandom',
+      'Window targets are unavailable for this random skill',
+    ),
+    _ => reason,
+  };
+
   String tb(
     String key,
     String fallback, [
@@ -920,6 +935,9 @@ class TeamBuilderController extends ChangeNotifier {
       if (s.minComboBonus < 1) {
         return tb('invalidCombo', 'Enter a positive integer');
       }
+      if (hasMission(3, s.songs) && s.justWindowMs < 0) {
+        return tb('invalidCombo', 'Enter a positive integer');
+      }
       if (s.opponentsMode) {
         final ranges = s.opponentDrafts
             .map(
@@ -1023,6 +1041,7 @@ class TeamBuilderController extends ChangeNotifier {
                 rank: s.gekisoRank,
                 seeds: _missionEnabled(s, 2) ? s.gekisoSeeds : 0,
                 minComboBonus: _missionEnabled(s, 1) ? s.minComboBonus : 1,
+                minJustWindowMs: _missionEnabled(s, 3) ? s.justWindowMs : 0,
                 opponents: s.opponents,
                 musicType: s.songRulesOverride?.musicType,
                 missions: s.songRulesOverride?.missions,
@@ -1049,6 +1068,7 @@ class TeamBuilderController extends ChangeNotifier {
             ptOnly: s.ptGekiso && s.route == 'live',
             ranking: 'primary',
             minComboBonus: s.minComboBonus,
+            minJustWindowMs: _missionEnabled(s, 3) ? s.justWindowMs : 0,
             gekiso: s.ptGekiso && s.route == 'live'
                 ? (just: s.ptJust / 100, luckSamples: s.ptLuckSamples)
                 : null,
@@ -1311,7 +1331,7 @@ class TeamBuilderController extends ChangeNotifier {
           }
           if (snapshot.response.stopReason == 'error') {
             error = tb('searchFailed', 'The search failed: {reason}', {
-              'reason': snapshot.response.error ?? 'engine-error',
+              'reason': engineErrorText(snapshot.response.error),
             });
           }
           results = snapshot.response;
@@ -1325,7 +1345,7 @@ class TeamBuilderController extends ChangeNotifier {
       if (generation == runGeneration && fingerprint == _fingerprint()) {
         if (response.stopReason == 'error') {
           error = tb('searchFailed', 'The search failed: {reason}', {
-            'reason': response.error ?? 'engine-error',
+            'reason': engineErrorText(response.error),
           });
         }
         results = response;

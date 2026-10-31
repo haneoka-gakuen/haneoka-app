@@ -3089,7 +3089,12 @@
         "continue": "探索を続ける",
         "pool": "メンバー / スナップ",
         "materials": "素材・スキル資料"
-      }
+      },
+      "justWindow": "理想の JUST タップ判定幅",
+      "justWindowActual": "JUST タップ判定幅",
+      "justWindowUnmet": "理想の判定幅に未達",
+      "justWindowTiming": "JUST タップの判定データがありません",
+      "justWindowRandom": "このランダムスキルでは判定幅を指定できません"
     },
     "calendar": {
       "title": "カレンダー",

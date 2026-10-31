@@ -3089,7 +3089,12 @@
         "continue": "탐색 계속",
         "pool": "멤버 / 스냅",
         "materials": "재료 및 스킬 정보"
-      }
+      },
+      "justWindow": "이상적인 JUST 탭 판정 폭",
+      "justWindowActual": "JUST 탭 판정 폭",
+      "justWindowUnmet": "이상적인 판정 폭 미달",
+      "justWindowTiming": "JUST 탭 판정 데이터가 없습니다",
+      "justWindowRandom": "이 랜덤 스킬에는 판정 폭 조건을 쓸 수 없습니다"
     },
     "calendar": {
       "title": "달력",

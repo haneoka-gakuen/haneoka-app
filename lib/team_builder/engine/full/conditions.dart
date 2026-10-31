@@ -80,13 +80,16 @@ class AndChecker extends Checker {
     : _resettable = [for (final item in items) item.countResettable()];
   final List<Checker> items;
   final List<bool> _resettable;
+  int? _override;
   @override
   (bool, int) check(CheckCtx ctx) {
+    _override = null;
     var hit = 0;
     for (var i = 0; i < items.length; i++) {
       final (ok, h) = items[i].check(ctx);
       hit = math.max(hit, h);
       if (!ok) {
+        _override = null;
         if (!_resettable[i]) {
           for (var k = 0; k < items.length; k++) {
             if (_resettable[k]) items[k].resetCount(ctx);
@@ -94,12 +97,20 @@ class AndChecker extends Checker {
         }
         return (false, 0);
       }
+      final time = items[i].overrideTime();
+      if (time != null) {
+        final current = _override;
+        _override = current == null ? time : math.max(current, time);
+      }
     }
     return (true, hit);
   }
 
   @override
+  int? overrideTime() => _override;
+  @override
   void reset(CheckCtx ctx) {
+    _override = null;
     for (final item in items) {
       item.reset(ctx);
     }
@@ -109,19 +120,27 @@ class AndChecker extends Checker {
 class OrChecker extends Checker {
   OrChecker(this.items);
   final List<Checker> items;
+  int? _override;
   @override
   (bool, int) check(CheckCtx ctx) {
+    _override = null;
     var hit = 0;
     for (final c in items) {
       final (ok, h) = c.check(ctx);
       hit = math.max(hit, h);
-      if (ok) return (true, hit);
+      if (ok) {
+        _override = c.overrideTime();
+        return (true, hit);
+      }
     }
     return (false, 0);
   }
 
   @override
+  int? overrideTime() => _override;
+  @override
   void reset(CheckCtx ctx) {
+    _override = null;
     for (final item in items) {
       item.reset(ctx);
     }

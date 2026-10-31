@@ -175,6 +175,7 @@ class BuildSettings {
     'gekisoPlacementMode': 'rank',
     'gekisoOpponents': <Object?>['', '', ''],
     'minComboBonus': 1,
+    'justWindowMs': 0,
     'songRules': null,
     'manualEventEnabled': false,
     'manualEvent': null,
@@ -247,6 +248,7 @@ class BuildSettings {
   String get manualScoreMode => '${_json['manualScoreMode']}';
   int get gekisoSeeds => _int('gekisoSeeds');
   int get minComboBonus => _int('minComboBonus');
+  int get justWindowMs => _int('justWindowMs');
   bool get opponentsMode => _json['gekisoPlacementMode'] == 'opponents';
   List<String> get opponentDrafts => [
     for (final v in _json['gekisoOpponents'] as List) '$v',

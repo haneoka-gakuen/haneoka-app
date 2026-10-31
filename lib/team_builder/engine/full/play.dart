@@ -187,9 +187,40 @@ LivePlay judgementStream(
       grade[i] = 1;
     }
   }
+  final frames = [for (final r in rows) r.frame];
+  if (gekisou != null) {
+    for (final (range, (start, end)) in gekisou.fevers.indexed) {
+      if (gekisou.missions[range] != 1) continue;
+      final first = rows.indexWhere(
+        (r) => r.note.timeMs >= start && r.note.timeMs <= end,
+      );
+      if (first < 0) continue;
+      final opening = rows[first];
+      var after = first + 1;
+      while (after < rows.length &&
+          rows[after].frame == opening.frame &&
+          rows[after].note.timeMs <= end) {
+        after++;
+      }
+      final nextFrame = opening.frame + 1;
+      final next = nextFrame < times.length ? times[nextFrame] : null;
+      if (after - first < 2 || next == null || next >= end) continue;
+      final legal = rows.sublist(first, after).every((r) {
+        final note = r.note;
+        return note.timeMs == opening.note.timeMs &&
+            (note.op == 1 || note.op == 40) &&
+            next - note.timeMs <=
+                (master.live.perfectAfterMs[note.judgementType] ?? -1);
+      });
+      if (!legal) continue;
+      for (var i = first + 1; i < after; i++) {
+        frames[i]++;
+      }
+    }
+  }
   final out = [for (final timeMs in times) PlayFrame(timeMs, [])];
   for (final (i, r) in rows.indexed) {
-    out[r.frame].judged.add(JudgedNote(r.note.id, grade[i], r.note.timeMs));
+    out[frames[i]].judged.add(JudgedNote(r.note.id, grade[i], r.note.timeMs));
   }
   return LivePlay(out, List.filled(times.length, dt), [
     for (final i in eligible) rows[i].note.id,

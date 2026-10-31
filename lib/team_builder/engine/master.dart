@@ -363,6 +363,7 @@ class LiveTables {
     required this.settings,
     required this.justTypes,
     required this.timingTypes,
+    required this.perfectAfterMs,
     required this.afterMs,
     required this.phases,
     required this.gekiso,
@@ -385,6 +386,7 @@ class LiveTables {
   final Map<String, String> settings;
   final Set<int> justTypes;
   final Set<int> timingTypes;
+  final Map<int, num> perfectAfterMs;
   final double afterMs;
   final Map<int, int> phases;
 }
@@ -911,6 +913,14 @@ EngineMaster compileTeamData(Doc data) {
             intOf(row['noteJudgementType']),
       },
       timingTypes: {for (final row in timings) intOf(row['noteJudgementType'])},
+      perfectAfterMs: {
+        for (final row in timings)
+          if (intOf(row['assistLevel']) == 0 &&
+              intOf(row['noteSimulateJudgement']) == 5)
+            intOf(row['noteJudgementType']): numOf(
+              row['afterMs'] ?? row['after'],
+            ),
+      },
       afterMs: maxOf(
         timings.map((row) => numOf(row['afterMs'] ?? row['after'])),
         0,

@@ -1027,6 +1027,11 @@ class _HitCardState extends State<_HitCard> {
           label: c.tb('comboBonus', 'Base COMBO BONUS'),
           value: '×${hit.comboBonus}',
         ),
+      if (hit.justWindow case final window?)
+        ValueChip(
+          label: c.tb('justWindowActual', 'JUST tap window'),
+          value: _justWindowText(c, window),
+        ),
       if (hit.event?.rewardValues case final values?)
         for (final entry in values.entries)
           ValueChip(
@@ -2099,6 +2104,8 @@ Future<List<int>> renderHitImage(
         (c.tb('power', 'Power'), formatNumber(locale, hit.power)),
         if (hit.comboBonus != null)
           (c.tb('comboBonus', 'Base COMBO BONUS'), '×${hit.comboBonus}'),
+        if (hit.justWindow case final window?)
+          (c.tb('justWindowActual', 'JUST tap window'), _justWindowText(c, window)),
         if (hit.event?.rewardValues case final values?)
           for (final entry in values.entries)
             (
@@ -2139,4 +2146,13 @@ Future<List<int>> renderHitImage(
       ),
     ),
   );
+}
+
+String _justWindowText(TeamBuilderController c, JustWindow window) {
+  final before = window.beforeMs.toStringAsFixed(2);
+  final after = window.afterMs.toStringAsFixed(2);
+  final span = before == after ? '±$before ms' : '−$before / +$after ms';
+  return window.meetsTarget
+      ? span
+      : '$span · ${c.tb('justWindowUnmet', 'Below the desired window')}';
 }

@@ -3089,7 +3089,12 @@
         "continue": "继续配队",
         "pool": "成员 / 留影",
         "materials": "材料与技能资料"
-      }
+      },
+      "justWindow": "理想 JUST 点按窗口",
+      "justWindowActual": "JUST 点按窗口",
+      "justWindowUnmet": "未达理想窗口",
+      "justWindowTiming": "缺少 JUST 点按判定数据",
+      "justWindowRandom": "此随机技能不支持窗口条件"
     },
     "calendar": {
       "title": "日历",

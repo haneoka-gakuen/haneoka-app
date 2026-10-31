@@ -253,6 +253,20 @@ class _PtTabState extends State<PtTab> {
               onChanged: (value) =>
                   c.updateSettings({'minComboBonus': int.tryParse(value) ?? 1}),
             ),
+          if (s.ptGekiso && c.hasMission(3, s.songs))
+            TextFormField(
+              key: const ValueKey('pt-just-window'),
+              initialValue: s.justWindowMs == 0 ? '' : '${s.justWindowMs}',
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: c.tb('justWindow', 'Ideal JUST tap window'),
+                prefixText: '±',
+                suffixText: 'ms',
+                hintText: c.tb('unlimitedCombo', 'No minimum'),
+              ),
+              onChanged: (value) =>
+                  c.updateSettings({'justWindowMs': int.tryParse(value) ?? 0}),
+            ),
           field(
             'event',
             DropdownMenu<int>(

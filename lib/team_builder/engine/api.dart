@@ -170,6 +170,7 @@ sealed class Goal {
         ranking: json['ranking'] as String?,
         weights: json['weights'] is Map ? objectRow(json['weights']) : null,
         minComboBonus: intOf(objectRow(json['gekiso'])['minComboBonus'], 1),
+        minJustWindowMs: intOf(objectRow(json['gekiso'])['minJustWindowMs']),
         cpExchange: json['cpExchange'] is Map
             ? CpExchange(
                 intOf(objectRow(json['cpExchange'])['numerator']),
@@ -198,6 +199,7 @@ sealed class Goal {
         rank: intOf(json['rank'], 1),
         seeds: intOf(json['seeds']),
         minComboBonus: intOf(json['minComboBonus'], 1),
+        minJustWindowMs: intOf(json['minJustWindowMs']),
         opponents: json['opponents'] is List
             ? [
                 for (final range in json['opponents'] as List)
@@ -258,6 +260,7 @@ class EventGoal extends Goal {
     this.weights,
     this.rewardPlan,
     this.minComboBonus = 1,
+    this.minJustWindowMs = 0,
     this.cpExchange,
     this.gekiso,
     this.eventEffects,
@@ -270,6 +273,7 @@ class EventGoal extends Goal {
   final Doc? weights;
   final Doc? rewardPlan;
   final int minComboBonus;
+  final int minJustWindowMs;
   bool get primaryOnly => ptOnly || ranking != null;
 
   /// Best challenge payout per CP for this objective (solo trial only).
@@ -302,6 +306,7 @@ class EventGoal extends Goal {
     weights: weights,
     rewardPlan: rewardPlan ?? this.rewardPlan,
     minComboBonus: minComboBonus,
+    minJustWindowMs: minJustWindowMs,
     cpExchange: cpExchange ?? this.cpExchange,
     gekiso: dropGekiso ? null : gekiso,
     eventEffects: eventEffects,
@@ -327,6 +332,7 @@ class EventGoal extends Goal {
         'luckSamples': g.luckSamples,
         'rank': 1,
         'minComboBonus': minComboBonus,
+        if (minJustWindowMs > 0) 'minJustWindowMs': minJustWindowMs,
       },
   };
 
@@ -341,6 +347,24 @@ class EventGoal extends Goal {
   final PlayModel play;
 }
 
+/// The steady JUST tap half-window a team achieves, in milliseconds.
+class JustWindow {
+  const JustWindow(this.beforeMs, this.afterMs, this.meetsTarget);
+  factory JustWindow.fromJson(Doc json) => JustWindow(
+    numOf(json['beforeMs']),
+    numOf(json['afterMs']),
+    json['meetsTarget'] == true,
+  );
+  final num beforeMs;
+  final num afterMs;
+  final bool meetsTarget;
+  Doc toJson() => {
+    'beforeMs': beforeMs,
+    'afterMs': afterMs,
+    'meetsTarget': meetsTarget,
+  };
+}
+
 class GekisoGoal extends Goal {
   const GekisoGoal({
     required this.songs,
@@ -349,6 +373,7 @@ class GekisoGoal extends Goal {
     this.rank = 1,
     this.seeds = 0,
     this.minComboBonus = 1,
+    this.minJustWindowMs = 0,
     this.opponents,
     this.musicType,
     this.missions,
@@ -367,6 +392,7 @@ class GekisoGoal extends Goal {
   /// averages n native lottery seeds instead.
   final int seeds;
   final int minComboBonus;
+  final int minJustWindowMs;
   final List<List<double>>? opponents;
 
   /// Song rules override (`arena.ts` SongRules): the attribute a song is
@@ -429,6 +455,7 @@ Map<String, Object?> goalJson(Goal goal) => switch (goal) {
   GekisoGoal(
     :final arena,
     :final minComboBonus,
+    :final minJustWindowMs,
     :final opponents,
     :final songs,
     :final criterion,
@@ -440,6 +467,7 @@ Map<String, Object?> goalJson(Goal goal) => switch (goal) {
       'kind': 'gekiso',
       'arena': ?arena,
       'minComboBonus': minComboBonus,
+      if (minJustWindowMs > 0) 'minJustWindowMs': minJustWindowMs,
       'opponents': ?opponents,
       'songs': [for (final song in songs) song.toJson()],
       'criterion': criterion.name,
@@ -843,6 +871,9 @@ class EngineHit {
             : null
         ..skipScore = (json['skipScore'] as num?)?.toInt()
         ..comboBonus = (json['comboBonus'] as num?)?.toInt()
+        ..justWindow = json['justWindow'] is Map
+            ? JustWindow.fromJson(objectRow(json['justWindow']))
+            : null
         ..event = json['event'] is Map
             ? HitEvent.fromJson(objectRow(json['event']))
             : null
@@ -878,6 +909,7 @@ class EngineHit {
   HitScore? score;
   int? skipScore;
   int? comboBonus;
+  JustWindow? justWindow;
   HitEvent? event;
   PotentialDetail? potential;
   Map<String, Object?>? gekiso;
@@ -890,6 +922,7 @@ class EngineHit {
     'slotPowers': slotPowers,
     'key': key,
     'comboBonus': ?comboBonus,
+    if (justWindow case final window?) 'justWindow': window.toJson(),
     'score': score?.toJson(),
     'skipScore': skipScore,
     'event': event?.toJson(),

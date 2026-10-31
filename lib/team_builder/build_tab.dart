@@ -347,6 +347,12 @@ class _BuildTabState extends State<BuildTab> {
                   onChanged: (value) =>
                       set({'minComboBonus': value == 0 ? 1 : value}),
                 ),
+              if (c.hasMission(3, s.songs))
+                _NumberField(
+                  label: c.tb('justWindow', 'Ideal JUST tap window'),
+                  value: s.justWindowMs,
+                  onChanged: (value) => set({'justWindowMs': value}),
+                ),
               _NumberField(
                 label: c.tb('pt.luckSamples', 'Luck samples'),
                 value: s.gekisoSeeds,

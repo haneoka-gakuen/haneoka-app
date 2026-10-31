@@ -3089,7 +3089,12 @@
         "continue": "Continue search",
         "pool": "Members / Snapshots",
         "materials": "Materials and skills"
-      }
+      },
+      "justWindow": "Ideal JUST tap window",
+      "justWindowActual": "JUST tap window",
+      "justWindowUnmet": "Below the desired window",
+      "justWindowTiming": "JUST tap timing data is missing",
+      "justWindowRandom": "Window targets are unavailable for this random skill"
     },
     "calendar": {
       "title": "Calendar",
