@@ -526,6 +526,33 @@ final class NativeChartPlayback extends ChangeNotifier {
   bool get controlsThisAudio =>
       audio.active && document?.track.id == audio.current?.id;
 
+  /// Atlas pages carry a content hash in their name that changes with the
+  /// game, so the page comes from the release's own atlas record.
+  Future<String> _currentAtlasPage(
+    String path,
+    NativeChartDocument selected,
+  ) async {
+    final page = RegExp(
+      r'^/runtime/([^/]+)/(unity/(Assets/.+\.spriteatlasv2)/sactx-\d+-\d+x\d+-.+-)[0-9a-f]{8}(--Texture2D--\d+\.png)$',
+    ).firstMatch(path);
+    if (page == null) return path;
+    final source = page[3]!.split('/').map(Uri.encodeComponent).join('/');
+    final atlas = jsonDecode(
+      utf8.decode(
+        await fetch(
+          resourceUri('/api/v1/servers/${page[1]}/sources/$source', selected),
+        ),
+      ),
+    ) as Map;
+    for (final output in (atlas['outputs'] as List? ?? const []).cast<Map>()) {
+      final found = '${output['path']}';
+      if (found.startsWith('runtime/${page[2]}') && found.endsWith(page[4]!)) {
+        return '/runtime/${page[1]}/${found.substring('runtime/'.length)}';
+      }
+    }
+    return path;
+  }
+
   Uri resourceUri(String path, [NativeChartDocument? selected]) {
     if (path.startsWith('asset:')) {
       return Uri.parse('haneoka-asset:${path.substring(6)}');
@@ -611,7 +638,8 @@ final class NativeChartPlayback extends ChangeNotifier {
         ) as Map,
       );
       final chart = shiftNativeChart(
-        selected.chart ?? RuntimeChart.fromBytes(bytes, includeVisualSource: true),
+        selected.chart ??
+            RuntimeChart.fromBytes(bytes, includeVisualSource: true),
         selected.audioOffsetMs,
       );
       final visualTime = selected.timeScaleChanges.isEmpty
@@ -745,7 +773,10 @@ final class NativeChartPlayback extends ChangeNotifier {
             ),
             fetch(
               resourceUri(
-                compositor.baseWhitePath(selected.source.server),
+                await _currentAtlasPage(
+                  compositor.baseWhitePath(selected.source.server),
+                  selected,
+                ),
                 selected,
               ),
             ),

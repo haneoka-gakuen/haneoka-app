@@ -3,11 +3,22 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:http/http.dart' as http;
 import 'package:vega_plugin_haneoka/render_profile.dart';
 
 import '../core/api.dart';
 import '../core/background_work.dart';
 import '../core/resource_file_cache.dart';
+
+/// Sources the game stopped shipping, kept from the last client that had them.
+const _bundledSources = {
+  'Assets/AddressableResources/Common/Prefab/CameraManager.prefab':
+      'assets/render/camera-manager',
+};
+
+Future<Uint8List> _assetBytes(String path) async =>
+    (await rootBundle.load(path)).buffer.asUint8List();
 
 /// A verified actual source archive. Only requested typed records are retained;
 /// callers never execute Material or Shader programs from an archive.
@@ -48,10 +59,19 @@ final class NativeUnitySourceArchive {
           '${sourcePath.split('/').map(Uri.encodeComponent).join('/')}',
         )
         .replace(queryParameters: {'release': identity.release});
-    final descriptorBytes = await resourceFileCache.readBytes(
-      descriptorUri,
-      kind: ResourceFileKind.renderResource,
-    );
+    Uint8List descriptorBytes;
+    Uint8List? bundledArchive;
+    try {
+      descriptorBytes = await resourceFileCache.readBytes(
+        descriptorUri,
+        kind: ResourceFileKind.renderResource,
+      );
+    } on http.ClientException catch (error) {
+      final bundled = _bundledSources[sourcePath];
+      if (bundled == null || !error.message.endsWith('HTTP 404')) rethrow;
+      descriptorBytes = await _assetBytes('$bundled.json');
+      bundledArchive = await _assetBytes('$bundled.jsonl.gz');
+    }
     if (!current()) throw StateError('unity_archive_cancelled');
     final descriptor = jsonDecode(utf8.decode(descriptorBytes)) as Map;
     onTiming?.call('descriptor', timer.elapsedMicroseconds);
@@ -75,10 +95,12 @@ final class NativeUnitySourceArchive {
           '/objects/${identity.server}/${path.substring('objects/'.length)}',
         )
         .replace(queryParameters: {'release': identity.release});
-    final bytes = await resourceFileCache.readBytes(
-      uri,
-      kind: ResourceFileKind.renderResource,
-    );
+    final bytes =
+        bundledArchive ??
+        await resourceFileCache.readBytes(
+          uri,
+          kind: ResourceFileKind.renderResource,
+        );
     if (!current()) throw StateError('unity_archive_cancelled');
     if (bytes.length > 32 * 1024 * 1024 ||
         (!decodeOffThread && sha256.convert(bytes).toString() != hash)) {

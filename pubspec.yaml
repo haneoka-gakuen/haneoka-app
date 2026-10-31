@@ -142,6 +142,7 @@ flutter:
     - assets/brand/
     - assets/brand/oauth/
     - assets/settings/
+    - assets/render/
     - assets/fonts/OFL.txt
   fonts:
     - family: Roboto
