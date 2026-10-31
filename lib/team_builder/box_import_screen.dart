@@ -106,8 +106,7 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
       setState(
         () => _saves = [
           for (final save in AccountStore.instance.saves)
-            if (save.server == 'jp' || save.server == 'intl')
-              save,
+            if (save.server == 'jp' || save.server == 'intl') save,
         ],
       );
     });
@@ -117,8 +116,7 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
   Future<void> _addAccount() async {
     final added = [
       for (final save in await addGameAccounts(context))
-        if (save.server == 'jp' || save.server == 'intl')
-          save,
+        if (save.server == 'jp' || save.server == 'intl') save,
     ];
     if (!mounted || added.isEmpty) return;
     setState(
@@ -127,8 +125,7 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
         for (final save in _saves)
           if (!added.any(
             (row) =>
-                row.profileId == save.profileId &&
-                row.server == save.server,
+                row.profileId == save.profileId && row.server == save.server,
           ))
             save,
       ],
@@ -154,6 +151,18 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
       return _t(
         'changed',
         'Your account, data or inventory changed. Open the import again.',
+      );
+    }
+    if (code == 'box_no_capture') {
+      return _t(
+        'noCapture',
+        'No game login in this capture. Capture while the game starts, then export again.',
+      );
+    }
+    if (code == 'box_invalid_capture') {
+      return _t(
+        'invalidCapture',
+        'The player data in this capture could not be read. Export it as HAR with response bodies.',
       );
     }
     if (code == 'box_no_player') {

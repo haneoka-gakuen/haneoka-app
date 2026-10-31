@@ -2331,7 +2331,9 @@
           "intl-cbt": "International CBT"
         },
         "unavailableTarget": "Not in the target server's catalogue",
-        "incompatibleServer": "Card IDs from this server cannot be matched to the target server."
+        "incompatibleServer": "Card IDs from this server cannot be matched to the target server.",
+        "noCapture": "No game login in this capture. Capture while the game starts, then export again.",
+        "invalidCapture": "The player data in this capture could not be read. Export it as HAR with response bodies."
       },
       "resourceResultsChanged": "Training or conditions changed. Calculate again to update the results.",
       "localDraftChanged": "Your card library changed in another tab. Export your current inputs, then reload the saved library.",

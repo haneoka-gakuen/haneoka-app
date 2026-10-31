@@ -2331,7 +2331,9 @@
           "intl-cbt": "國際服封測"
         },
         "unavailableTarget": "目標服未收錄",
-        "incompatibleServer": "此來源服的卡牌編號無法與目標服對應。"
+        "incompatibleServer": "此來源服的卡牌編號無法與目標服對應。",
+        "noCapture": "這份抓包裡沒有遊戲登入。請在啟動遊戲時抓包，再重新匯出。",
+        "invalidCapture": "無法讀取這份抓包中的玩家資料。請以包含回應內容的 HAR 格式匯出。"
       },
       "resourceResultsChanged": "養成或條件已變更，請重新計算以更新結果。",
       "localDraftChanged": "另一個分頁已修改卡庫。請先匯出目前輸入，再重新讀取已儲存的卡庫。",
