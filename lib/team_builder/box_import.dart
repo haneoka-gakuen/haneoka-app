@@ -14,7 +14,6 @@ import 'package:crypto/crypto.dart';
 
 import '../save/codec.dart';
 import 'box.dart';
-import 'capture_import.dart';
 import 'engine/master.dart';
 import 'engine/num.dart';
 import 'engine/power.dart';
@@ -434,16 +433,6 @@ BoxCandidate? _parseBytes(Uint8List data) {
       .trimLeft();
   if (prefix.startsWith('ONPKG1:')) return parseBoxText(_utf8(data)).first;
   if (!prefix.startsWith('{')) return null;
-  if (RegExp(r'^\{\s*"log"\s*:').hasMatch(prefix)) {
-    final root = jsonDecode(_utf8(data));
-    if (isCapture(root)) {
-      try {
-        return projectBox(captureDocument(root as Map), 'player-json');
-      } on CaptureError catch (error) {
-        throw BoxImportError(error.code);
-      }
-    }
-  }
   return projectBox(_json(_utf8(data)), 'player-json');
 }
 
@@ -485,16 +474,7 @@ List<BoxCandidate> parseBoxFiles(List<Uint8List> files) {
         accept(Uint8List.fromList(entry.content));
       }
     } else {
-      final capture = RegExp(r'^\{\s*"log"\s*:').hasMatch(
-        utf8
-            .decode(
-              bytes.sublist(0, bytes.length < 64 ? bytes.length : 64),
-              allowMalformed: true,
-            )
-            .trimLeft(),
-      );
-      if (bytes.length >
-          (capture ? BoxLimits.inputBytes : BoxLimits.fileBytes)) {
+      if (bytes.length > BoxLimits.fileBytes) {
         throw const BoxImportError('box_file_budget');
       }
       accept(bytes);
