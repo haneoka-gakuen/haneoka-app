@@ -286,6 +286,10 @@ class RankingList extends StatefulWidget {
     required this.region,
     this.points = false,
     this.summary = false,
+    this.limit,
+    this.highlightRank,
+    this.rowDetail,
+    this.onData,
     this.onPlayer,
   });
 
@@ -293,6 +297,13 @@ class RankingList extends StatefulWidget {
   final String endpoint;
   final String region;
   final bool points, summary;
+
+  /// Shows exactly this many rows with no expansion; null keeps the top 20
+  /// with a button for the rest.
+  final int? limit;
+  final int? highlightRank;
+  final Widget? Function(Map row, num? observedAt)? rowDetail;
+  final void Function(Map ranking, CardCatalog cards)? onData;
   final void Function(String profileId)? onPlayer;
 
   @override
@@ -334,7 +345,10 @@ class RankingListState extends State<RankingList> {
         ? {...response, 'rows': previous!['rows']}
         : response;
     final result = (ranking, await CardCatalog.of(api));
-    if (mounted && endpoint == widget.endpoint) _last = result;
+    if (mounted && endpoint == widget.endpoint) {
+      _last = result;
+      widget.onData?.call(ranking, result.$2);
+    }
     return result;
   }
 
@@ -394,13 +408,23 @@ class RankingListState extends State<RankingList> {
                   ),
                 ),
               ),
-            for (final (index, row) in rows.take(_limit).indexed) ...[
+            for (final (index, row)
+                in rows.take(widget.limit ?? _limit).indexed) ...[
               if (index > 0) const Divider(height: 1),
-              _Row(
-                row: row,
-                cards: cards,
-                points: widget.points || widget.summary,
-                onPlayer: widget.onPlayer,
+              ColoredBox(
+                color: row['rank'] == widget.highlightRank
+                    ? theme.colorScheme.secondaryContainer
+                    : Colors.transparent,
+                child: _Row(
+                  row: row,
+                  cards: cards,
+                  points: widget.points || widget.summary,
+                  detail: widget.rowDetail?.call(
+                    row,
+                    fetched is num ? fetched : null,
+                  ),
+                  onPlayer: widget.onPlayer,
+                ),
               ),
             ],
             if (ranking['provider'] == 'official')
@@ -411,7 +435,7 @@ class RankingListState extends State<RankingList> {
                 ),
                 child: Text(rankingLabel(t, 'officialSource')),
               ),
-            if (rows.length > _limit)
+            if (widget.limit == null && rows.length > _limit)
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Center(
@@ -433,11 +457,13 @@ class _Row extends StatelessWidget {
     required this.row,
     required this.cards,
     required this.points,
+    this.detail,
     this.onPlayer,
   });
   final Map row;
   final CardCatalog cards;
   final bool points;
+  final Widget? detail;
   final void Function(String profileId)? onPlayer;
 
   @override
@@ -541,6 +567,7 @@ class _Row extends StatelessWidget {
                           color: scheme.onSurfaceVariant,
                         ),
                       ),
+                      ?detail,
                     ],
                   ),
                 ),
@@ -556,6 +583,8 @@ class _Row extends StatelessWidget {
                           )
                         : row['score'] is num
                         ? number.format(row['score'])
+                        : row['point'] is num
+                        ? number.format(row['point'])
                         : '—',
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontFeatures: const [FontFeature.tabularFigures()],
