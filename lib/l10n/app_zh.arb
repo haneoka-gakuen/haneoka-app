@@ -177,6 +177,11 @@
   "importToTeamHint": "直接使用此游戏账号的成员卡、留影、角色等级和乐队道具，预览后确认导入。",
   "saveAccountMismatch": "读取到的存档属于其他游戏账号或服务器，请选择此游戏账号的存档。",
   "saveUpdated": "游戏账号已更新",
+  "syncFromGame": "从游戏同步",
+  "syncedFromGame": "已从游戏同步",
+  "syncSessionExpired": "登录已失效，请重新读取存档。",
+  "syncUnrecognized": "无法识别游戏返回的数据。",
+  "syncFailed": "无法连接游戏服务器。",
   "cardSort": "卡牌排序",
   "sortRarity": "稀有度",
   "sortNewest": "最新卡牌"

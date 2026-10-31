@@ -564,6 +564,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get saveUpdated => '游戏账号已更新';
 
   @override
+  String get syncFromGame => '从游戏同步';
+
+  @override
+  String get syncedFromGame => '已从游戏同步';
+
+  @override
+  String get syncSessionExpired => '登录已失效，请重新读取存档。';
+
+  @override
+  String get syncUnrecognized => '无法识别游戏返回的数据。';
+
+  @override
+  String get syncFailed => '无法连接游戏服务器。';
+
+  @override
   String get cardSort => '卡牌排序';
 
   @override
@@ -1130,6 +1145,21 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get saveUpdated => '遊戲帳號已更新';
+
+  @override
+  String get syncFromGame => '從遊戲同步';
+
+  @override
+  String get syncedFromGame => '已從遊戲同步';
+
+  @override
+  String get syncSessionExpired => '登入已失效，請重新讀取存檔。';
+
+  @override
+  String get syncUnrecognized => '無法識別遊戲回傳的資料。';
+
+  @override
+  String get syncFailed => '無法連線至遊戲伺服器。';
 
   @override
   String get cardSort => '卡牌排序';

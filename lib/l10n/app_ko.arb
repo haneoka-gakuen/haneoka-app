@@ -177,6 +177,11 @@
   "importToTeamHint": "이 세이브의 카드, 스냅, 캐릭터 레벨과 밴드 아이템을 확인하고 가져옵니다.",
   "saveAccountMismatch": "다른 게임 계정이나 서버의 세이브입니다. 이 게임 계정의 세이브를 선택하세요.",
   "saveUpdated": "게임 계정이 업데이트되었습니다",
+  "syncFromGame": "게임에서 동기화",
+  "syncedFromGame": "게임에서 동기화했습니다",
+  "syncSessionExpired": "로그인이 만료되었습니다. 세이브를 다시 읽어 주세요.",
+  "syncUnrecognized": "게임 데이터를 읽을 수 없습니다.",
+  "syncFailed": "게임 서버에 연결할 수 없습니다.",
   "cardSort": "카드 정렬",
   "sortRarity": "희귀도",
   "sortNewest": "최신 카드"

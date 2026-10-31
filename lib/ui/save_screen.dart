@@ -17,6 +17,7 @@ import '../core/i18n.dart';
 import '../core/relative_time.dart';
 import '../l10n/app_localizations.dart';
 import '../save/account_store.dart';
+import '../save/player_refresh.dart';
 import '../save/export.dart';
 import '../save/game_save.dart';
 import '../save/save_view.dart';
@@ -194,6 +195,26 @@ class _SaveScreenState extends State<SaveScreen> {
     if (updated != null) _say(AppLocalizations.of(context).saveUpdated);
   }
 
+  Future<void> _syncFromGame() async {
+    if (_busy) return;
+    final t = AppLocalizations.of(context);
+    setState(() => _busy = true);
+    try {
+      await refreshFromGame(save);
+      if (mounted) _say(t.syncedFromGame);
+    } on PlayerRefreshError catch (error) {
+      if (!mounted) return;
+      _say(switch (error.code) {
+        'history_session_expired' || 'no_session' => t.syncSessionExpired,
+        'player_data_unrecognized' ||
+        'history_response_invalid' => t.syncUnrecognized,
+        _ => t.syncFailed,
+      });
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _importTeam() async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -217,9 +238,7 @@ class _SaveScreenState extends State<SaveScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final state = AppScope.of(context);
-    _catalog ??= _Catalog.of(
-      state.apiFor(save.server ?? state.server),
-    );
+    _catalog ??= _Catalog.of(state.apiFor(save.server ?? state.server));
   }
 
   void _say(String message) => ScaffoldMessenger.of(context)
@@ -235,8 +254,7 @@ class _SaveScreenState extends State<SaveScreen> {
   Future<void> _saveFile() async {
     final t = AppLocalizations.of(context);
     final bytes = exportSave(save);
-    final name =
-        'our-notes-${save.server ?? 'save'}-${save.profileId}.json';
+    final name = 'our-notes-${save.server ?? 'save'}-${save.profileId}.json';
     final path = await FilePicker.saveFile(fileName: name, bytes: bytes);
     if (path == null) return;
     if (mounted) _say(t.saved);
@@ -278,6 +296,12 @@ class _SaveScreenState extends State<SaveScreen> {
           onPressed: _busy ? null : _importTeam,
           tonal: true,
         ),
+        if (canRefreshFromGame(save))
+          BarAction(
+            icon: Symbols.cloud_sync_rounded,
+            label: t.syncFromGame,
+            onPressed: _busy ? null : _syncFromGame,
+          ),
         BarAction(
           icon: Symbols.refresh_rounded,
           label: t.updateSave,
@@ -293,6 +317,10 @@ class _SaveScreenState extends State<SaveScreen> {
           onSaveFile: _saveFile,
           onRemove: _remove,
           onUpdateSave: _busy ? null : _updateSave,
+          onSyncFromGame: canRefreshFromGame(save) && !_busy
+              ? _syncFromGame
+              : null,
+          showSyncFromGame: canRefreshFromGame(save),
           onImportTeam: _busy ? null : _importTeam,
           showReadHistory: _historyAction != null,
           onReadHistory: _busy || _historyAction == null
@@ -314,6 +342,8 @@ class _Profile extends StatelessWidget {
     required this.onSaveFile,
     required this.onRemove,
     required this.onUpdateSave,
+    required this.onSyncFromGame,
+    required this.showSyncFromGame,
     required this.onImportTeam,
     required this.onReadHistory,
     required this.showReadHistory,
@@ -325,7 +355,8 @@ class _Profile extends StatelessWidget {
   final VoidCallback onCopyPackage;
   final VoidCallback onSaveFile;
   final VoidCallback onRemove;
-  final VoidCallback? onUpdateSave, onImportTeam, onReadHistory;
+  final VoidCallback? onUpdateSave, onSyncFromGame, onImportTeam, onReadHistory;
+  final bool showSyncFromGame;
   final bool newestFirst, showReadHistory;
   final ValueChanged<bool> onSortChanged;
 
@@ -930,6 +961,12 @@ class _Profile extends StatelessWidget {
                       icon: const Icon(Symbols.groups_rounded),
                       label: Text(t.importToTeamBuilder),
                     ),
+                    if (showSyncFromGame)
+                      FilledButton.tonalIcon(
+                        onPressed: onSyncFromGame,
+                        icon: const Icon(Symbols.cloud_sync_rounded),
+                        label: Text(t.syncFromGame),
+                      ),
                     OutlinedButton.icon(
                       onPressed: onUpdateSave,
                       icon: const Icon(Symbols.refresh_rounded),

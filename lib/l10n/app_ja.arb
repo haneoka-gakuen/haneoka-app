@@ -177,6 +177,11 @@
   "importToTeamHint": "このセーブのカード、スナップ、キャラクターレベルとバンドアイテムを確認して取り込みます。",
   "saveAccountMismatch": "別のゲームアカウントまたはサーバーのセーブです。このゲームアカウントのセーブを選んでください。",
   "saveUpdated": "ゲームアカウントを更新しました",
+  "syncFromGame": "ゲームから同期",
+  "syncedFromGame": "ゲームから同期しました",
+  "syncSessionExpired": "ログインの有効期限が切れました。セーブデータを読み直してください。",
+  "syncUnrecognized": "ゲームのデータを読み取れませんでした。",
+  "syncFailed": "ゲームサーバーに接続できません。",
   "cardSort": "カードの並び順",
   "sortRarity": "レアリティ",
   "sortNewest": "新しいカード"

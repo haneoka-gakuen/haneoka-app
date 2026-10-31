@@ -575,6 +575,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get saveUpdated => 'Game account updated';
 
   @override
+  String get syncFromGame => 'Sync from game';
+
+  @override
+  String get syncedFromGame => 'Synced from the game';
+
+  @override
+  String get syncSessionExpired => 'Sign-in expired. Read the save again.';
+
+  @override
+  String get syncUnrecognized => 'The game\'s data couldn\'t be read.';
+
+  @override
+  String get syncFailed => 'Couldn\'t reach the game server.';
+
+  @override
   String get cardSort => 'Card order';
 
   @override

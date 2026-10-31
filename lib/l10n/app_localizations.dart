@@ -1165,6 +1165,36 @@ abstract class AppLocalizations {
   /// **'Game account updated'**
   String get saveUpdated;
 
+  /// No description provided for @syncFromGame.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync from game'**
+  String get syncFromGame;
+
+  /// No description provided for @syncedFromGame.
+  ///
+  /// In en, this message translates to:
+  /// **'Synced from the game'**
+  String get syncedFromGame;
+
+  /// No description provided for @syncSessionExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in expired. Read the save again.'**
+  String get syncSessionExpired;
+
+  /// No description provided for @syncUnrecognized.
+  ///
+  /// In en, this message translates to:
+  /// **'The game\'s data couldn\'t be read.'**
+  String get syncUnrecognized;
+
+  /// No description provided for @syncFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t reach the game server.'**
+  String get syncFailed;
+
   /// No description provided for @cardSort.
   ///
   /// In en, this message translates to:

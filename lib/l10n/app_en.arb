@@ -229,6 +229,11 @@
   "importToTeamHint": "Review and import cards, snapshots, character levels and band items directly from this save.",
   "saveAccountMismatch": "This save belongs to another game account or server. Choose a save for this game account.",
   "saveUpdated": "Game account updated",
+  "syncFromGame": "Sync from game",
+  "syncedFromGame": "Synced from the game",
+  "syncSessionExpired": "Sign-in expired. Read the save again.",
+  "syncUnrecognized": "The game's data couldn't be read.",
+  "syncFailed": "Couldn't reach the game server.",
   "cardSort": "Card order",
   "sortRarity": "Rarity",
   "sortNewest": "Newest cards"

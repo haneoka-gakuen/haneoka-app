@@ -567,6 +567,21 @@ class AppLocalizationsJa extends AppLocalizations {
   String get saveUpdated => 'ゲームアカウントを更新しました';
 
   @override
+  String get syncFromGame => 'ゲームから同期';
+
+  @override
+  String get syncedFromGame => 'ゲームから同期しました';
+
+  @override
+  String get syncSessionExpired => 'ログインの有効期限が切れました。セーブデータを読み直してください。';
+
+  @override
+  String get syncUnrecognized => 'ゲームのデータを読み取れませんでした。';
+
+  @override
+  String get syncFailed => 'ゲームサーバーに接続できません。';
+
+  @override
   String get cardSort => 'カードの並び順';
 
   @override

@@ -177,6 +177,11 @@
   "importToTeamHint": "直接使用此遊戲帳號的成員卡、留影、角色等級和樂團道具，預覽後確認匯入。",
   "saveAccountMismatch": "讀取到的存檔屬於其他遊戲帳號或伺服器，請選擇此遊戲帳號的存檔。",
   "saveUpdated": "遊戲帳號已更新",
+  "syncFromGame": "從遊戲同步",
+  "syncedFromGame": "已從遊戲同步",
+  "syncSessionExpired": "登入已失效，請重新讀取存檔。",
+  "syncUnrecognized": "無法識別遊戲回傳的資料。",
+  "syncFailed": "無法連線至遊戲伺服器。",
   "cardSort": "卡牌排序",
   "sortRarity": "稀有度",
   "sortNewest": "最新卡牌"

@@ -569,6 +569,21 @@ class AppLocalizationsKo extends AppLocalizations {
   String get saveUpdated => '게임 계정이 업데이트되었습니다';
 
   @override
+  String get syncFromGame => '게임에서 동기화';
+
+  @override
+  String get syncedFromGame => '게임에서 동기화했습니다';
+
+  @override
+  String get syncSessionExpired => '로그인이 만료되었습니다. 세이브를 다시 읽어 주세요.';
+
+  @override
+  String get syncUnrecognized => '게임 데이터를 읽을 수 없습니다.';
+
+  @override
+  String get syncFailed => '게임 서버에 연결할 수 없습니다.';
+
+  @override
   String get cardSort => '카드 정렬';
 
   @override
