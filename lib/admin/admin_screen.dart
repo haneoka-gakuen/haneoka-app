@@ -1,3 +1,5 @@
+import 'comments_panel.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -34,6 +36,7 @@ class AdminScreen extends StatefulWidget {
 }
 
 class _AdminScreenState extends State<AdminScreen> {
+  String _commentQuery = '';
   late final c = AdminController(
     adminSections.contains(widget.section) ? widget.section : 'overview',
     initialQuery: widget.query,
@@ -148,6 +151,7 @@ class _AdminScreenState extends State<AdminScreen> {
     'forums' => Symbols.forum_rounded,
     'reports' => Symbols.flag_rounded,
     'appeals' => Symbols.balance_rounded,
+    'comments' => Symbols.forum_rounded,
     'operations' => Symbols.settings_rounded,
     _ => Symbols.dashboard_rounded,
   };
@@ -1017,6 +1021,27 @@ class _AdminScreenState extends State<AdminScreen> {
                   },
                   child: Text(t(c.error == null ? 'retry' : 'forbidden')),
                 ),
+        ),
+      );
+    }
+    if (c.section == 'comments') {
+      return ShellPage(
+        title: t('sections.comments'),
+        actions: _actions,
+        search: ShellSearch(
+          label: AppScope.of(context)
+              .text('admin.comments.search', 'Search comments'),
+          onChanged: (value) => setState(() => _commentQuery = value.trim()),
+        ),
+        body: ListView(
+          padding: pagePadding(context),
+          children: [
+            AdminCommentsPanel(
+              key: ValueKey(c.ownerGeneration),
+              controller: c,
+              query: _commentQuery,
+            ),
+          ],
         ),
       );
     }

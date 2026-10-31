@@ -15,6 +15,7 @@ const adminSections = [
   'forums',
   'reports',
   'appeals',
+  'comments',
   'operations',
 ];
 const adminRoles = [
