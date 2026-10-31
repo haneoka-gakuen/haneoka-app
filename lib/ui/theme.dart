@@ -59,6 +59,7 @@ ThemeData haneokaTheme(
   Brightness brightness, {
   String seed = 'haneoka',
   (ColorScheme, ColorScheme)? schemes,
+  bool backdrop = false,
   bool compact = false,
   Locale locale = const Locale('ja'),
 }) {
@@ -82,7 +83,9 @@ ThemeData haneokaTheme(
         TargetPlatform.linux: FadeForwardsPageTransitionsBuilder(),
       },
     ),
-    scaffoldBackgroundColor: scheme.surfaceContainer,
+    scaffoldBackgroundColor: backdrop
+        ? Colors.transparent
+        : scheme.surfaceContainer,
     appBarTheme: AppBarTheme(
       backgroundColor: scheme.surfaceContainer,
       surfaceTintColor: Colors.transparent,

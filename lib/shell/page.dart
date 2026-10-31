@@ -172,15 +172,19 @@ class _ShellPageState extends State<ShellPage> {
     final compact = shell?.compact ?? false;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final barColor = compact
-        ? (_scrolled ? scheme.surfaceContainer : scheme.surface)
-        : scheme.surfaceContainer;
+    // Over the seasonal background the frame is clear and the pane translucent.
+    final backdrop = AppScope.maybeOf(context)?.seasonBackdrop ?? false;
+    final surface = backdrop
+        ? scheme.surface.withValues(alpha: 0.55)
+        : scheme.surface;
+    final frame = backdrop ? Colors.transparent : scheme.surfaceContainer;
+    final barColor = compact ? (_scrolled ? frame : surface) : frame;
     final pane = NotificationListener<ScrollNotification>(
       onNotification: _onScroll,
-      child: Material(color: scheme.surface, child: widget.body),
+      child: Material(color: surface, child: widget.body),
     );
     return Material(
-      color: compact ? scheme.surface : scheme.surfaceContainer,
+      color: compact ? surface : frame,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

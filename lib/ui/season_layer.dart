@@ -1,6 +1,6 @@
-/// The website's seasonal effect layer (`src/lib/seasonal.ts`): the motif of
-/// a seasonal or birthday theme drifting over the app, never taking input,
-/// and off when the system turns animations off.
+/// The website's seasonal background (`src/lib/seasonal.ts`) for a seasonal
+/// or birthday theme, behind the app; still when the system turns animations
+/// off.
 library;
 
 import 'dart:math' as math;
@@ -24,38 +24,59 @@ class SeasonLayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final motif = this.motif;
-    if (motif == null || MediaQuery.disableAnimationsOf(context)) return child;
+    if (motif == null) return child;
     return Stack(
       children: [
-        child,
         Positioned.fill(
           child: IgnorePointer(
-            child: RepaintBoundary(child: _Field(motif: motif)),
+            child: RepaintBoundary(
+              child: _Backdrop(
+                motif: motif,
+                still: MediaQuery.disableAnimationsOf(context),
+              ),
+            ),
           ),
         ),
+        child,
       ],
     );
   }
 }
 
-class _Field extends StatefulWidget {
-  const _Field({required this.motif});
+/// The website's seasonal background (MoeSekai's brand background): a wash
+/// in the theme's colours, three facets, and the motif over three depths with
+/// blur, drifting slowly. It sits behind the app, which turns its frame
+/// transparent and its page pane translucent while it shows.
+class _Backdrop extends StatefulWidget {
+  const _Backdrop({required this.motif, required this.still});
   final Motif motif;
+  final bool still;
 
   @override
-  State<_Field> createState() => _FieldState();
+  State<_Backdrop> createState() => _BackdropState();
 }
 
-class _FieldState extends State<_Field> with SingleTickerProviderStateMixin {
+class _BackdropState extends State<_Backdrop>
+    with SingleTickerProviderStateMixin {
   late final Ticker _ticker;
   final _time = ValueNotifier<double>(0);
 
   @override
   void initState() {
     super.initState();
-    _ticker = createTicker(
-      (elapsed) => _time.value = elapsed.inMicroseconds / 1e6,
-    )..start();
+    // The drift is slow: about fifteen frames a second is smooth enough.
+    _ticker = createTicker((elapsed) {
+      final t = elapsed.inMilliseconds / 1000;
+      if (t - _time.value >= 1 / 15) _time.value = t;
+    });
+    if (!widget.still) _ticker.start();
+  }
+
+  @override
+  void didUpdateWidget(_Backdrop old) {
+    super.didUpdateWidget(old);
+    if (widget.still && _ticker.isActive) _ticker.stop();
+    if (!widget.still && !_ticker.isActive) _ticker.start();
   }
 
   @override
@@ -68,14 +89,13 @@ class _FieldState extends State<_Field> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final count = MediaQuery.sizeOf(context).width < 600 ? 10 : 18;
+    final narrow = MediaQuery.sizeOf(context).width < 600;
     return CustomPaint(
       painter: _Painter(
         motif: widget.motif,
         time: _time,
-        count: count,
-        tones: [scheme.primary, scheme.tertiary, scheme.secondary],
-        moon: scheme.tertiaryContainer,
+        narrow: narrow,
+        scheme: scheme,
       ),
       size: Size.infinite,
     );
@@ -120,19 +140,24 @@ double _random(int seed) {
   return value - value.floorToDouble();
 }
 
+/// Depths from far to near: glyph count, size range, blur and opacity.
+const _depths = [
+  (count: 5, size: (56.0, 88.0), blur: 6.0, opacity: 0.3),
+  (count: 8, size: (22.0, 32.0), blur: 1.5, opacity: 0.55),
+  (count: 14, size: (14.0, 22.0), blur: 0.0, opacity: 0.75),
+];
+
 class _Painter extends CustomPainter {
   _Painter({
     required this.motif,
     required this.time,
-    required this.count,
-    required this.tones,
-    required this.moon,
+    required this.narrow,
+    required this.scheme,
   }) : super(repaint: time);
   final Motif motif;
   final ValueNotifier<double> time;
-  final int count;
-  final List<Color> tones;
-  final Color moon;
+  final bool narrow;
+  final ColorScheme scheme;
 
   void _icon(Canvas canvas, IconData icon, Color color, double size) {
     final painter = TextPainter(
@@ -160,122 +185,157 @@ class _Painter extends CustomPainter {
       ..restore();
   }
 
+  void _glyph(Canvas canvas, int index, Color color, double size) {
+    final paint = Paint()..color = color;
+    switch (motif) {
+      case Motif.snow when index % 3 == 0:
+        _icon(canvas, Symbols.ac_unit_rounded, color, size);
+      case Motif.hearts:
+        _icon(canvas, Symbols.favorite_rounded, color, size);
+      case Motif.sparkles || Motif.fireworks when index % 3 != 0:
+        _icon(canvas, Symbols.auto_awesome_rounded, color, size);
+      case Motif.stars when index % 3 != 0:
+        _icon(canvas, Symbols.star_rounded, color, size);
+      case Motif.bats:
+        _shape(canvas, _batPath, const Size(24, 12), color, size);
+      case Motif.lanterns:
+        _shape(canvas, _lanternPath, const Size(16, 24), color, size * 0.7);
+      case Motif.petals:
+        final r = size / 2;
+        canvas.drawPath(
+          Path()
+            ..moveTo(0, -r)
+            ..quadraticBezierTo(r * 0.8, -r, 0, r)
+            ..quadraticBezierTo(-r * 0.8, r, 0, -r),
+          paint,
+        );
+      case Motif.confetti:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromCenter(
+              center: Offset.zero,
+              width: size * 0.36,
+              height: size * 0.72,
+            ),
+            const Radius.circular(2),
+          ),
+          paint,
+        );
+      default:
+        canvas.drawCircle(Offset.zero, size * 0.2, paint);
+    }
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     final t = time.value;
     final w = size.width, h = size.height;
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = scheme.surfaceContainer,
+    );
+    void wash(Offset centre, double rx, double ry, Color color, double alpha) {
+      canvas
+        ..save()
+        ..translate(centre.dx, centre.dy)
+        ..scale(1, ry / rx)
+        ..drawCircle(
+          Offset.zero,
+          rx,
+          Paint()
+            ..shader = RadialGradient(
+              colors: [
+                color.withValues(alpha: alpha),
+                color.withValues(alpha: 0),
+              ],
+              stops: const [0, 0.72],
+            ).createShader(Rect.fromCircle(center: Offset.zero, radius: rx)),
+        )
+        ..restore();
+    }
+
+    wash(Offset.zero, 1024, 832, scheme.primaryContainer, 0.7);
+    wash(Offset(w * 0.62, -h * 0.1), 1152, 704, scheme.tertiaryContainer, 0.6);
+    wash(Offset(w, h), 1088, 832, scheme.primaryContainer, 0.55);
+    wash(Offset(w * 0.06, h), 896, 704, scheme.tertiaryContainer, 0.5);
+    final facet = Paint()
+      ..color = scheme.surfaceBright.withValues(alpha: 0.45 * 0.9);
+    Path poly(List<double> points) {
+      final path = Path()..moveTo(points[0] / 1600 * w, points[1] / 900 * h);
+      for (var i = 2; i < points.length; i += 2) {
+        path.lineTo(points[i] / 1600 * w, points[i + 1] / 900 * h);
+      }
+      return path..close();
+    }
+
+    canvas
+      ..drawPath(poly([0, 0, 380, 0, 0, 820]), facet)
+      ..drawPath(
+        poly([250, 0, 1600, 0, 1600, 380, 1040, 250]),
+        Paint()..color = scheme.surfaceBright.withValues(alpha: 0.45 * 0.55),
+      )
+      ..drawPath(
+        poly([120, 900, 1040, 250, 1600, 380, 1600, 900]),
+        Paint()..color = scheme.surfaceBright.withValues(alpha: 0.45 * 0.75),
+      );
     if (motif == Motif.moon) {
-      final centre = Offset(w * 0.94 - 36, 124);
       canvas.drawCircle(
-        centre,
-        36,
+        Offset(w * 0.92 - 60, h * 0.12 + 60),
+        60,
         Paint()
-          ..color = moon.withValues(alpha: 0.7)
-          ..maskFilter = const ui.MaskFilter.blur(BlurStyle.solid, 24),
+          ..color = scheme.tertiaryContainer.withValues(alpha: 0.8)
+          ..maskFilter = const ui.MaskFilter.blur(BlurStyle.solid, 40),
       );
     }
-    for (var i = 0; i < count; i++) {
-      final x0 = _random(i + 1), y0 = _random(i + 41) * 0.7;
-      final duration = 10 + _random(i + 13) * 10;
-      final phase = ((t + _random(i + 7) * 16) / duration) % 1;
-      final scale = 0.6 + _random(i + 29) * 0.8;
-      final sway = (_random(i + 3) - 0.5) * 120;
-      final color = tones[i % 3].withValues(alpha: 0.55);
-      final wave = math.sin(phase * 2 * math.pi);
-      canvas.save();
-      switch (motif) {
-        case Motif.hearts || Motif.lanterns:
-          canvas.translate(x0 * w + sway * wave, h + 32 - phase * (h + 64));
-        case Motif.bats:
-          canvas.translate(-40 + phase * (w + 80), y0 * h + sway * wave / 2);
-        case Motif.stars || Motif.sparkles || Motif.fireworks:
-          canvas.translate(x0 * w, y0 * h);
-        default:
-          canvas.translate(x0 * w + sway * wave, -32 + phase * (h + 64));
-      }
-      canvas.scale(scale);
-      switch (motif) {
-        case Motif.snow:
-          if (i % 3 == 0) {
-            canvas.rotate(phase * math.pi);
-            _icon(canvas, Symbols.ac_unit_rounded, color, 16);
-          } else {
-            canvas.drawCircle(Offset.zero, 3, Paint()..color = color);
-          }
-        case Motif.hearts:
-          _icon(canvas, Symbols.favorite_rounded, color, 18);
-        case Motif.sparkles || Motif.stars:
-          final glow =
-              0.15 + 0.55 * (0.5 + 0.5 * math.sin(phase * 6 * math.pi));
-          _icon(
-            canvas,
-            motif == Motif.stars
-                ? Symbols.star_rounded
-                : Symbols.auto_awesome_rounded,
-            tones[i % 3].withValues(alpha: glow),
-            motif == Motif.stars ? 12 : 18,
-          );
-        case Motif.petals:
-          canvas.rotate(phase * 4 * math.pi);
-          canvas.drawPath(
-            Path()
-              ..moveTo(0, -7)
-              ..quadraticBezierTo(7, -7, 0, 7)
-              ..quadraticBezierTo(-7, 7, 0, -7),
-            Paint()..color = color,
-          );
-        case Motif.confetti:
-          canvas.rotate(phase * 4 * math.pi);
-          canvas.drawRRect(
-            RRect.fromRectAndRadius(
-              const Rect.fromLTWH(-3, -6, 6, 12),
-              const Radius.circular(2),
+    final tones = [scheme.primary, scheme.tertiary];
+    for (final (layer, depth) in _depths.indexed) {
+      final count = narrow ? (depth.count / 2).ceil() : depth.count;
+      if (depth.blur > 0) {
+        canvas.saveLayer(
+          null,
+          Paint()
+            ..imageFilter = ui.ImageFilter.blur(
+              sigmaX: depth.blur,
+              sigmaY: depth.blur,
             ),
-            Paint()..color = color,
-          );
-        case Motif.beans || Motif.moon:
-          canvas.drawCircle(Offset.zero, 3, Paint()..color = color);
-        case Motif.bats:
-          canvas.scale(1, 0.45 + 0.55 * (0.5 + 0.5 * math.sin(t * 18 + i)));
-          _shape(
-            canvas,
-            _batPath,
-            const Size(24, 12),
-            tones[i % 3].withValues(alpha: 0.5),
-            32,
-          );
-        case Motif.lanterns:
-          _shape(
-            canvas,
-            _lanternPath,
-            const Size(16, 24),
-            tones[i % 3].withValues(alpha: 0.4),
-            18,
-          );
-        case Motif.fireworks:
-          final burst = (phase * 3) % 1;
-          if (burst < 0.6) {
-            final paint = Paint()
-              ..color = tones[i % 3].withValues(
-                alpha: (1 - burst / 0.6).clamp(0, 1),
-              );
-            for (var k = 0; k < 10; k++) {
-              final angle = k * math.pi / 5;
-              canvas.drawCircle(
-                Offset(math.cos(angle), math.sin(angle)) * (burst / 0.6 * 48),
-                2,
-                paint,
-              );
-            }
-          }
+        );
       }
-      canvas.restore();
+      for (var i = 0; i < count; i++) {
+        final seed = layer * 97 + i + 1;
+        final glyph =
+            depth.size.$1 + _random(seed + 3) * (depth.size.$2 - depth.size.$1);
+        final duration = 14 + _random(seed + 13) * 14;
+        // An eased back-and-forth like the website's alternate drift.
+        final phase =
+            0.5 -
+            0.5 * math.cos((t / duration + _random(seed + 7)) * 2 * math.pi);
+        final dx = (_random(seed + 5) - 0.5) * 32 * phase;
+        final dy = (_random(seed + 9) - 0.5) * 40 * phase;
+        final turn = (_random(seed + 11) - 0.5) * 24 * phase;
+        var alpha = depth.opacity;
+        if ((motif == Motif.stars ||
+                motif == Motif.sparkles ||
+                motif == Motif.fireworks) &&
+            depth.blur == 0) {
+          alpha *= 0.72 + 0.28 * math.sin((t / duration * 3 + i) * 2 * math.pi);
+        }
+        canvas
+          ..save()
+          ..translate(
+            _random(seed) * w + dx,
+            (_random(seed + 41) * 1.2 - 0.1) * h + dy,
+          )
+          ..rotate(((_random(seed + 17) - 0.5) * 60 + turn) * math.pi / 180);
+        _glyph(canvas, i, tones[i % 2].withValues(alpha: alpha), glyph);
+        canvas.restore();
+      }
+      if (depth.blur > 0) canvas.restore();
     }
   }
 
   @override
   bool shouldRepaint(_Painter old) =>
-      old.motif != motif || old.count != count || old.tones != tones;
+      old.motif != motif || old.narrow != narrow || old.scheme != scheme;
 }
 
 /// The brand mark, in a seasonal theme cut to its shape on a tonal container

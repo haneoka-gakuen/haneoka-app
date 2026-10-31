@@ -265,6 +265,9 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
+  /// Whether the seasonal background shows behind the app.
+  bool get seasonBackdrop => seasonEffects && shownDecoration != null;
+
   /// Light and dark schemes for a character or seasonal seed.
   (ColorScheme, ColorScheme)? schemesFor(String value) {
     if (_schemes[value] case final cached?) return cached;

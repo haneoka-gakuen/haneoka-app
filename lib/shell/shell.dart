@@ -604,7 +604,9 @@ class _DrawerState extends State<_Drawer> {
     );
 
     return ColoredBox(
-      color: scheme.surfaceContainer,
+      color: AppScope.of(context).seasonBackdrop
+          ? Colors.transparent
+          : scheme.surfaceContainer,
       child: SafeArea(
         child: Column(
           children: [
