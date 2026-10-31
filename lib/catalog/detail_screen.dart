@@ -634,9 +634,15 @@ class _Page {
         ),
     ];
     return [
+      if (facts.isNotEmpty)
+        DetailSection(
+          icon: Symbols.info_rounded,
+          title: t('common.actions.details', 'Details'),
+          child: DataGrid(cells: facts, minWidth: 180),
+        ),
       DetailSection(
-        icon: Symbols.info_rounded,
-        title: t('common.actions.details', 'Details'),
+        icon: Symbols.bar_chart_rounded,
+        title: t('navigation.chart', 'Chart'),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -673,7 +679,6 @@ class _Page {
                 estimate: estimate(chart),
               ),
             ),
-            DataGrid(cells: facts, minWidth: 180),
           ],
         ),
       ),

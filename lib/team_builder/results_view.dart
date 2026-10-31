@@ -26,6 +26,7 @@ import '../ui/card_artwork.dart';
 import '../ui/scrollable_choice_chips.dart';
 import '../ui/theme.dart';
 import 'box.dart';
+import 'box_import_screen.dart';
 import 'controller.dart';
 import 'engine/api.dart';
 import 'engine/num.dart';
@@ -335,6 +336,8 @@ class _ResultsViewState extends State<ResultsView> {
     final theme = Theme.of(context);
     final locale = c.state.text.locale;
     if (results == null) {
+      final noCards =
+          !c.searchSettings.theoretical && (c.view?.members.isEmpty ?? true);
       return ToolSection(
         children: [
           Padding(
@@ -348,9 +351,19 @@ class _ResultsViewState extends State<ResultsView> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  c.tb('resultsEmpty', 'Results appear here'),
+                  noCards
+                      ? c.tb('emptyBoxTitle', 'No cards imported yet')
+                      : c.tb('resultsEmpty', 'Results appear here'),
                   style: theme.textTheme.titleMedium,
+                  textAlign: TextAlign.center,
                 ),
+                if (noCards) ...[
+                  const SizedBox(height: 12),
+                  FilledButton.tonal(
+                    onPressed: () => openBoxImport(context, c, members: true),
+                    child: Text(c.tb('importMyCards', 'Import my cards')),
+                  ),
+                ],
               ],
             ),
           ),

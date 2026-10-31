@@ -559,6 +559,7 @@ class _HomeScreenState extends State<HomeScreen> {
     BuildContext context,
     SiteText t,
     Map<String, Object?>? seed,
+    CatalogVisuals visuals,
   ) {
     final theme = Theme.of(context);
     final api = CatalogSourceScope.apiOf(context);
@@ -607,20 +608,33 @@ class _HomeScreenState extends State<HomeScreen> {
           ? null
           : AppImage(candidates: [api.asset('$source').toString()]),
     );
-    Widget rule(Doc? value, {bool next = false}) {
-      final id = intListOf(value?['missions']).firstOrNull;
+    Widget rule(Doc? value, {required bool compact, bool next = false}) {
+      final ids = intListOf(value?['missions']).toSet();
+      final size = next ? 16.0 : 18.0;
+      final style = next
+          ? theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            )
+          : theme.textTheme.labelSmall;
+      final same = intListOf(value?['missions']).length == 3 && ids.length == 1;
       return Row(
         mainAxisSize: MainAxisSize.min,
-        spacing: 2,
+        spacing: 3,
         children: [
-          if (next) const Icon(Symbols.arrow_forward_rounded, size: 12),
-          mark(missions['$id'], next ? 16 : 18),
-          Text(
-            ['', 'COMBO', 'LUCK', 'JUST'].elementAtOrNull(id ?? 0) ?? '',
-            style: next
-                ? theme.textTheme.labelSmall
-                : theme.textTheme.labelMedium,
-          ),
+          mark(visuals.musicTypeMark(value?['musicType']), size),
+          if (compact)
+            for (final id in ids) mark(missions['$id'], size)
+          else
+            Flexible(
+              child: Text(
+                same
+                    ? '${_missionNames[ids.first]}×3'
+                    : ids.map((id) => _missionNames[id]).join(' / '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: style,
+              ),
+            ),
         ],
       );
     }
@@ -632,70 +646,89 @@ class _HomeScreenState extends State<HomeScreen> {
       viewAll: t('home.dashboard.viewAll', 'View all'),
       onViewAll: open,
       framed: true,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 4,
-          children: [
-            Wrap(
-              spacing: 12,
-              crossAxisAlignment: WrapCrossAlignment.center,
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final compact = box.maxWidth <= 420;
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              spacing: 4,
               children: [
-                Text(
-                  t.text(season['title']),
-                  style: theme.textTheme.labelLarge,
-                ),
-                Text(
-                  t(
-                    live
-                        ? 'catalog.arena.status.current'
-                        : 'catalog.arena.status.upcoming',
+                if (!compact)
+                  Wrap(
+                    spacing: 12,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        t.text(season['title']),
+                        style: theme.textTheme.labelLarge,
+                      ),
+                      Text(
+                        t(
+                          live
+                              ? 'catalog.arena.status.current'
+                              : 'catalog.arena.status.upcoming',
+                        ),
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                      Text(
+                        live
+                            ? span(intOf(season['endAt']) + 1000)
+                            : span(intOf(season['startAt'])),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
                   ),
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-                Text(
-                  live
-                      ? span(intOf(season['endAt']) + 1000)
-                      : span(intOf(season['startAt'])),
-                  style: theme.textTheme.bodySmall,
+                Row(
+                  spacing: 4,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final (index, league) in leagues.indexed)
+                      Expanded(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(Corner.medium),
+                          onTap: () => open(intOf(league['bandId'])),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 2,
+                              vertical: 4,
+                            ),
+                            child: Column(
+                              spacing: 2,
+                              children: [
+                                Tooltip(
+                                  message: t.text(league['name']),
+                                  child: mark(league['image'], 28),
+                                ),
+                                rule(
+                                  arenaRuleAt(
+                                    season,
+                                    league,
+                                    live ? now : intOf(season['startAt']),
+                                  ),
+                                  compact: compact,
+                                ),
+                                if (rotation != null)
+                                  rule(
+                                    rotation.rules.elementAtOrNull(index),
+                                    compact: compact,
+                                    next: true,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
-            for (final (index, league) in leagues.indexed)
-              Expanded(
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(Corner.small),
-                  onTap: () => open(intOf(league['bandId'])),
-                  child: Row(
-                    spacing: 8,
-                    children: [
-                      mark(league['image'], 24),
-                      Expanded(
-                        child: Text(
-                          t.text(league['name']),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ),
-                      rule(
-                        arenaRuleAt(
-                          season,
-                          league,
-                          live ? now : intOf(season['startAt']),
-                        ),
-                      ),
-                      if (rotation != null)
-                        rule(rotation.rules.elementAtOrNull(index), next: true),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -1011,6 +1044,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                             context,
                                             t,
                                             snapshot.data?.seed,
+                                            data.visuals,
                                           ),
                                           'songs' => _Module(
                                             aside: _railButtons(_songsScroll),
@@ -1185,6 +1219,8 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 /// A home module: the section heading with View all, then its content.
+const _missionNames = {1: 'COMBO', 2: 'LUCK', 3: 'JUST'};
+
 class _Module extends StatelessWidget {
   const _Module({
     required this.icon,
@@ -1541,30 +1577,39 @@ class _EventCard extends StatelessWidget {
     final characters = visuals.characters.values.where(
       (c) => bands.contains(c['bandId']),
     );
-    Widget bonusTarget(Map target) {
+    Widget bonusTarget(Map target, {bool compact = false}) {
       final band = visuals.bands[target['bandId']];
+      final own = target['image'];
       final image = target['homeTargetKind'] == 'band'
           ? visuals.bandIcon(target['bandId']) ?? target['icon']
-          : target['image'] ?? visuals.cardTypeMark(target['cardType']);
+          : own is String && own.isNotEmpty
+          ? own
+          : visuals.cardTypeMark(num.tryParse('${target['cardType']}'));
       final name = t.text(target['name']);
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (image is String && image.isNotEmpty)
-            SizedBox.square(
-              dimension: 20,
-              child: AppImage(candidates: [api.asset(image).toString()]),
-            ),
-          const SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              name.isNotEmpty ? name : t.text(band?['bandName']),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelSmall,
-            ),
-          ),
-        ],
+      final label = name.isNotEmpty ? name : t.text(band?['bandName']);
+      return Tooltip(
+        message: label,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (image is String && image.isNotEmpty)
+              SizedBox.square(
+                dimension: 20,
+                child: AppImage(candidates: [api.asset(image).toString()]),
+              ),
+            if (!compact) ...[
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall,
+                ),
+              ),
+            ],
+          ],
+        ),
       );
     }
 
@@ -1652,6 +1697,7 @@ class _EventCard extends StatelessWidget {
                           ),
                           if (start != null &&
                               end != null &&
+                              !tight &&
                               box.maxHeight > 125)
                             Text(
                               '${SiteDate.day(t.locale).format(DateTime.fromMillisecondsSinceEpoch(start.toInt()))} – ${SiteDate.day(t.locale).format(DateTime.fromMillisecondsSinceEpoch(end.toInt()))}',
@@ -1682,7 +1728,7 @@ class _EventCard extends StatelessWidget {
                                             'attribute',
                                           }.contains(target['homeTargetKind']),
                                         ))
-                                          bonusTarget(target),
+                                          bonusTarget(target, compact: tight),
                                       ],
                                     ),
                                     const SizedBox(height: 4),
@@ -1702,7 +1748,7 @@ class _EventCard extends StatelessWidget {
                                               ),
                                               child: ClipOval(
                                                 child: SizedBox.square(
-                                                  dimension: tight ? 24 : 32,
+                                                  dimension: tight ? 20 : 32,
                                                   child: AppImage(
                                                     candidates: [
                                                       api
@@ -1796,19 +1842,20 @@ class _EventCard extends StatelessWidget {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Icon(action.$1, size: 20),
-                                          Text(
-                                            action.$2,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            textAlign: TextAlign.center,
-                                            style: theme.textTheme.labelSmall
-                                                ?.copyWith(
-                                                  color: index == 0
-                                                      ? scheme.onPrimary
-                                                      : scheme
-                                                            .onSecondaryContainer,
-                                                ),
-                                          ),
+                                          if (!tight)
+                                            Text(
+                                              action.$2,
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              textAlign: TextAlign.center,
+                                              style: theme.textTheme.labelSmall
+                                                  ?.copyWith(
+                                                    color: index == 0
+                                                        ? scheme.onPrimary
+                                                        : scheme
+                                                              .onSecondaryContainer,
+                                                  ),
+                                            ),
                                         ],
                                       ),
                                     ),
@@ -2109,7 +2156,14 @@ class _BirthdaysState extends State<_Birthdays> {
       );
     }
 
-    final avatars = items.where((b) => b.key != featured.key).take(12).toList();
+    final avatars = items
+        .where(
+          (b) =>
+              b.key != featured.key &&
+              '${b.character?['faceImage'] ?? ''}'.isNotEmpty,
+        )
+        .take(12)
+        .toList();
     return Material(
       color: theme.colorScheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(Corner.extraLarge),
@@ -2400,7 +2454,7 @@ class _BirthdaysState extends State<_Birthdays> {
                           : small
                           ? 5.0
                           : 8.0;
-                      final minimum = avatarSize.clamp(48.0, double.infinity);
+                      final minimum = avatarSize.clamp(32.0, double.infinity);
                       final count = ((rail.maxWidth + gap) / (minimum + gap))
                           .floor()
                           .clamp(0, avatars.length);
@@ -2441,6 +2495,10 @@ class _BirthdaysState extends State<_Birthdays> {
                                                           api
                                                               .asset(main)
                                                               .toString(),
+                                                        if (role.isNotEmpty)
+                                                          api
+                                                              .asset(role)
+                                                              .toString(),
                                                       ],
                                                       fit: BoxFit.cover,
                                                     ),
@@ -2452,6 +2510,10 @@ class _BirthdaysState extends State<_Birthdays> {
                                                         if (main.isNotEmpty)
                                                           api
                                                               .asset(main)
+                                                              .toString(),
+                                                        if (role.isNotEmpty)
+                                                          api
+                                                              .asset(role)
                                                               .toString(),
                                                       ],
                                                       fit: BoxFit.cover,
