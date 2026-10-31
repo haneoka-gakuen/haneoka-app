@@ -321,7 +321,8 @@
       "timeHour": "시",
       "timeSeconds": "초",
       "timeZoneName": "시간대 표기",
-      "dateTime": "날짜 및 시간"
+      "dateTime": "날짜 및 시간",
+      "usageAnalytics": "사용 통계 보내기"
     }
   },
   "home": {

@@ -1,3 +1,4 @@
+import 'analytics.dart';
 import 'site_date.dart';
 
 import 'dart:async';
@@ -25,7 +26,8 @@ class AppState extends ChangeNotifier {
       seed = _prefs.getString('seed') ?? 'haneoka',
       compact = _prefs.getBool('compact') ?? false,
       japaneseTitles = _prefs.getBool('japaneseTitles') ?? true,
-      difficultyEstimates = _prefs.getBool('difficultyEstimates') ?? false {
+      difficultyEstimates = _prefs.getBool('difficultyEstimates') ?? false,
+      analytics = _prefs.getBool('analytics') ?? true {
     SiteDatePreferences.changes.addListener(notifyListeners);
     HistoryCloudSync.instance.start();
     _apis[server] = api;
@@ -87,6 +89,7 @@ class AppState extends ChangeNotifier {
   bool compact;
   bool japaneseTitles;
   bool difficultyEstimates;
+  bool analytics;
 
   Future<void> setFlag(String key, bool value) async {
     switch (key) {
@@ -96,6 +99,9 @@ class AppState extends ChangeNotifier {
         japaneseTitles = value;
       case 'difficultyEstimates':
         difficultyEstimates = value;
+      case 'analytics':
+        analytics = value;
+        AppAnalytics.setEnabled(value);
     }
     await _prefs.setBool(key, value);
     notifyListeners();

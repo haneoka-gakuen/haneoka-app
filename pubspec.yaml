@@ -120,6 +120,8 @@ dependencies:
       ref: 421afc8897576929b3b4812d9e29c31f0a900adc
   window_manager: ^0.5.2
   spine_flutter: 4.2.36
+  firebase_core: ^5.1.0
+  firebase_analytics: ^13.0.1
 dependency_overrides:
   media_kit_libs_windows_video:
     path: third_party/media_kit_libs_windows_video

@@ -1,4 +1,6 @@
+import 'core/analytics.dart';
 import 'core/site_date.dart';
+
 import 'dart:async';
 import 'dart:io';
 
@@ -41,6 +43,7 @@ Future<void> main(List<String> arguments) async {
   final state = await AppState.load(
     WidgetsBinding.instance.platformDispatcher.locale,
   );
+  AppAnalytics.startLater(enabled: state.analytics);
   PlaybackFocus.prepare = MusicBackground.prepareSession;
   Uri? initialAddress;
   for (final argument in arguments) {

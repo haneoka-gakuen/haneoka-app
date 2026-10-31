@@ -1,3 +1,4 @@
+import '../core/analytics.dart';
 import '../core/site_date.dart';
 
 import 'package:flutter/material.dart';
@@ -187,6 +188,16 @@ class SettingsScreen extends StatelessWidget {
                             onChanged: (v) =>
                                 state.setFlag('difficultyEstimates', v),
                           ),
+                          if (AppAnalytics.supported)
+                            _Switch(
+                              icon: Symbols.monitoring_rounded,
+                              label: t(
+                                'settings.labels.usageAnalytics',
+                                'Share usage statistics',
+                              ),
+                              value: state.analytics,
+                              onChanged: (v) => state.setFlag('analytics', v),
+                            ),
                         ],
                       ),
                       _Card(

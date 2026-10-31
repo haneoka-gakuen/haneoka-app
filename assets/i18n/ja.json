@@ -321,7 +321,8 @@
       "timeHour": "時",
       "timeSeconds": "秒",
       "timeZoneName": "タイムゾーン表記",
-      "dateTime": "日付と時刻"
+      "dateTime": "日付と時刻",
+      "usageAnalytics": "利用状況を送信"
     }
   },
   "home": {

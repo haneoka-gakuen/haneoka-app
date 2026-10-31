@@ -321,7 +321,8 @@
       "timeHour": "小時",
       "timeSeconds": "秒",
       "timeZoneName": "時區標註",
-      "dateTime": "日期與時間"
+      "dateTime": "日期與時間",
+      "usageAnalytics": "傳送使用統計"
     }
   },
   "home": {

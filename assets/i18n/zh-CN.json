@@ -321,7 +321,8 @@
       "timeHour": "小时",
       "timeSeconds": "秒",
       "timeZoneName": "时区标注",
-      "dateTime": "日期与时间"
+      "dateTime": "日期与时间",
+      "usageAnalytics": "发送使用统计"
     }
   },
   "home": {

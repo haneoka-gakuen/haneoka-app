@@ -321,7 +321,8 @@
       "timeHour": "Hour",
       "timeSeconds": "Seconds",
       "timeZoneName": "Time zone label",
-      "dateTime": "Date and time"
+      "dateTime": "Date and time",
+      "usageAnalytics": "Share usage statistics"
     }
   },
   "home": {
