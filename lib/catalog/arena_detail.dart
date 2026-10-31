@@ -8,6 +8,7 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../core/app_state.dart';
 import '../records/player.dart';
+import '../records/ranking_board.dart';
 import '../records/records.dart';
 import '../save/game_save.dart' show regionOfProfile;
 import '../shell/links.dart';
@@ -264,7 +265,7 @@ const _ruleKeys = [
   'disconnect_penalty_threshold',
   'penalty_rate',
 ];
-const _boardWindow = 100;
+const _boardWindow = rankingWindow;
 
 /// One Arena season: the league chooser and six tabs, as on the website.
 class ArenaDetail extends StatefulWidget {
@@ -1025,91 +1026,18 @@ class _ArenaDetailState extends State<ArenaDetail> with WidgetsBindingObserver {
     }
   }
 
-  Widget _boardControls() {
-    final maximum = (_ranking?['maxRank'] as num?)?.toInt();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 8,
-      children: [
-        Row(
-          spacing: 8,
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _rankField,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(labelText: _text('ranking.jump')),
-                onSubmitted: (value) {
-                  final rank = int.tryParse(value);
-                  if (rank != null && rank > 0) _jump(rank);
-                },
-              ),
-            ),
-            FilledButton.tonal(
-              onPressed: () {
-                final rank = int.tryParse(_rankField.text);
-                if (rank != null && rank > 0) _jump(rank);
-              },
-              child: Text(_text('ranking.go')),
-            ),
-          ],
-        ),
-        Row(
-          spacing: 8,
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _playerField,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: _text('ranking.playerId'),
-                ),
-                onSubmitted: (_) => _findPlayer(),
-              ),
-            ),
-            FilledButton.tonal(
-              onPressed: _findPlayer,
-              child: Text(_text('ranking.find')),
-            ),
-          ],
-        ),
-        Row(
-          children: [
-            IconButton(
-              tooltip: _text('ranking.previous'),
-              onPressed: _start > 1
-                  ? () => setState(() {
-                      _start -= _boardWindow;
-                      _target = null;
-                    })
-                  : null,
-              icon: const Icon(Symbols.chevron_left_rounded),
-            ),
-            Expanded(
-              child: Text(
-                _text('ranking.window', {
-                  'start': _number(_start),
-                  'end': _number(_start + _boardWindow - 1),
-                  'total': maximum == null ? '—' : _number(maximum),
-                }),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            IconButton(
-              tooltip: _text('ranking.next'),
-              onPressed: maximum == null || _start + _boardWindow <= maximum
-                  ? () => setState(() {
-                      _start += _boardWindow;
-                      _target = null;
-                    })
-                  : null,
-              icon: const Icon(Symbols.chevron_right_rounded),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
+  Widget _boardControls() => RankingBoardControls(
+    rankField: _rankField,
+    playerField: _playerField,
+    start: _start,
+    maximum: (_ranking?['maxRank'] as num?)?.toInt(),
+    onJump: _jump,
+    onFind: _findPlayer,
+    onPage: (direction) => setState(() {
+      _start += direction * _boardWindow;
+      _target = null;
+    }),
+  );
 
   Widget _usage(ThemeData theme) {
     final rows = (_ranking?['rows'] as List? ?? const [])

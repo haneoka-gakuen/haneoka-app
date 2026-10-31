@@ -18,6 +18,7 @@ import '../ui/app_image.dart';
 import '../ui/detail.dart';
 import '../ui/tile.dart';
 import 'player.dart';
+import 'ranking_board.dart';
 import 'records.dart';
 
 /// The website's event tracker (`event-tracker`): the event running on the
@@ -41,7 +42,7 @@ class _EventTrackerScreenState extends State<EventTrackerScreen>
   Duration _pollEvery = const Duration(seconds: 60);
   bool _refreshing = false;
   final _rankings = GlobalKey<RankingListState>();
-  final _points = GlobalKey<RankingListState>();
+  final _points = GlobalKey<EventPointBoardState>();
   final _total = GlobalKey<RankingListState>();
 
   @override
@@ -436,12 +437,10 @@ class _EventTrackerScreenState extends State<EventTrackerScreen>
                     'Event point ranking',
                   ),
                   child: event['pointRankingEnabled'] == true
-                      ? RankingList(
+                      ? EventPointBoard(
                           key: _points,
                           region: _region!,
-                          points: true,
-                          endpoint:
-                              '/api/v1/game/records/$_region/events/${event['id']}/latest',
+                          eventId: event['id'],
                           onPlayer: openPlayer,
                         )
                       : Text(
