@@ -202,25 +202,26 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
     };
     final tabs = [
       (_Tab.build, Symbols.groups_rounded, c.tb('tabBuild', 'Build'), null),
+      (_Tab.arena, Symbols.swords_rounded, c.tb('arena.tab', 'Arena'), null),
+      (
+        _Tab.comparison,
+        Symbols.music_note_rounded,
+        c.tb('sc.tab', 'Gekiso songs'),
+        null,
+      ),
       (
         _Tab.pt,
         Symbols.emoji_events_rounded,
         c.tb('pt.tab', 'Event rewards'),
         null,
       ),
-      (
-        _Tab.comparison,
-        Symbols.monitoring_rounded,
-        c.tb('sc.tab', 'Gekiso songs'),
-        null,
-      ),
-      (
-        _Tab.arena,
-        Symbols.military_tech_rounded,
-        c.tb('arena.tab', 'Arena'),
-        null,
-      ),
     ];
+    const resources = [
+      (_Tab.box, Symbols.style_rounded, 'tabBox'),
+      (_Tab.account, Symbols.trending_up_rounded, 'tabAccount'),
+      (_Tab.teams, Symbols.bookmark_rounded, 'tabTeams'),
+    ];
+    const tasks = [_Tab.build, _Tab.pt, _Tab.comparison, _Tab.arena];
     final Widget body;
     if (!ready) {
       body = Center(
@@ -249,14 +250,24 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
       body = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (const [
-            _Tab.build,
-            _Tab.pt,
-            _Tab.comparison,
-            _Tab.arena,
-          ].contains(_tab))
+          if (tasks.contains(_tab))
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+              child: Row(
+                children: [
+                  for (final (tab, _, key) in resources)
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => _selectTab(tab),
+                        child: Text(c.tb(key, ''), textAlign: TextAlign.center),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          if (tasks.contains(_tab))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
               child: PillTabs<_Tab>(
                 value: _tab,
                 tabs: tabs,
@@ -371,17 +382,14 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
               onPressed: () =>
                   showResultComparison(context, c, rewards: c.usesPtResults),
             ),
-          for (final (tab, icon, key) in const [
-            (_Tab.box, Symbols.style_rounded, 'tabBox'),
-            (_Tab.account, Symbols.trending_up_rounded, 'tabAccount'),
-            (_Tab.teams, Symbols.bookmark_rounded, 'tabTeams'),
-          ])
-            BarAction(
-              icon: icon,
-              label: c.tb(key, ''),
-              selected: _tab == tab,
-              onPressed: () => _selectTab(tab),
-            ),
+          if (!tasks.contains(_tab))
+            for (final (tab, icon, key) in resources)
+              BarAction(
+                icon: icon,
+                label: c.tb(key, ''),
+                selected: _tab == tab,
+                onPressed: () => _selectTab(tab),
+              ),
           if (_tab == _Tab.box && widget.importSave == null)
             BarAction.choice(
               label: t('common.fields.server', 'Server'),
