@@ -83,21 +83,52 @@ class _BackdropState extends State<_Backdrop>
   void dispose() {
     _ticker.dispose();
     _time.dispose();
+    _dropGlyphs();
     super.dispose();
+  }
+
+  /// Each glyph drawn once, blurred, at the screen's pixel ratio; frames only place these images.
+  final _glyphs = <String, ui.Image>{};
+  Object? _glyphKey;
+
+  void _dropGlyphs() {
+    for (final image in _glyphs.values) {
+      image.dispose();
+    }
+    _glyphs.clear();
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final narrow = MediaQuery.sizeOf(context).width < 600;
-    return CustomPaint(
-      painter: _Painter(
-        motif: widget.motif,
-        time: _time,
-        narrow: narrow,
-        scheme: scheme,
-      ),
-      size: Size.infinite,
+    final ratio = MediaQuery.devicePixelRatioOf(context);
+    final key = (widget.motif, scheme, ratio);
+    if (key != _glyphKey) {
+      _dropGlyphs();
+      _glyphKey = key;
+    }
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        RepaintBoundary(
+          child: CustomPaint(
+            painter: _BasePainter(motif: widget.motif, scheme: scheme),
+          ),
+        ),
+        RepaintBoundary(
+          child: CustomPaint(
+            painter: _Painter(
+              motif: widget.motif,
+              time: _time,
+              narrow: narrow,
+              scheme: scheme,
+              ratio: ratio,
+              glyphs: _glyphs,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -147,17 +178,117 @@ const _depths = [
   (count: 14, size: (14.0, 22.0), blur: 0.0, opacity: 0.75),
 ];
 
+/// The wash, facets and moon: still, so painted once behind the moving glyphs.
+class _BasePainter extends CustomPainter {
+  _BasePainter({required this.motif, required this.scheme});
+  final Motif motif;
+  final ColorScheme scheme;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = scheme.surfaceContainer,
+    );
+    void wash(Offset centre, double rx, double ry, Color color, double alpha) {
+      canvas
+        ..save()
+        ..translate(centre.dx, centre.dy)
+        ..scale(1, ry / rx)
+        ..drawCircle(
+          Offset.zero,
+          rx,
+          Paint()
+            ..shader = RadialGradient(
+              colors: [
+                color.withValues(alpha: alpha),
+                color.withValues(alpha: 0),
+              ],
+              stops: const [0, 0.72],
+            ).createShader(Rect.fromCircle(center: Offset.zero, radius: rx)),
+        )
+        ..restore();
+    }
+
+    wash(Offset.zero, 1024, 832, scheme.primaryContainer, 0.7);
+    wash(Offset(w * 0.62, -h * 0.1), 1152, 704, scheme.tertiaryContainer, 0.6);
+    wash(Offset(w, h), 1088, 832, scheme.primaryContainer, 0.55);
+    wash(Offset(w * 0.06, h), 896, 704, scheme.tertiaryContainer, 0.5);
+    Path poly(List<double> points) {
+      final path = Path()..moveTo(points[0] / 1600 * w, points[1] / 900 * h);
+      for (var i = 2; i < points.length; i += 2) {
+        path.lineTo(points[i] / 1600 * w, points[i + 1] / 900 * h);
+      }
+      return path..close();
+    }
+
+    canvas
+      ..drawPath(
+        poly([0, 0, 380, 0, 0, 820]),
+        Paint()..color = scheme.surfaceBright.withValues(alpha: 0.45 * 0.9),
+      )
+      ..drawPath(
+        poly([250, 0, 1600, 0, 1600, 380, 1040, 250]),
+        Paint()..color = scheme.surfaceBright.withValues(alpha: 0.45 * 0.55),
+      )
+      ..drawPath(
+        poly([120, 900, 1040, 250, 1600, 380, 1600, 900]),
+        Paint()..color = scheme.surfaceBright.withValues(alpha: 0.45 * 0.75),
+      );
+    if (motif == Motif.moon) {
+      canvas.drawCircle(
+        Offset(w * 0.92 - 60, h * 0.12 + 60),
+        60,
+        Paint()
+          ..color = scheme.tertiaryContainer.withValues(alpha: 0.8)
+          ..maskFilter = const ui.MaskFilter.blur(BlurStyle.solid, 40),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_BasePainter old) =>
+      old.motif != motif || old.scheme != scheme;
+}
+
 class _Painter extends CustomPainter {
   _Painter({
     required this.motif,
     required this.time,
     required this.narrow,
     required this.scheme,
+    required this.ratio,
+    required this.glyphs,
   }) : super(repaint: time);
   final Motif motif;
   final ValueNotifier<double> time;
   final bool narrow;
   final ColorScheme scheme;
+  final double ratio;
+  final Map<String, ui.Image> glyphs;
+
+  /// One glyph at full opacity, blurred, centred in its own image.
+  ui.Image _render(int index, Color color, double size, double blur) {
+    final pad = blur * 3 + 2;
+    final extent = (size + pad * 2) * ratio;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder)
+      ..scale(ratio)
+      ..translate(size / 2 + pad, size / 2 + pad);
+    if (blur > 0) {
+      canvas.saveLayer(
+        null,
+        Paint()..imageFilter = ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+      );
+    }
+    _glyph(canvas, index, color, size);
+    if (blur > 0) canvas.restore();
+    final picture = recorder.endRecording();
+    final image = picture.toImageSync(extent.ceil(), extent.ceil());
+    picture.dispose();
+    return image;
+  }
 
   void _icon(Canvas canvas, IconData icon, Color color, double size) {
     final painter = TextPainter(
@@ -230,80 +361,17 @@ class _Painter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final t = time.value;
     final w = size.width, h = size.height;
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()..color = scheme.surfaceContainer,
-    );
-    void wash(Offset centre, double rx, double ry, Color color, double alpha) {
-      canvas
-        ..save()
-        ..translate(centre.dx, centre.dy)
-        ..scale(1, ry / rx)
-        ..drawCircle(
-          Offset.zero,
-          rx,
-          Paint()
-            ..shader = RadialGradient(
-              colors: [
-                color.withValues(alpha: alpha),
-                color.withValues(alpha: 0),
-              ],
-              stops: const [0, 0.72],
-            ).createShader(Rect.fromCircle(center: Offset.zero, radius: rx)),
-        )
-        ..restore();
-    }
-
-    wash(Offset.zero, 1024, 832, scheme.primaryContainer, 0.7);
-    wash(Offset(w * 0.62, -h * 0.1), 1152, 704, scheme.tertiaryContainer, 0.6);
-    wash(Offset(w, h), 1088, 832, scheme.primaryContainer, 0.55);
-    wash(Offset(w * 0.06, h), 896, 704, scheme.tertiaryContainer, 0.5);
-    final facet = Paint()
-      ..color = scheme.surfaceBright.withValues(alpha: 0.45 * 0.9);
-    Path poly(List<double> points) {
-      final path = Path()..moveTo(points[0] / 1600 * w, points[1] / 900 * h);
-      for (var i = 2; i < points.length; i += 2) {
-        path.lineTo(points[i] / 1600 * w, points[i + 1] / 900 * h);
-      }
-      return path..close();
-    }
-
-    canvas
-      ..drawPath(poly([0, 0, 380, 0, 0, 820]), facet)
-      ..drawPath(
-        poly([250, 0, 1600, 0, 1600, 380, 1040, 250]),
-        Paint()..color = scheme.surfaceBright.withValues(alpha: 0.45 * 0.55),
-      )
-      ..drawPath(
-        poly([120, 900, 1040, 250, 1600, 380, 1600, 900]),
-        Paint()..color = scheme.surfaceBright.withValues(alpha: 0.45 * 0.75),
-      );
-    if (motif == Motif.moon) {
-      canvas.drawCircle(
-        Offset(w * 0.92 - 60, h * 0.12 + 60),
-        60,
-        Paint()
-          ..color = scheme.tertiaryContainer.withValues(alpha: 0.8)
-          ..maskFilter = const ui.MaskFilter.blur(BlurStyle.solid, 40),
-      );
-    }
     final tones = [scheme.primary, scheme.tertiary];
     for (final (layer, depth) in _depths.indexed) {
       final count = narrow ? (depth.count / 2).ceil() : depth.count;
-      if (depth.blur > 0) {
-        canvas.saveLayer(
-          null,
-          Paint()
-            ..imageFilter = ui.ImageFilter.blur(
-              sigmaX: depth.blur,
-              sigmaY: depth.blur,
-            ),
-        );
-      }
       for (var i = 0; i < count; i++) {
         final seed = layer * 97 + i + 1;
         final glyph =
             depth.size.$1 + _random(seed + 3) * (depth.size.$2 - depth.size.$1);
+        final image = glyphs.putIfAbsent(
+          '$layer:$i',
+          () => _render(i, tones[i % 2], glyph, depth.blur),
+        );
         final duration = 14 + _random(seed + 13) * 14;
         // An eased back-and-forth like the website's alternate drift.
         final phase =
@@ -325,17 +393,27 @@ class _Painter extends CustomPainter {
             _random(seed) * w + dx,
             (_random(seed + 41) * 1.2 - 0.1) * h + dy,
           )
-          ..rotate(((_random(seed + 17) - 0.5) * 60 + turn) * math.pi / 180);
-        _glyph(canvas, i, tones[i % 2].withValues(alpha: alpha), glyph);
-        canvas.restore();
+          ..rotate(((_random(seed + 17) - 0.5) * 60 + turn) * math.pi / 180)
+          ..scale(1 / ratio)
+          ..drawImage(
+            image,
+            Offset(-image.width / 2, -image.height / 2),
+            Paint()
+              ..color = Color.fromRGBO(0, 0, 0, alpha)
+              ..filterQuality = FilterQuality.low,
+          )
+          ..restore();
       }
-      if (depth.blur > 0) canvas.restore();
     }
   }
 
   @override
   bool shouldRepaint(_Painter old) =>
-      old.motif != motif || old.narrow != narrow || old.scheme != scheme;
+      old.motif != motif ||
+      old.narrow != narrow ||
+      old.scheme != scheme ||
+      old.ratio != ratio ||
+      !identical(old.glyphs, glyphs);
 }
 
 /// The brand mark, in a seasonal theme cut to its shape on a tonal container
