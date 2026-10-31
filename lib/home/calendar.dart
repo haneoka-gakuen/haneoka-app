@@ -38,7 +38,6 @@ const calendarFacets = [
   'game-live',
   'external-live',
   'arena',
-  'arena-rotation',
 ];
 const _facetLabels = {
   'our-notes:character': 'ourNotesCharacterBirthday',
@@ -52,7 +51,6 @@ const _facetLabels = {
   'game-live': 'game-live',
   'external-live': 'externalLive',
   'arena': 'arena',
-  'arena-rotation': 'arena-rotation',
 };
 
 /// One dated thing on the calendar (`CalendarOccurrence`).
@@ -65,6 +63,7 @@ class Occurrence {
   final List<String> facets;
 
   bool get birthday => kind == 'character' || kind == 'cast';
+  String? get href => source['href'] as String?;
   String get category => birthday
       ? 'birthdays'
       : kind == 'live'
@@ -264,7 +263,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final first = DateTime.utc(_selected.year, _selected.month, 1);
     final offset = (first.weekday % 7 - _weekStart + 7) % 7;
     final start = first.subtract(Duration(days: offset));
-    return [for (var i = 0; i < 42; i++) start.add(Duration(days: i))];
+    final next = DateTime.utc(first.year, first.month + 1, 1);
+    final weeks = (next.difference(start).inDays / 7).ceil();
+    return [for (var i = 0; i < weeks * 7; i++) start.add(Duration(days: i))];
   }
 
   @override
@@ -300,8 +301,24 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 days.last,
               ).where((o) => o.facets.any(_categories.contains)).toList();
         return ShellPage(
-          title: label('title', 'Calendar'),
+          title:
+              '${label('title', 'Calendar')} · ${DateFormat.yMMMM(t.locale).format(_selected)}',
           actions: [
+            BarAction(
+              icon: Symbols.chevron_left_rounded,
+              label: label('previous', 'Previous month'),
+              onPressed: () => setState(() => _selected = _shiftMonth(-1)),
+            ),
+            BarAction(
+              icon: Symbols.chevron_right_rounded,
+              label: label('next', 'Next month'),
+              onPressed: () => setState(() => _selected = _shiftMonth(1)),
+            ),
+            BarAction(
+              icon: Symbols.today_rounded,
+              label: label('today', 'Today'),
+              onPressed: () => setState(() => _selected = _today),
+            ),
             BarAction(
               icon: Symbols.filter_alt_rounded,
               label: t('common.actions.filter', 'Filter'),
@@ -336,34 +353,113 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 )
               : data == null
               ? const Center(child: CircularProgressIndicator())
-              : _body(context, items, days, label),
+              : _body(context, data, items, days, label),
         );
       },
     );
   }
 
+  Json? _arena(Json data) =>
+      _categories.contains('arena') ? data['arena'] as Json? : null;
+  List<Object?> _rulesOn(Json? arena, DateTime date) =>
+      (arena?['days'] as Map?)?[_key(date)] as List? ?? const [];
+  String _key(DateTime date) =>
+      '${date.year}-${'${date.month}'.padLeft(2, '0')}-${'${date.day}'.padLeft(2, '0')}';
+  String _mission(Object? rule) =>
+      switch (((rule as Map?)?['missions'] as List?)?.firstOrNull) {
+        1 => 'COMBO',
+        2 => 'LUCK',
+        3 => 'JUST',
+        _ => '—',
+      };
+  Widget _mark(String? source, double size) => SizedBox(
+    width: size,
+    height: size,
+    child: source == null
+        ? null
+        : AppImage(
+            candidates: [AppScope.of(context).api.asset(source).toString()],
+          ),
+  );
+  String? _missionImage(Json arena, Object? rule) {
+    final id = ((rule as Map?)?['missions'] as List?)?.firstOrNull;
+    final value = (arena['missions'] as Map?)?['$id'];
+    return value is String ? value : null;
+  }
+
   Widget _body(
     BuildContext context,
+    Json data,
     List<Occurrence> items,
     List<DateTime> days,
     String Function(String, String) label,
   ) {
+    if (_agenda) {
+      return ListView(
+        padding: pagePadding(context),
+        children: [_agendaList(context, data, items, days, label)],
+      );
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 720;
+        final side = constraints.maxWidth >= 960;
+        final month = _month(context, data, items, days, label, wide);
+        final detail = _detail(context, data, items, label);
+        if (!side) {
+          return ListView(
+            padding: pagePadding(context),
+            children: [month, const SizedBox(height: 16), detail],
+          );
+        }
+        return SingleChildScrollView(
+          padding: pagePadding(context),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            spacing: 16,
+            children: [
+              Expanded(child: month),
+              SizedBox(width: 300, child: detail),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _detail(
+    BuildContext context,
+    Json data,
+    List<Occurrence> items,
+    String Function(String, String) label,
+  ) {
     final t = AppScope.of(context).text;
     final theme = Theme.of(context);
-    final locale = t.locale;
-    final onDay = items.where((o) => o.on(_selected)).toList();
-    final agenda = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (_agenda) _strip(context),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 16, 4, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final arena = _arena(data);
+    final rules = _rulesOn(arena, _selected);
+    final leagues = (arena?['leagues'] as List?)?.cast<Json>() ?? const [];
+    final onDay = items
+        .where((o) => o.on(_selected) && o.kind != 'arena')
+        .toList();
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(Corner.extraLarge),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 12,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(
-                DateFormat.MMMMEEEEd(locale).format(_selected),
-                style: theme.textTheme.titleMedium,
+              Expanded(
+                child: Text(
+                  DateFormat.MMMEd(t.locale).format(_selected),
+                  style: theme.textTheme.titleLarge,
+                ),
               ),
               Text(
                 DateTime.now().timeZoneName,
@@ -373,77 +469,210 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ),
             ],
           ),
-        ),
-        if (onDay.isEmpty)
-          Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
+          if (rules.isNotEmpty && arena != null) ...[
+            Row(
+              spacing: 8,
               children: [
-                Icon(
-                  Symbols.event_rounded,
-                  size: 32,
-                  color: theme.colorScheme.onSurfaceVariant,
+                const Icon(Symbols.swords_rounded, size: 18),
+                Text(
+                  label('arena', 'Gekiso Arena'),
+                  style: theme.textTheme.titleSmall,
                 ),
-                const SizedBox(height: 8),
-                Text(label('empty', 'No events')),
               ],
             ),
-          )
-        else
-          for (final (index, item) in onDay.indexed) ...[
-            if (index > 0) const Divider(height: 1),
-            _Entry(item: item, range: _range(item, label)),
+            for (final (index, rule) in rules.indexed)
+              if (rule != null && index < leagues.length)
+                InkWell(
+                  borderRadius: BorderRadius.circular(Corner.medium),
+                  onTap: () => openLink(context, '${arena['href']}'),
+                  child: SizedBox(
+                    height: 48,
+                    child: Row(
+                      spacing: 8,
+                      children: [
+                        _mark('${leagues[index]['image']}', 28),
+                        Expanded(
+                          child: Text(
+                            t.text(leagues[index]['name']),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        _mark(_missionImage(arena, rule), 20),
+                        Text(_mission(rule), style: theme.textTheme.labelSmall),
+                      ],
+                    ),
+                  ),
+                ),
           ],
-      ],
-    );
-    return ListView(
-      padding: pagePadding(context),
-      children: [
-        _toolbar(context, label),
-        if (!_agenda) _month(context, items, days, label),
-        agenda,
-      ],
+          if (onDay.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Center(child: Text(label('empty', 'No events'))),
+            )
+          else
+            for (final (index, item) in onDay.indexed) ...[
+              if (index > 0) const Divider(height: 1),
+              _Entry(item: item, range: _range(item, label)),
+            ],
+        ],
+      ),
     );
   }
 
-  Widget _toolbar(BuildContext context, String Function(String, String) label) {
-    final theme = Theme.of(context);
+  /// Each day of the month with what starts or ends on it.
+  Widget _agendaList(
+    BuildContext context,
+    Json data,
+    List<Occurrence> items,
+    List<DateTime> days,
+    String Function(String, String) label,
+  ) {
     final t = AppScope.of(context).text;
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            DateFormat.yMMMM(t.locale).format(_selected),
-            style: theme.textTheme.headlineSmall,
+    final theme = Theme.of(context);
+    final arena = _arena(data);
+    final leagues = (arena?['leagues'] as List?)?.cast<Json>() ?? const [];
+    final rows = [
+      for (final date in days)
+        if (date.month == _selected.month)
+          (
+            date: date,
+            changes: items
+                .where(
+                  (o) =>
+                      o.kind != 'arena' && (o.start == date || o.end == date),
+                )
+                .toList(),
           ),
-        ),
-        TextButton(
-          onPressed: () => setState(() => _selected = _today),
-          child: Text(label('today', 'Today')),
-        ),
-        IconButton(
-          tooltip: label('previous', 'Previous month'),
-          onPressed: () => setState(() => _selected = _shiftMonth(-1)),
-          icon: const Icon(Symbols.chevron_left_rounded),
-        ),
-        IconButton(
-          tooltip: label('next', 'Next month'),
-          onPressed: () => setState(() => _selected = _shiftMonth(1)),
-          icon: const Icon(Symbols.chevron_right_rounded),
-        ),
-        IconButton(
-          tooltip: label('chooseDate', 'Choose date'),
-          onPressed: () async {
-            final date = await showDatePicker(
-              context: context,
-              initialDate: _selected,
-              firstDate: DateTime.utc(2020),
-              lastDate: DateTime.utc(2040),
-            );
-            if (date != null) setState(() => _selected = _day(date));
-          },
-          icon: const Icon(Symbols.event_rounded),
-        ),
+    ].where((row) => row.changes.isNotEmpty || row.date == _today).toList();
+    if (rows.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(32),
+        child: Center(child: Text(label('empty', 'No events'))),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 8,
+      children: [
+        for (final row in rows)
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(Corner.large),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: 12,
+              children: [
+                InkWell(
+                  borderRadius: BorderRadius.circular(Corner.medium),
+                  onTap: () => setState(() {
+                    _selected = row.date;
+                    _agenda = false;
+                  }),
+                  child: Container(
+                    width: 56,
+                    padding: const EdgeInsets.all(4),
+                    decoration: row.date == _today
+                        ? BoxDecoration(
+                            color: theme.colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(Corner.medium),
+                          )
+                        : null,
+                    child: Column(
+                      children: [
+                        Text(
+                          DateFormat.E(t.locale).format(row.date),
+                          style: theme.textTheme.labelSmall,
+                        ),
+                        Text(
+                          '${row.date.day}',
+                          style: theme.textTheme.titleLarge,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (arena != null && _rulesOn(arena, row.date).isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Wrap(
+                            spacing: 12,
+                            runSpacing: 4,
+                            children: [
+                              for (final (index, rule) in _rulesOn(
+                                arena,
+                                row.date,
+                              ).indexed)
+                                if (rule != null && index < leagues.length)
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    spacing: 2,
+                                    children: [
+                                      _mark('${leagues[index]['image']}', 20),
+                                      _mark(_missionImage(arena, rule), 18),
+                                    ],
+                                  ),
+                            ],
+                          ),
+                        ),
+                      for (final item in row.changes)
+                        InkWell(
+                          onTap: item.kind != 'cast' && item.href != null
+                              ? () => openLink(context, item.href!)
+                              : null,
+                          child: SizedBox(
+                            height: 48,
+                            child: Row(
+                              spacing: 8,
+                              children: [
+                                Container(
+                                  width: 10,
+                                  height: 10,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _tone(
+                                      theme.colorScheme,
+                                      item.kind,
+                                    ).$3,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    t.text(
+                                      item.source['title'] ??
+                                          item.source['name'],
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Text(
+                                  [
+                                    if (item.start != item.end)
+                                      item.start == row.date
+                                          ? label('starts', 'Starts')
+                                          : label('ends', 'Ends'),
+                                    label(item.kind, item.kind),
+                                  ].join(' · '),
+                                  style: theme.textTheme.labelSmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -454,147 +683,164 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return DateTime.utc(first.year, first.month, _selected.day.clamp(1, cap));
   }
 
-  /// The week around the selected day, as the agenda view's date strip.
-  Widget _strip(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final offset = (_selected.weekday % 7 - _weekStart + 7) % 7;
-    final first = _selected.subtract(Duration(days: offset));
-    return Row(
-      children: [
-        for (var i = 0; i < 7; i++)
-          Builder(
-            builder: (context) {
-              final date = first.add(Duration(days: i));
-              final selected = date == _selected;
-              return Expanded(
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(Corner.large),
-                  onTap: () => setState(() => _selected = date),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    decoration: BoxDecoration(
-                      color: selected ? scheme.primaryContainer : null,
-                      borderRadius: BorderRadius.circular(Corner.large),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          DateFormat.E(AppScope.of(context).text.locale)
-                              .format(date)
-                              .characters
-                              .first,
-                          style: theme.textTheme.labelSmall,
-                        ),
-                        Text('${date.day}', style: theme.textTheme.titleMedium),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-      ],
-    );
-  }
-
   Widget _month(
     BuildContext context,
+    Json data,
     List<Occurrence> items,
     List<DateTime> days,
     String Function(String, String) label,
+    bool wide,
   ) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final locale = AppScope.of(context).text.locale;
-    final month = _selected.month;
+    final t = AppScope.of(context).text;
+    final arena = _arena(data);
+    final leagues = (arena?['leagues'] as List?)?.cast<Json>() ?? const [];
+    final bars = items.where((item) => item.kind != 'arena').toList()
+      ..sort(
+        (a, b) =>
+            _barOrder.indexOf(_toneOf(a.kind)) -
+            _barOrder.indexOf(_toneOf(b.kind)),
+      );
+    final weeks = [
+      for (var w = 0; w < days.length ~/ 7; w++) days.sublist(w * 7, w * 7 + 7),
+    ].where((week) => week.any((d) => d.month == _selected.month)).toList();
+    final seen = <int>{
+      for (final date in days)
+        for (final rule in _rulesOn(arena, date))
+          if (((rule as Map?)?['missions'] as List?)?.firstOrNull
+              case final int id)
+            id,
+    }.toList()..sort();
     return Container(
-      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        border: Border.all(color: scheme.outlineVariant),
-        borderRadius: BorderRadius.circular(Corner.large),
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(Corner.extraLarge),
       ),
-      clipBehavior: Clip.antiAlias,
       child: Column(
+        spacing: 2,
         children: [
           SizedBox(
-            height: 44,
+            height: 28,
             child: Row(
               children: [
                 for (final date in days.take(7))
                   Expanded(
                     child: Center(
                       child: Text(
-                        DateFormat.E(locale).format(date),
-                        style: theme.textTheme.titleSmall,
+                        DateFormat.E(t.locale).format(date),
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ),
               ],
             ),
           ),
-          for (var w = 0; w < 6; w++)
+          for (final week in weeks)
             Builder(
               builder: (context) {
-                final week = days.sublist(w * 7, w * 7 + 7);
-                final segments = _segments(items, week);
+                final segments = _segments(bars, week);
+                final hasArena = week.any(
+                  (date) => _rulesOn(arena, date).isNotEmpty,
+                );
+                final head = wide ? (hasArena ? 80.0 : 44.0) : 46.0;
+                final lane = wide ? 22.0 : 6.0;
+                final height = head + lane * 3 + (wide ? 18 : 6);
                 return SizedBox(
-                  height: 140,
-                  child: Stack(
-                    children: [
-                      Row(
+                  height: height,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final cell = constraints.maxWidth / 7;
+                      return Stack(
                         children: [
-                          for (final date in week)
-                            Expanded(
-                              child: _Cell(
-                                date: date,
-                                other: date.month != month,
-                                selected: date == _selected,
-                                today: date == _today,
-                                overflow: segments
-                                    .where(
-                                      (s) => s.lane >= 3 && s.item.on(date),
-                                    )
-                                    .length,
-                                more: label('more', '{count} more'),
-                                onTap: () => setState(() => _selected = date),
-                              ),
-                            ),
-                        ],
-                      ),
-                      Positioned.fill(
-                        top: 48,
-                        left: 3,
-                        right: 3,
-                        child: IgnorePointer(
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              final column = constraints.maxWidth / 7;
-                              return Stack(
-                                children: [
-                                  for (final s in segments.where(
-                                    (s) => s.lane < 3,
-                                  ))
-                                    Positioned(
-                                      left: s.column * column + 2,
-                                      width: s.span * column - 4,
-                                      top: s.lane * 23.0,
-                                      height: 20,
-                                      child: _Bar(
-                                        segment: s,
-                                        t: AppScope.of(context).text,
-                                      ),
-                                    ),
-                                ],
-                              );
-                            },
+                          Row(
+                            spacing: 0,
+                            children: [
+                              for (final date in week)
+                                Expanded(
+                                  child: _Cell(
+                                    date: date,
+                                    other: date.month != _selected.month,
+                                    selected: date == _selected,
+                                    today: date == _today,
+                                    wide: wide,
+                                    arena: arena,
+                                    rules: _rulesOn(arena, date),
+                                    leagues: leagues,
+                                    overflow: segments
+                                        .where(
+                                          (s) => s.lane >= 3 && s.item.on(date),
+                                        )
+                                        .length,
+                                    mark: _mark,
+                                    missionImage: _missionImage,
+                                    onTap: () =>
+                                        setState(() => _selected = date),
+                                  ),
+                                ),
+                            ],
                           ),
-                        ),
-                      ),
-                    ],
+                          for (final segment in segments)
+                            if (segment.lane < 3)
+                              Positioned(
+                                left: segment.column * cell + 2,
+                                width: segment.span * cell - 4,
+                                top: head + segment.lane * lane,
+                                height: wide ? lane - 1 : 4,
+                                child: IgnorePointer(
+                                  child: _Bar(
+                                    segment: segment,
+                                    t: t,
+                                    wide: wide,
+                                  ),
+                                ),
+                              ),
+                        ],
+                      );
+                    },
                   ),
                 );
               },
+            ),
+          if (arena != null && seen.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+              child: Wrap(
+                spacing: 16,
+                runSpacing: 4,
+                children: [
+                  for (final id in seen)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      spacing: 6,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _missionColor(scheme, id),
+                          ),
+                        ),
+                        _mark(
+                          _missionImage(arena, {
+                            'missions': [id],
+                          }),
+                          16,
+                        ),
+                        Text(
+                          _mission({
+                            'missions': [id],
+                          }),
+                          style: theme.textTheme.labelMedium,
+                        ),
+                      ],
+                    ),
+                ],
+              ),
             ),
         ],
       ),
@@ -692,77 +938,177 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 }
 
+const _barOrder = ['event', 'gacha', 'live', 'birthday', 'other'];
+String _toneOf(String kind) => kind == 'character' || kind == 'cast'
+    ? 'birthday'
+    : kind == 'live' || kind == 'game-live'
+    ? 'live'
+    : kind == 'gacha'
+    ? 'gacha'
+    : kind == 'event'
+    ? 'event'
+    : 'other';
+(Color, Color, Color) _tone(ColorScheme scheme, String kind) => switch (_toneOf(
+  kind,
+)) {
+  'event' => (
+    scheme.primaryContainer,
+    scheme.onPrimaryContainer,
+    scheme.primary,
+  ),
+  'gacha' => (
+    scheme.tertiaryContainer,
+    scheme.onTertiaryContainer,
+    scheme.tertiary,
+  ),
+  'birthday' => (scheme.errorContainer, scheme.onErrorContainer, scheme.error),
+  'live' => (
+    scheme.secondaryContainer,
+    scheme.onSecondaryContainer,
+    scheme.secondary,
+  ),
+  _ => (
+    scheme.surfaceContainerHighest,
+    scheme.onSurfaceVariant,
+    scheme.outline,
+  ),
+};
+Color _missionColor(ColorScheme scheme, Object? mission) => switch (mission) {
+  1 => scheme.primary,
+  2 => scheme.tertiary,
+  3 => scheme.error,
+  _ => scheme.outline,
+};
+
 class _Cell extends StatelessWidget {
   const _Cell({
     required this.date,
     required this.other,
     required this.selected,
     required this.today,
+    required this.wide,
+    required this.arena,
+    required this.rules,
+    required this.leagues,
     required this.overflow,
-    required this.more,
+    required this.mark,
+    required this.missionImage,
     required this.onTap,
   });
   final DateTime date;
-  final bool other, selected, today;
+  final bool other, selected, today, wide;
+  final Json? arena;
+  final List<Object?> rules;
+  final List<Json> leagues;
   final int overflow;
-  final String more;
+  final Widget Function(String?, double) mark;
+  final String? Function(Json, Object?) missionImage;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: selected
-              ? scheme.secondaryContainer.withValues(alpha: 0.35)
-              : null,
-          border: Border(
-            top: BorderSide(color: scheme.outlineVariant),
-            left: BorderSide(color: scheme.outlineVariant, width: 0.5),
-            right: BorderSide(color: scheme.outlineVariant, width: 0.5),
-          ),
-        ),
-        child: Column(
-          children: [
-            const SizedBox(height: 6),
-            Container(
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: today
-                  ? BoxDecoration(
-                      color: scheme.primaryContainer,
-                      shape: BoxShape.circle,
-                    )
-                  : null,
-              child: Text(
-                '${date.day}',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: today
-                      ? scheme.onPrimaryContainer
-                      : other
-                      ? scheme.onSurfaceVariant.withValues(alpha: 0.6)
-                      : scheme.onSurface,
-                ),
-              ),
-            ),
-            const Spacer(),
-            if (overflow > 0)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  more.replaceAll('{count}', '$overflow'),
-                  maxLines: 1,
-                  overflow: TextOverflow.clip,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
+    final faded = other ? 0.45 : 1.0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 1),
+      child: Material(
+        color: selected
+            ? scheme.secondaryContainer
+            : other
+            ? Colors.transparent
+            : scheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(Corner.medium),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(Corner.medium),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(4),
+            child: Column(
+              crossAxisAlignment: wide
+                  ? CrossAxisAlignment.start
+                  : CrossAxisAlignment.center,
+              spacing: 4,
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  alignment: Alignment.center,
+                  decoration: today
+                      ? BoxDecoration(
+                          color: scheme.primary,
+                          shape: BoxShape.circle,
+                        )
+                      : null,
+                  child: Text(
+                    '${date.day}',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: today
+                          ? scheme.onPrimary
+                          : other
+                          ? scheme.onSurfaceVariant
+                          : null,
+                    ),
                   ),
                 ),
-              ),
-          ],
+                if (rules.isNotEmpty && arena != null)
+                  Opacity(
+                    opacity: faded,
+                    child: wide
+                        ? Row(
+                            children: [
+                              for (final (index, rule) in rules.indexed)
+                                Expanded(
+                                  child: rule == null || index >= leagues.length
+                                      ? const SizedBox.shrink()
+                                      : Column(
+                                          spacing: 2,
+                                          children: [
+                                            mark(
+                                              '${leagues[index]['image']}',
+                                              16,
+                                            ),
+                                            mark(
+                                              missionImage(arena!, rule),
+                                              16,
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                            ],
+                          )
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            spacing: 2,
+                            children: [
+                              for (final rule in rules)
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _missionColor(
+                                      scheme,
+                                      ((rule as Map?)?['missions'] as List?)
+                                          ?.firstOrNull,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                  ),
+                if (wide && overflow > 0) ...[
+                  const Spacer(),
+                  Text(
+                    '+$overflow',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -770,58 +1116,41 @@ class _Cell extends StatelessWidget {
 }
 
 class _Bar extends StatelessWidget {
-  const _Bar({required this.segment, required this.t});
+  const _Bar({required this.segment, required this.t, required this.wide});
   final _Segment segment;
   final SiteText t;
+  final bool wide;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final (background, foreground) = switch (segment.item.category) {
-      'birthdays' => (scheme.tertiaryContainer, scheme.onTertiaryContainer),
-      'lives' => (scheme.primaryContainer, scheme.onPrimaryContainer),
-      _ => (scheme.secondaryContainer, scheme.onSecondaryContainer),
-    };
+    final (background, foreground, solid) = _tone(
+      Theme.of(context).colorScheme,
+      segment.item.kind,
+    );
     final title = t.text(
       segment.item.source['title'] ?? segment.item.source['name'],
     );
-    const radius = Radius.circular(Corner.extraSmall);
+    const radius = Radius.circular(Corner.small);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
+      padding: wide ? const EdgeInsets.symmetric(horizontal: 6) : null,
+      alignment: Alignment.centerLeft,
       decoration: BoxDecoration(
-        color: background,
+        color: wide ? background : solid,
         borderRadius: BorderRadius.horizontal(
           left: segment.before ? Radius.zero : radius,
           right: segment.after ? Radius.zero : radius,
         ),
-        border: Border(
-          left: segment.before
-              ? BorderSide(color: foreground, width: 3)
-              : BorderSide.none,
-          right: segment.after
-              ? BorderSide(color: foreground, width: 3)
-              : BorderSide.none,
-        ),
       ),
-      child: Row(
-        children: [
-          if (segment.item.birthday && MediaQuery.sizeOf(context).width >= 600)
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: Icon(Symbols.cake_rounded, size: 14, color: foreground),
-            ),
-          Expanded(
-            child: Text(
+      child: wide
+          ? Text(
               title,
               maxLines: 1,
               softWrap: false,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelSmall
                   ?.copyWith(color: foreground),
-            ),
-          ),
-        ],
-      ),
+            )
+          : null,
     );
   }
 }
