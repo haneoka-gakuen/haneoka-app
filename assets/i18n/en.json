@@ -186,7 +186,10 @@
     },
     "search": {
       "placeholder": "Search the archive and community",
-      "hint": "Find songs, characters, story dialogue, guides and community posts."
+      "hint": "Find songs, characters, story dialogue, guides and community posts.",
+      "recent": "Recent",
+      "browse": "Browse",
+      "results": "{count} results"
     }
   },
   "navigation": {
@@ -300,7 +303,25 @@
       "tuneDefault": "Original key",
       "manual": "Manual",
       "loadingTips": "Loading tips",
-      "showSpoilerContent": "Show spoiler content"
+      "showSpoilerContent": "Show spoiler content",
+      "timeZone": "Time zone",
+      "zoneLocal": "Local time",
+      "dateAuto": "Auto",
+      "dateOrder": "Date order",
+      "dateMonth": "Month",
+      "dateDay": "Day",
+      "dateSeparator": "Separator",
+      "dateYear": "Year",
+      "yearAuto": "Other years",
+      "yearAlways": "Always",
+      "yearNever": "Never",
+      "dateYearDigits": "Year digits",
+      "dateWeekday": "Weekday",
+      "timeFormat": "Time format",
+      "timeHour": "Hour",
+      "timeSeconds": "Seconds",
+      "timeZoneName": "Time zone label",
+      "dateTime": "Date and time"
     }
   },
   "home": {
@@ -412,7 +433,8 @@
       "effects": "Effects",
       "scoreRanks": "Score Ranks",
       "skill": "Skill",
-      "skillHint": "Skill name"
+      "skillHint": "Skill name",
+      "description": "Description"
     },
     "songs": {
       "fields": {
@@ -765,7 +787,11 @@
         "everyOrder": "Every order",
         "bestOrder": "Best order",
         "powerNeeded": "Power needed",
-        "allCharts": "Every chart"
+        "allCharts": "Every chart",
+        "gekisouTiming": "Timing",
+        "gekisouTimingOpening": "Late start",
+        "gekisouTimingEnding": "Early end",
+        "gekisouTimingNotes": "{count} notes"
       }
     },
     "characters": {
@@ -1507,6 +1533,9 @@
         "notFound": "Not in the top {count}"
       },
       "resetKept": "Kept"
+    },
+    "comics": {
+      "numbered": "Comic {number}"
     }
   },
   "story": {
@@ -2799,7 +2828,8 @@
         "correctionHelp": "Editing an input for event rewards",
         "back": "Back",
         "requiredMemberCount": "More than five required members",
-        "luckSampling": "LUCK calculation"
+        "luckSampling": "LUCK calculation",
+        "invalidSamples": "Enter zero or a positive integer"
       },
       "criterionMax": "Single-run maximum (ranking)",
       "criterionMeanHelp": "Rank by the average of 120 skill orders for everyday play.",
@@ -3251,7 +3281,10 @@
       "duration": "{days}d {time}",
       "unknownDeadline": "End time unavailable",
       "cached": "Showing the last available event information.",
-      "totalRanking": "Total song ranking"
+      "totalRanking": "Total song ranking",
+      "totalTab": "Total",
+      "challengeTab": "Songs",
+      "pointTab": "Points"
     },
     "stampMaker": {
       "title": "Stamp maker",
@@ -3331,7 +3364,9 @@
     "playerProfile": {
       "title": "Player lookup",
       "queryIdle": "Enter a player ID",
-      "invalidId": "Check the player ID"
+      "invalidId": "Check the player ID",
+      "linked": "Your game accounts",
+      "recent": "Recent lookups"
     },
     "songPuzzle": {
       "title": "Song cover puzzle",
@@ -4051,7 +4086,66 @@
       "signInDescription": "Sign in to access your account.",
       "roleRegular": "Regular",
       "roleTrusted": "Trusted member",
-      "roleContributor": "Contributor"
+      "roleContributor": "Contributor",
+      "relationships": "Blocks & mutes",
+      "moderation": "Restrictions & appeals",
+      "blockedUsers": "Blocked users",
+      "mutedUsers": "Muted users",
+      "restrictions": "Restrictions",
+      "restrictionWrite": "Posting",
+      "restrictionUpload": "Uploads",
+      "restrictionSignIn": "Sign-in",
+      "restrictionPermanent": "Permanent",
+      "listEmpty": "None",
+      "preview": "Preview",
+      "joined": "Joined",
+      "remove": "Remove",
+      "removeGameAccount": "Remove this game account?",
+      "gameAccountRemoved": "Game account removed.",
+      "findPlayer": "Find a player",
+      "visibilityPublic": "Public",
+      "visibilityPrivate": "Private",
+      "gameAccounts": "Game accounts",
+      "unblockUser": "Unblock",
+      "unmute": "Unmute",
+      "gameRank": "Rank {value}",
+      "gameRating": "Rating {value}",
+      "appealsTitle": "Your appeals",
+      "appealStatus": {
+        "pending": "Pending",
+        "accepted": "Accepted",
+        "rejected": "Rejected",
+        "superseded": "Superseded"
+      },
+      "appeal": "Appeal",
+      "appealStatement": "Appeal statement",
+      "submitAppeal": "Submit appeal",
+      "appealSubmitted": "Appeal submitted",
+      "appealFailed": "The appeal could not be submitted.",
+      "emailPassword": "Email & password",
+      "apiTokens": "API tokens",
+      "apiTokenName": "Token name",
+      "apiTokenLifetime": "Valid for",
+      "apiTokenDays30": "30 days",
+      "apiTokenDays90": "90 days",
+      "apiTokenDays365": "1 year",
+      "apiTokenCreate": "Create token",
+      "apiTokenShown": "Copy this token now",
+      "apiTokenCopy": "Copy",
+      "apiTokenCopied": "Token copied.",
+      "apiTokenExpires": "Expires",
+      "apiTokenUsed": "Last used",
+      "apiTokenNeverUsed": "Never",
+      "apiTokenRevokeTitle": "Revoke this token?",
+      "apiTokenRevoked": "Token revoked.",
+      "apiTokenScopes": "Permissions",
+      "apiScope_team_read": "Read box and teams",
+      "apiScope_team_write": "Change box and teams",
+      "apiScope_gacha_read": "Read gacha history",
+      "apiScope_games_read": "Read game accounts",
+      "apiScope_profile_read": "Read profile",
+      "apiTokenEvents": "Recent changes",
+      "apiTokenEventChanged": "Box entries changed"
     },
     "profile": {
       "title": "Public profile",
@@ -4643,7 +4737,10 @@
         "accepted": "Accepted"
       },
       "unmute": "Unmute",
-      "unblock": "Unblock"
+      "unblock": "Unblock",
+      "editProfile": "Edit profile",
+      "followsYou": "Follows you",
+      "emptyList": "Nothing here yet"
     },
     "charts": {
       "title": "Community Charts",
@@ -5093,7 +5190,8 @@
         "reports": "Reports",
         "appeals": "Appeals",
         "operations": "Operations",
-        "forums": "Forums"
+        "forums": "Forums",
+        "comments": "Comments"
       },
       "metrics": {
         "totalUsers": "Total users",
@@ -5105,7 +5203,11 @@
         "pendingReports": "Pending reports",
         "pendingOperations": "Pending operations",
         "readyPackages": "Ready packages",
-        "resourceRuns": "Resource runs"
+        "resourceRuns": "Resource runs",
+        "reviewComments": "Comments to review",
+        "reviewPosts": "Posts to review",
+        "pendingDisplayNames": "Names awaiting review",
+        "totalComments": "Comments"
       },
       "columns": {
         "user": "User",
@@ -5258,7 +5360,8 @@
         "openHistory": "Open target history and governance",
         "openProfile": "Open public profile",
         "manageUser": "Open user management",
-        "governanceNote": "Updating the report only records its review status; it does not automatically hide content or restrict a user."
+        "governanceNote": "Updating the report only records its review status; it does not automatically hide content or restrict a user.",
+        "block": "Block content"
       },
       "history": {
         "open": "View history",
@@ -5460,7 +5563,10 @@
         "sessionNote": "Session validity and record updates do not indicate whether a person is online.",
         "displayTimezone": "Displayed time zone: {zone}",
         "restrictionRecord": "Restriction record",
-        "access": "Role and status"
+        "access": "Role and status",
+        "posts": "Posts",
+        "comments": "Comments",
+        "activity": "Activity"
       },
       "analytics": {
         "trends": "Trends",
@@ -5610,6 +5716,34 @@
         "confirmRemove": "Remove this content?",
         "search": "Search content"
       }
+    },
+    "comments": {
+      "search": "Search comments",
+      "partial": "{done} updated · {failed} failed",
+      "updated": "{count} updated",
+      "selected": "{count} selected",
+      "approve": "Approve",
+      "block": "Block",
+      "hide": "Hide",
+      "unhide": "Show",
+      "history": "History",
+      "select": "Select",
+      "selectAll": "Select all {count}",
+      "statusReview": "Needs review",
+      "statusPending": "Pending",
+      "statusBlocked": "Blocked",
+      "statusHidden": "Hidden",
+      "reports": "{count} reports",
+      "filterAttention": "To review",
+      "filterReported": "Reported",
+      "filterBlocked": "Blocked",
+      "filterHidden": "Hidden",
+      "filterAll": "All",
+      "target": "Where",
+      "targetAll": "All",
+      "targetForum": "Forums",
+      "targetEntity": "Entity pages",
+      "empty": "Nothing here"
     }
   },
   "app": {
@@ -5715,6 +5849,10 @@
     "saveTitle": "Save import options",
     "saveBody": "Read Android saves with Shizuku or supported folder access. On desktop, connect and authorize an Android phone to import, or use a local iPhone / iPad backup. Standard iOS installations import save files exported on a computer.",
     "saveGuide": "Explore save import",
-    "windowsArmPackage": "Windows 11 ARM64 → x64"
+    "windowsArmPackage": "Windows 11 ARM64 → x64",
+    "saveAndroid": "Shizuku · folder access",
+    "saveDesktopLabel": "Desktop",
+    "saveDesktop": "Connected Android phone · iPhone / iPad local backup",
+    "saveIos": "Save file exported from a computer"
   }
 }

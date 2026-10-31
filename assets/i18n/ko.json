@@ -186,7 +186,10 @@
     },
     "search": {
       "placeholder": "자료와 스토리, 커뮤니티 검색",
-      "hint": "곡, 캐릭터, 스토리 대사, 가이드, 커뮤니티 게시물을 찾아보세요."
+      "hint": "곡, 캐릭터, 스토리 대사, 가이드, 커뮤니티 게시물을 찾아보세요.",
+      "recent": "최근 검색",
+      "browse": "둘러보기",
+      "results": "결과 {count}개"
     }
   },
   "navigation": {
@@ -300,7 +303,25 @@
       "tuneDefault": "기본",
       "manual": "매뉴얼",
       "loadingTips": "로딩 팁",
-      "showSpoilerContent": "스포일러 콘텐츠 표시"
+      "showSpoilerContent": "스포일러 콘텐츠 표시",
+      "timeZone": "시간대",
+      "zoneLocal": "현지 시간",
+      "dateAuto": "자동",
+      "dateOrder": "날짜 순서",
+      "dateMonth": "월",
+      "dateDay": "일",
+      "dateSeparator": "구분 기호",
+      "dateYear": "연도",
+      "yearAuto": "올해 제외",
+      "yearAlways": "항상",
+      "yearNever": "표시 안 함",
+      "dateYearDigits": "연도 자릿수",
+      "dateWeekday": "요일",
+      "timeFormat": "시간 형식",
+      "timeHour": "시",
+      "timeSeconds": "초",
+      "timeZoneName": "시간대 표기",
+      "dateTime": "날짜 및 시간"
     }
   },
   "home": {
@@ -412,7 +433,8 @@
       "effects": "효과",
       "scoreRanks": "스코어 랭크",
       "skill": "스킬",
-      "skillHint": "스킬 이름"
+      "skillHint": "스킬 이름",
+      "description": "설명"
     },
     "songs": {
       "fields": {
@@ -765,7 +787,11 @@
         "everyOrder": "모든 스킬 순서",
         "bestOrder": "최적의 스킬 순서",
         "powerNeeded": "필요 종합력",
-        "allCharts": "모든 채보 비교"
+        "allCharts": "모든 채보 비교",
+        "gekisouTiming": "타이밍 조절",
+        "gekisouTimingOpening": "시작 지연",
+        "gekisouTimingEnding": "종료 선입력",
+        "gekisouTimingNotes": "{count}노트"
       }
     },
     "characters": {
@@ -1507,6 +1533,9 @@
         "notFound": "상위 {count}위 안에 없음"
       },
       "resetKept": "유지"
+    },
+    "comics": {
+      "numbered": "제{number}화"
     }
   },
   "story": {
@@ -2799,7 +2828,8 @@
         "correctionHelp": "이벤트 보상 입력 수정 중",
         "back": "뒤로",
         "requiredMemberCount": "필수 멤버가 5명을 넘습니다",
-        "luckSampling": "LUCK 계산"
+        "luckSampling": "LUCK 계산",
+        "invalidSamples": "0 이상의 정수를 입력하세요"
       },
       "criterionMax": "최고 점수 (랭킹)",
       "criterionMeanHelp": "120가지 스킬 순서의 평균 점수로 비교합니다. 일상적인 플레이에 적합합니다.",
@@ -3251,7 +3281,10 @@
       "duration": "{days}일 {time}",
       "unknownDeadline": "마감 시간이 제공되지 않았습니다",
       "cached": "마지막으로 가져온 이벤트 정보를 표시합니다.",
-      "totalRanking": "악곡 종합 랭킹"
+      "totalRanking": "악곡 종합 랭킹",
+      "totalTab": "종합",
+      "challengeTab": "곡별",
+      "pointTab": "이벤트 포인트"
     },
     "stampMaker": {
       "title": "스탬프 만들기",
@@ -3331,7 +3364,9 @@
     "playerProfile": {
       "title": "플레이어 조회",
       "queryIdle": "플레이어 ID 입력",
-      "invalidId": "플레이어 ID를 확인해 주세요"
+      "invalidId": "플레이어 ID를 확인해 주세요",
+      "linked": "내 게임 계정",
+      "recent": "최근 조회"
     },
     "songPuzzle": {
       "title": "곡 커버 퍼즐",
@@ -4051,7 +4086,66 @@
       "signInDescription": "계정에 접근하려면 로그인하세요.",
       "roleRegular": "단골 회원",
       "roleTrusted": "신뢰 회원",
-      "roleContributor": "기여자"
+      "roleContributor": "기여자",
+      "relationships": "차단 및 뮤트",
+      "moderation": "제한 및 이의 제기",
+      "blockedUsers": "차단한 사용자",
+      "mutedUsers": "뮤트한 사용자",
+      "restrictions": "제한",
+      "restrictionWrite": "게시",
+      "restrictionUpload": "업로드",
+      "restrictionSignIn": "로그인",
+      "restrictionPermanent": "영구",
+      "listEmpty": "없음",
+      "preview": "미리 보기",
+      "joined": "가입일",
+      "remove": "삭제",
+      "removeGameAccount": "이 게임 계정을 삭제할까요?",
+      "gameAccountRemoved": "게임 계정을 삭제했습니다.",
+      "findPlayer": "플레이어 찾기",
+      "visibilityPublic": "공개",
+      "visibilityPrivate": "비공개",
+      "gameAccounts": "게임 계정",
+      "unblockUser": "차단 해제",
+      "unmute": "뮤트 해제",
+      "gameRank": "랭크 {value}",
+      "gameRating": "하이스코어 레이팅 {value}",
+      "appealsTitle": "이의 제기",
+      "appealStatus": {
+        "pending": "검토 중",
+        "accepted": "승인됨",
+        "rejected": "거부됨",
+        "superseded": "대체됨"
+      },
+      "appeal": "이의 제기",
+      "appealStatement": "이의 제기 내용",
+      "submitAppeal": "이의 제기 제출",
+      "appealSubmitted": "이의 제기 제출됨",
+      "appealFailed": "이의 제기를 제출할 수 없습니다.",
+      "emailPassword": "이메일 및 비밀번호",
+      "apiTokens": "API 토큰",
+      "apiTokenName": "토큰 이름",
+      "apiTokenLifetime": "유효 기간",
+      "apiTokenDays30": "30일",
+      "apiTokenDays90": "90일",
+      "apiTokenDays365": "1년",
+      "apiTokenCreate": "토큰 만들기",
+      "apiTokenShown": "지금 이 토큰을 복사하세요",
+      "apiTokenCopy": "복사",
+      "apiTokenCopied": "토큰을 복사했습니다.",
+      "apiTokenExpires": "만료",
+      "apiTokenUsed": "마지막 사용",
+      "apiTokenNeverUsed": "사용 안 함",
+      "apiTokenRevokeTitle": "이 토큰을 폐기할까요?",
+      "apiTokenRevoked": "토큰을 폐기했습니다.",
+      "apiTokenScopes": "권한",
+      "apiScope_team_read": "박스와 편성 읽기",
+      "apiScope_team_write": "박스와 편성 변경",
+      "apiScope_gacha_read": "가챠 기록 읽기",
+      "apiScope_games_read": "게임 계정 읽기",
+      "apiScope_profile_read": "프로필 읽기",
+      "apiTokenEvents": "최근 변경",
+      "apiTokenEventChanged": "변경된 박스 항목"
     },
     "profile": {
       "title": "공개 프로필",
@@ -4643,7 +4737,10 @@
         "accepted": "승인됨"
       },
       "unmute": "뮤트 해제",
-      "unblock": "차단 해제"
+      "unblock": "차단 해제",
+      "editProfile": "프로필 편집",
+      "followsYou": "나를 팔로우함",
+      "emptyList": "아직 없습니다"
     },
     "charts": {
       "title": "커뮤니티 채보",
@@ -5093,7 +5190,8 @@
         "reports": "신고",
         "appeals": "이의 제기",
         "operations": "작업 기록",
-        "forums": "포럼"
+        "forums": "포럼",
+        "comments": "댓글"
       },
       "metrics": {
         "totalUsers": "전체 사용자",
@@ -5105,7 +5203,11 @@
         "pendingReports": "처리 대기 신고",
         "pendingOperations": "처리 중인 작업",
         "readyPackages": "준비된 패키지",
-        "resourceRuns": "리소스 작업"
+        "resourceRuns": "리소스 작업",
+        "reviewComments": "검토할 댓글",
+        "reviewPosts": "검토할 게시글",
+        "pendingDisplayNames": "심사 대기 이름",
+        "totalComments": "댓글"
       },
       "columns": {
         "user": "사용자",
@@ -5258,7 +5360,8 @@
         "openHistory": "대상 기록 및 관리 열기",
         "openProfile": "공개 프로필 열기",
         "manageUser": "사용자 관리 열기",
-        "governanceNote": "신고 상태 변경은 검토 결과만 기록하며 콘텐츠 숨김이나 사용자 제한을 자동으로 실행하지 않습니다."
+        "governanceNote": "신고 상태 변경은 검토 결과만 기록하며 콘텐츠 숨김이나 사용자 제한을 자동으로 실행하지 않습니다.",
+        "block": "콘텐츠 차단"
       },
       "history": {
         "open": "기록 보기",
@@ -5460,7 +5563,10 @@
         "sessionNote": "세션 유효성과 기록 수정은 사용자의 온라인 상태를 나타내지 않습니다.",
         "displayTimezone": "표시 시간대: {zone}",
         "restrictionRecord": "제한 기록",
-        "access": "역할 및 상태"
+        "access": "역할 및 상태",
+        "posts": "게시물",
+        "comments": "댓글",
+        "activity": "활동"
       },
       "analytics": {
         "trends": "추이",
@@ -5610,6 +5716,34 @@
         "confirmRemove": "이 콘텐츠를 삭제할까요?",
         "search": "콘텐츠 검색"
       }
+    },
+    "comments": {
+      "search": "댓글 검색",
+      "partial": "{done}개 처리 · {failed}개 실패",
+      "updated": "{count}개 처리됨",
+      "selected": "{count}개 선택",
+      "approve": "승인",
+      "block": "차단",
+      "hide": "숨기기",
+      "unhide": "표시",
+      "history": "기록",
+      "select": "선택",
+      "selectAll": "{count}개 모두 선택",
+      "statusReview": "검토 필요",
+      "statusPending": "심사 대기",
+      "statusBlocked": "차단됨",
+      "statusHidden": "숨김",
+      "reports": "신고 {count}건",
+      "filterAttention": "검토 대상",
+      "filterReported": "신고됨",
+      "filterBlocked": "차단됨",
+      "filterHidden": "숨김",
+      "filterAll": "전체",
+      "target": "위치",
+      "targetAll": "전체",
+      "targetForum": "게시판",
+      "targetEntity": "도감 페이지",
+      "empty": "항목 없음"
     }
   },
   "app": {
@@ -5715,6 +5849,10 @@
     "saveTitle": "세이브 가져오기 방법",
     "saveBody": "Android는 Shizuku 또는 지원되는 폴더 접근 방식으로 세이브를 읽습니다. 데스크톱에서는 Android 기기를 연결하고 승인한 뒤 가져오거나 iPhone / iPad 로컬 백업을 사용할 수 있습니다. 일반 iOS 설치는 컴퓨터에서 내보낸 세이브 파일을 가져옵니다.",
     "saveGuide": "세이브 가져오기 안내",
-    "windowsArmPackage": "Windows 11 ARM64 → x64"
+    "windowsArmPackage": "Windows 11 ARM64 → x64",
+    "saveAndroid": "Shizuku · 폴더 접근",
+    "saveDesktopLabel": "컴퓨터",
+    "saveDesktop": "연결한 Android 휴대폰 · iPhone / iPad 로컬 백업",
+    "saveIos": "컴퓨터에서 내보낸 저장 파일"
   }
 }

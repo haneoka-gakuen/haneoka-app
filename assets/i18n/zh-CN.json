@@ -186,7 +186,10 @@
     },
     "search": {
       "placeholder": "搜索资料、剧情与社区",
-      "hint": "查找乐曲、角色、剧情对白、帮助指南和社区帖子。"
+      "hint": "查找乐曲、角色、剧情对白、帮助指南和社区帖子。",
+      "recent": "最近搜索",
+      "browse": "浏览",
+      "results": "{count} 条结果"
     }
   },
   "navigation": {
@@ -300,7 +303,25 @@
       "tuneDefault": "原色",
       "manual": "说明",
       "loadingTips": "加载提示",
-      "showSpoilerContent": "显示剧透内容"
+      "showSpoilerContent": "显示剧透内容",
+      "timeZone": "时区",
+      "zoneLocal": "本地时间",
+      "dateAuto": "自动",
+      "dateOrder": "日期顺序",
+      "dateMonth": "月份",
+      "dateDay": "日",
+      "dateSeparator": "分隔符",
+      "dateYear": "年份",
+      "yearAuto": "非本年",
+      "yearAlways": "始终",
+      "yearNever": "不显示",
+      "dateYearDigits": "年份位数",
+      "dateWeekday": "星期",
+      "timeFormat": "时间格式",
+      "timeHour": "小时",
+      "timeSeconds": "秒",
+      "timeZoneName": "时区标注",
+      "dateTime": "日期与时间"
     }
   },
   "home": {
@@ -412,7 +433,8 @@
       "effects": "效果",
       "scoreRanks": "得分评级",
       "skill": "技能",
-      "skillHint": "技能名"
+      "skillHint": "技能名",
+      "description": "说明"
     },
     "songs": {
       "fields": {
@@ -765,7 +787,11 @@
         "everyOrder": "任意技能顺序",
         "bestOrder": "最佳技能顺序",
         "powerNeeded": "所需综合力",
-        "allCharts": "对比所有谱面"
+        "allCharts": "对比所有谱面",
+        "gekisouTiming": "卡键",
+        "gekisouTimingOpening": "开段延后",
+        "gekisouTimingEnding": "段尾提前",
+        "gekisouTimingNotes": "{count}键"
       }
     },
     "characters": {
@@ -1507,6 +1533,9 @@
         "notFound": "前 {count} 名中未找到"
       },
       "resetKept": "保留"
+    },
+    "comics": {
+      "numbered": "第{number}话"
     }
   },
   "story": {
@@ -2799,7 +2828,8 @@
         "correctionHelp": "正在修改活动收益所需的输入",
         "back": "返回",
         "requiredMemberCount": "必带成员超过五人",
-        "luckSampling": "LUCK 计算"
+        "luckSampling": "LUCK 计算",
+        "invalidSamples": "请输入0或正整数"
       },
       "criterionMax": "单次最高分（冲榜）",
       "criterionMeanHelp": "按 120 种技能顺序的平均分排序，适合日常游玩。",
@@ -3251,7 +3281,10 @@
       "duration": "{days} 天 {time}",
       "unknownDeadline": "截止时间未提供",
       "cached": "正在显示最近一次取得的活动信息。",
-      "totalRanking": "乐曲总榜"
+      "totalRanking": "乐曲总榜",
+      "totalTab": "总榜",
+      "challengeTab": "单曲榜",
+      "pointTab": "积分榜"
     },
     "stampMaker": {
       "title": "表情制作",
@@ -3331,7 +3364,9 @@
     "playerProfile": {
       "title": "玩家查询",
       "queryIdle": "输入玩家 ID",
-      "invalidId": "请检查玩家 ID"
+      "invalidId": "请检查玩家 ID",
+      "linked": "我的游戏账号",
+      "recent": "最近查询"
     },
     "songPuzzle": {
       "title": "歌曲封面华容道",
@@ -4051,7 +4086,66 @@
       "signInDescription": "登录以访问您的账号。",
       "roleRegular": "活跃用户",
       "roleTrusted": "受信用户",
-      "roleContributor": "贡献者"
+      "roleContributor": "贡献者",
+      "relationships": "屏蔽与静音",
+      "moderation": "限制与申诉",
+      "blockedUsers": "已屏蔽的用户",
+      "mutedUsers": "已静音的用户",
+      "restrictions": "限制",
+      "restrictionWrite": "发布",
+      "restrictionUpload": "上传",
+      "restrictionSignIn": "登录",
+      "restrictionPermanent": "永久",
+      "listEmpty": "无",
+      "preview": "预览",
+      "joined": "加入时间",
+      "remove": "移除",
+      "removeGameAccount": "移除此游戏账号?",
+      "gameAccountRemoved": "已移除游戏账号。",
+      "findPlayer": "查找玩家",
+      "visibilityPublic": "公开",
+      "visibilityPrivate": "私密",
+      "gameAccounts": "游戏账号",
+      "unblockUser": "取消屏蔽",
+      "unmute": "取消静音",
+      "gameRank": "等级 {value}",
+      "gameRating": "高分评级 {value}",
+      "appealsTitle": "我的申诉",
+      "appealStatus": {
+        "pending": "审核中",
+        "accepted": "已通过",
+        "rejected": "已驳回",
+        "superseded": "已取代"
+      },
+      "appeal": "申诉",
+      "appealStatement": "申诉内容",
+      "submitAppeal": "提交申诉",
+      "appealSubmitted": "申诉已提交",
+      "appealFailed": "无法提交申诉。",
+      "emailPassword": "邮箱与密码",
+      "apiTokens": "API 令牌",
+      "apiTokenName": "令牌名称",
+      "apiTokenLifetime": "有效期",
+      "apiTokenDays30": "30 天",
+      "apiTokenDays90": "90 天",
+      "apiTokenDays365": "1 年",
+      "apiTokenCreate": "创建令牌",
+      "apiTokenShown": "请立即复制此令牌",
+      "apiTokenCopy": "复制",
+      "apiTokenCopied": "令牌已复制。",
+      "apiTokenExpires": "到期",
+      "apiTokenUsed": "上次使用",
+      "apiTokenNeverUsed": "从未",
+      "apiTokenRevokeTitle": "要撤销此令牌吗?",
+      "apiTokenRevoked": "令牌已撤销。",
+      "apiTokenScopes": "权限",
+      "apiScope_team_read": "读取 Box 和队伍",
+      "apiScope_team_write": "修改 Box 和队伍",
+      "apiScope_gacha_read": "读取抽卡记录",
+      "apiScope_games_read": "读取游戏账号",
+      "apiScope_profile_read": "读取个人资料",
+      "apiTokenEvents": "最近修改",
+      "apiTokenEventChanged": "修改的 Box 条目"
     },
     "profile": {
       "title": "个人主页",
@@ -4643,7 +4737,10 @@
         "accepted": "已受理"
       },
       "unmute": "取消屏蔽",
-      "unblock": "取消拉黑"
+      "unblock": "取消拉黑",
+      "editProfile": "编辑资料",
+      "followsYou": "关注了你",
+      "emptyList": "暂无内容"
     },
     "charts": {
       "title": "社区谱面",
@@ -5093,7 +5190,8 @@
         "reports": "举报",
         "appeals": "申诉",
         "operations": "操作记录",
-        "forums": "板块"
+        "forums": "板块",
+        "comments": "评论"
       },
       "metrics": {
         "totalUsers": "用户总数",
@@ -5105,7 +5203,11 @@
         "pendingReports": "待处理举报",
         "pendingOperations": "处理中操作",
         "readyPackages": "就绪资源包",
-        "resourceRuns": "资源任务"
+        "resourceRuns": "资源任务",
+        "reviewComments": "待处理评论",
+        "reviewPosts": "待处理帖子",
+        "pendingDisplayNames": "待审昵称",
+        "totalComments": "评论"
       },
       "columns": {
         "user": "用户",
@@ -5258,7 +5360,8 @@
         "openHistory": "打开目标历史与治理",
         "openProfile": "打开公开主页",
         "manageUser": "打开用户管理",
-        "governanceNote": "更新举报只记录审核状态，不会自动隐藏内容或限制用户。"
+        "governanceNote": "更新举报只记录审核状态，不会自动隐藏内容或限制用户。",
+        "block": "拦截内容"
       },
       "history": {
         "open": "查看历史记录",
@@ -5460,7 +5563,10 @@
         "sessionNote": "会话有效性和记录更新不代表用户是否在线。",
         "displayTimezone": "显示时区：{zone}",
         "restrictionRecord": "限制记录",
-        "access": "角色与状态"
+        "access": "角色与状态",
+        "posts": "帖子",
+        "comments": "评论",
+        "activity": "活动"
       },
       "analytics": {
         "trends": "趋势",
@@ -5610,6 +5716,34 @@
         "confirmRemove": "移除此内容？",
         "search": "搜索内容"
       }
+    },
+    "comments": {
+      "search": "搜索评论",
+      "partial": "已处理 {done} 条 · 失败 {failed} 条",
+      "updated": "已处理 {count} 条",
+      "selected": "已选 {count} 条",
+      "approve": "通过",
+      "block": "拦截",
+      "hide": "隐藏",
+      "unhide": "取消隐藏",
+      "history": "历史",
+      "select": "选择",
+      "selectAll": "全选 {count} 条",
+      "statusReview": "需复核",
+      "statusPending": "待审核",
+      "statusBlocked": "已拦截",
+      "statusHidden": "已隐藏",
+      "reports": "举报 {count}",
+      "filterAttention": "待处理",
+      "filterReported": "被举报",
+      "filterBlocked": "已拦截",
+      "filterHidden": "已隐藏",
+      "filterAll": "全部",
+      "target": "位置",
+      "targetAll": "全部",
+      "targetForum": "板块",
+      "targetEntity": "图鉴页",
+      "empty": "没有内容"
     }
   },
   "app": {
@@ -5715,6 +5849,10 @@
     "saveTitle": "存档导入方式",
     "saveBody": "Android 可通过 Shizuku 或受支持的文件夹访问方式读取存档；电脑端连接并授权 Android 手机后即可导入，也支持 iPhone / iPad 本地备份。标准 iOS 版可导入从电脑导出的存档文件。",
     "saveGuide": "了解存档导入",
-    "windowsArmPackage": "Windows 11 ARM64 → x64"
+    "windowsArmPackage": "Windows 11 ARM64 → x64",
+    "saveAndroid": "Shizuku · 文件夹访问",
+    "saveDesktopLabel": "电脑",
+    "saveDesktop": "连接的 Android 手机 · iPhone / iPad 本地备份",
+    "saveIos": "从电脑导出的存档文件"
   }
 }

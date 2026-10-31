@@ -186,7 +186,10 @@
     },
     "search": {
       "placeholder": "資料・物語・コミュニティを検索",
-      "hint": "楽曲、キャラクター、物語の台詞、ガイド、コミュニティの投稿を検索できます。"
+      "hint": "楽曲、キャラクター、物語の台詞、ガイド、コミュニティの投稿を検索できます。",
+      "recent": "最近の検索",
+      "browse": "カテゴリー",
+      "results": "{count} 件"
     }
   },
   "navigation": {
@@ -300,7 +303,25 @@
       "tuneDefault": "オリジナル",
       "manual": "マニュアル",
       "loadingTips": "ロード中のヒント",
-      "showSpoilerContent": "ネタバレを含む内容を表示"
+      "showSpoilerContent": "ネタバレを含む内容を表示",
+      "timeZone": "タイムゾーン",
+      "zoneLocal": "現地時間",
+      "dateAuto": "自動",
+      "dateOrder": "日付の順序",
+      "dateMonth": "月",
+      "dateDay": "日",
+      "dateSeparator": "区切り",
+      "dateYear": "年",
+      "yearAuto": "今年以外",
+      "yearAlways": "常に",
+      "yearNever": "表示しない",
+      "dateYearDigits": "年の桁数",
+      "dateWeekday": "曜日",
+      "timeFormat": "時刻の形式",
+      "timeHour": "時",
+      "timeSeconds": "秒",
+      "timeZoneName": "タイムゾーン表記",
+      "dateTime": "日付と時刻"
     }
   },
   "home": {
@@ -412,7 +433,8 @@
       "effects": "効果",
       "scoreRanks": "スコアランク",
       "skill": "スキル",
-      "skillHint": "スキル名"
+      "skillHint": "スキル名",
+      "description": "説明"
     },
     "songs": {
       "fields": {
@@ -765,7 +787,11 @@
         "everyOrder": "全スキル順",
         "bestOrder": "最良のスキル順",
         "powerNeeded": "必要総合力",
-        "allCharts": "全譜面で比較"
+        "allCharts": "全譜面で比較",
+        "gekisouTiming": "判定タイミング",
+        "gekisouTimingOpening": "開始遅押し",
+        "gekisouTimingEnding": "終端早押し",
+        "gekisouTimingNotes": "{count}ノーツ"
       }
     },
     "characters": {
@@ -1507,6 +1533,9 @@
         "notFound": "上位{count}位内に見つかりません"
       },
       "resetKept": "引き継ぎ"
+    },
+    "comics": {
+      "numbered": "第{number}話"
     }
   },
   "story": {
@@ -2799,7 +2828,8 @@
         "correctionHelp": "イベント報酬の入力を編集中",
         "back": "戻る",
         "requiredMemberCount": "必須メンバーが5人を超えています",
-        "luckSampling": "LUCK 計算"
+        "luckSampling": "LUCK 計算",
+        "invalidSamples": "0以上の整数を入力"
       },
       "criterionMax": "最高スコア（ランキング）",
       "criterionMeanHelp": "120 通りのスキル順の平均スコアで比較。普段のプレイ向け。",
@@ -3251,7 +3281,10 @@
       "duration": "{days}日 {time}",
       "unknownDeadline": "終了時刻は未提供です",
       "cached": "最後に取得したイベント情報を表示しています。",
-      "totalRanking": "楽曲総合ランキング"
+      "totalRanking": "楽曲総合ランキング",
+      "totalTab": "総合",
+      "challengeTab": "楽曲別",
+      "pointTab": "イベントP"
     },
     "stampMaker": {
       "title": "スタンプ作成",
@@ -3331,7 +3364,9 @@
     "playerProfile": {
       "title": "プレイヤー検索",
       "queryIdle": "プレイヤーIDを入力",
-      "invalidId": "プレイヤーIDを確認してください"
+      "invalidId": "プレイヤーIDを確認してください",
+      "linked": "自分のゲームアカウント",
+      "recent": "最近の検索"
     },
     "songPuzzle": {
       "title": "楽曲ジャケットパズル",
@@ -4051,7 +4086,66 @@
       "signInDescription": "アカウントを利用するにはログインしてください。",
       "roleRegular": "常連",
       "roleTrusted": "信頼メンバー",
-      "roleContributor": "貢献者"
+      "roleContributor": "貢献者",
+      "relationships": "ブロックとミュート",
+      "moderation": "制限と異議申し立て",
+      "blockedUsers": "ブロック中のユーザー",
+      "mutedUsers": "ミュート中のユーザー",
+      "restrictions": "制限",
+      "restrictionWrite": "投稿",
+      "restrictionUpload": "アップロード",
+      "restrictionSignIn": "サインイン",
+      "restrictionPermanent": "無期限",
+      "listEmpty": "なし",
+      "preview": "プレビュー",
+      "joined": "登録日",
+      "remove": "削除",
+      "removeGameAccount": "このゲームアカウントを削除しますか?",
+      "gameAccountRemoved": "ゲームアカウントを削除しました。",
+      "findPlayer": "プレイヤーを検索",
+      "visibilityPublic": "公開",
+      "visibilityPrivate": "非公開",
+      "gameAccounts": "ゲームアカウント",
+      "unblockUser": "ブロック解除",
+      "unmute": "ミュート解除",
+      "gameRank": "ランク {value}",
+      "gameRating": "ハイスコアレーティング {value}",
+      "appealsTitle": "異議申し立て",
+      "appealStatus": {
+        "pending": "審査中",
+        "accepted": "承認",
+        "rejected": "却下",
+        "superseded": "取り下げ"
+      },
+      "appeal": "異議申し立て",
+      "appealStatement": "異議申し立ての内容",
+      "submitAppeal": "送信する",
+      "appealSubmitted": "送信済み",
+      "appealFailed": "異議申し立てを送信できませんでした。",
+      "emailPassword": "メールとパスワード",
+      "apiTokens": "APIトークン",
+      "apiTokenName": "トークン名",
+      "apiTokenLifetime": "有効期間",
+      "apiTokenDays30": "30日",
+      "apiTokenDays90": "90日",
+      "apiTokenDays365": "1年",
+      "apiTokenCreate": "トークンを作成",
+      "apiTokenShown": "このトークンを今すぐコピー",
+      "apiTokenCopy": "コピー",
+      "apiTokenCopied": "トークンをコピーしました。",
+      "apiTokenExpires": "有効期限",
+      "apiTokenUsed": "最終使用",
+      "apiTokenNeverUsed": "未使用",
+      "apiTokenRevokeTitle": "このトークンを無効にしますか?",
+      "apiTokenRevoked": "トークンを無効にしました。",
+      "apiTokenScopes": "権限",
+      "apiScope_team_read": "ボックスと編成を読む",
+      "apiScope_team_write": "ボックスと編成を変更",
+      "apiScope_gacha_read": "ガチャ履歴を読む",
+      "apiScope_games_read": "ゲームアカウントを読む",
+      "apiScope_profile_read": "プロフィールを読む",
+      "apiTokenEvents": "最近の変更",
+      "apiTokenEventChanged": "変更されたボックス項目"
     },
     "profile": {
       "title": "公開プロフィール",
@@ -4643,7 +4737,10 @@
         "accepted": "受理済み"
       },
       "unmute": "ミュートを解除",
-      "unblock": "ブロックを解除"
+      "unblock": "ブロックを解除",
+      "editProfile": "プロフィールを編集",
+      "followsYou": "フォローされています",
+      "emptyList": "まだありません"
     },
     "charts": {
       "title": "コミュニティ譜面",
@@ -5093,7 +5190,8 @@
         "reports": "報告",
         "appeals": "異議申し立て",
         "operations": "操作履歴",
-        "forums": "フォーラム"
+        "forums": "フォーラム",
+        "comments": "コメント"
       },
       "metrics": {
         "totalUsers": "総ユーザー",
@@ -5105,7 +5203,11 @@
         "pendingReports": "未処理の報告",
         "pendingOperations": "処理中の操作",
         "readyPackages": "準備済みパッケージ",
-        "resourceRuns": "リソース実行"
+        "resourceRuns": "リソース実行",
+        "reviewComments": "要確認コメント",
+        "reviewPosts": "要確認投稿",
+        "pendingDisplayNames": "審査待ちの名前",
+        "totalComments": "コメント"
       },
       "columns": {
         "user": "ユーザー",
@@ -5258,7 +5360,8 @@
         "openHistory": "対象の履歴と管理を開く",
         "openProfile": "公開プロフィールを開く",
         "manageUser": "ユーザー管理を開く",
-        "governanceNote": "報告の更新は確認状況のみを記録します。コンテンツの非表示やユーザー制限は自動では行われません。"
+        "governanceNote": "報告の更新は確認状況のみを記録します。コンテンツの非表示やユーザー制限は自動では行われません。",
+        "block": "コンテンツをブロック"
       },
       "history": {
         "open": "履歴を表示",
@@ -5460,7 +5563,10 @@
         "sessionNote": "セッションの有効性や記録の更新は、オンライン状態を示すものではありません。",
         "displayTimezone": "表示タイムゾーン：{zone}",
         "restrictionRecord": "制限記録",
-        "access": "権限と状態"
+        "access": "権限と状態",
+        "posts": "投稿",
+        "comments": "コメント",
+        "activity": "アクティビティ"
       },
       "analytics": {
         "trends": "推移",
@@ -5610,6 +5716,34 @@
         "confirmRemove": "このコンテンツを削除しますか？",
         "search": "コンテンツを検索"
       }
+    },
+    "comments": {
+      "search": "コメントを検索",
+      "partial": "{done} 件更新 · {failed} 件失敗",
+      "updated": "{count} 件更新",
+      "selected": "{count} 件選択",
+      "approve": "承認",
+      "block": "ブロック",
+      "hide": "非表示",
+      "unhide": "表示",
+      "history": "履歴",
+      "select": "選択",
+      "selectAll": "{count} 件をすべて選択",
+      "statusReview": "要確認",
+      "statusPending": "審査待ち",
+      "statusBlocked": "ブロック済み",
+      "statusHidden": "非表示",
+      "reports": "通報 {count} 件",
+      "filterAttention": "要対応",
+      "filterReported": "通報あり",
+      "filterBlocked": "ブロック済み",
+      "filterHidden": "非表示",
+      "filterAll": "すべて",
+      "target": "場所",
+      "targetAll": "すべて",
+      "targetForum": "掲示板",
+      "targetEntity": "図鑑ページ",
+      "empty": "該当なし"
     }
   },
   "app": {
@@ -5715,6 +5849,10 @@
     "saveTitle": "セーブの取り込み方法",
     "saveBody": "Android は Shizuku または対応するフォルダーアクセスで読み込み。PC では Android 端末の接続・認証後に取り込めるほか、iPhone / iPad のローカルバックアップにも対応。通常の iOS 版では PC で書き出したセーブファイルを取り込めます。",
     "saveGuide": "セーブの取り込み方法",
-    "windowsArmPackage": "Windows 11 ARM64 → x64"
+    "windowsArmPackage": "Windows 11 ARM64 → x64",
+    "saveAndroid": "Shizuku · フォルダーアクセス",
+    "saveDesktopLabel": "パソコン",
+    "saveDesktop": "接続した Android 端末 · iPhone / iPad のローカルバックアップ",
+    "saveIos": "パソコンから書き出したセーブデータ"
   }
 }

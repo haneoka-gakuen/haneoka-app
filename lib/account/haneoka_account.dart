@@ -145,10 +145,7 @@ class HaneokaAccount extends ChangeNotifier {
   };
 
   LinkedPlayer? linkOf(GameSave save) => _players
-      .where(
-        (p) =>
-            p.server == save.server && p.profileId == save.profileId,
-      )
+      .where((p) => p.server == save.server && p.profileId == save.profileId)
       .firstOrNull;
 
   Future<void> load() async {

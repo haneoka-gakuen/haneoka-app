@@ -8,6 +8,7 @@ import '../ui/theme.dart';
 import '../ui/tile.dart';
 import 'haneoka_account.dart';
 import 'security_widgets.dart';
+import 'account_sections.dart';
 import 'appeals.dart';
 
 /// The reader's haneoka profile and sign-in sessions (`account-workspace`):
@@ -24,6 +25,7 @@ class _AccountProfileScreenState extends State<AccountProfileScreen> {
   final _bio = TextEditingController();
   Future<List<Map<String, Object?>>>? _sessions;
   bool _saving = false;
+  String _section = 'profile';
   Object? _owner = HaneokaAccount.instance.user?['id'];
   void _accountChanged() {
     final owner = HaneokaAccount.instance.user?['id'];
@@ -41,8 +43,8 @@ class _AccountProfileScreenState extends State<AccountProfileScreen> {
   @override
   void initState() {
     super.initState();
-    HaneokaAccount.instance.addListener(_accountChanged);
     final profile = HaneokaAccount.instance.profile ?? const {};
+    HaneokaAccount.instance.addListener(_accountChanged);
     _name.text = '${profile['displayName'] ?? ''}';
     _handle.text = '${profile['handle'] ?? ''}';
     _bio.text = '${profile['bio'] ?? ''}';
@@ -115,7 +117,6 @@ class _AccountProfileScreenState extends State<AccountProfileScreen> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final locale = AppScope.of(context).text.locale;
-    final profile = HaneokaAccount.instance.profile ?? const {};
     Widget surface(Widget child) => Material(
       color: scheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(Corner.extraLarge),
@@ -132,135 +133,200 @@ class _AccountProfileScreenState extends State<AccountProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  surface(
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                  surface(const AccountSummary()),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 48,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
                       children: [
-                        if (profile['publicUid'] != null)
+                        for (final (key, icon, label) in [
+                          (
+                            'profile',
+                            Symbols.person_rounded,
+                            _label('profile', 'Profile'),
+                          ),
+                          (
+                            'games',
+                            Symbols.sports_esports_rounded,
+                            _label('gameAccounts', 'Game accounts'),
+                          ),
+                          (
+                            'security',
+                            Symbols.verified_user_rounded,
+                            _label('security', 'Sign-in & security'),
+                          ),
+                          (
+                            'sessions',
+                            Symbols.devices_rounded,
+                            _label('sessions', 'Sessions'),
+                          ),
+                          (
+                            'relationships',
+                            Symbols.block_rounded,
+                            _label('relationships', 'Blocks & mutes'),
+                          ),
+                          (
+                            'moderation',
+                            Symbols.policy_rounded,
+                            _label('moderation', 'Restrictions & appeals'),
+                          ),
+                          (
+                            'management',
+                            Symbols.settings_rounded,
+                            _label('accountManagement', 'Account management'),
+                          ),
+                        ])
                           Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: Text(
-                              '${_label('publicUid', 'UID')} ${profile['publicUid']}',
-                              style: theme.textTheme.titleSmall,
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              avatar: Icon(icon, size: 18),
+                              showCheckmark: false,
+                              label: Text(label),
+                              selected: _section == key,
+                              onSelected: (_) => setState(() => _section = key),
                             ),
                           ),
-                        TextField(
-                          controller: _name,
-                          maxLength: 80,
-                          decoration: InputDecoration(
-                            labelText: _label('displayName', 'Display name'),
-                            border: const OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: _handle,
-                          maxLength: 32,
-                          decoration: InputDecoration(
-                            labelText: _label('handle', 'Handle'),
-                            prefixText: '@',
-                            border: const OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: _bio,
-                          minLines: 3,
-                          maxLines: 6,
-                          maxLength: 500,
-                          decoration: InputDecoration(
-                            labelText: _label('bio', 'Bio'),
-                            border: const OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        FilledButton(
-                          onPressed: _saving ? null : _save,
-                          child: Text(_label('saveProfile', 'Save profile')),
-                        ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  surface(const AccountAvatar()),
-                  const SizedBox(height: 16),
-                  surface(const AccountSecurity()),
-                  const SizedBox(height: 16),
-                  surface(
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          _label('sessions', 'Sessions'),
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 8),
-                        FutureBuilder(
-                          future: _sessions,
-                          builder: (context, snapshot) {
-                            final sessions = snapshot.data;
-                            if (snapshot.hasError) {
-                              return FilledButton.tonalIcon(
-                                onPressed: () =>
-                                    setState(() => _sessions = _loadSessions()),
-                                icon: const Icon(Symbols.refresh_rounded),
-                                label: Text(
-                                  AppScope.of(context)
-                                      .text('common.actions.retry', 'Retry'),
-                                ),
-                              );
-                            }
-                            if (sessions == null) {
-                              return const Padding(
-                                padding: EdgeInsets.all(16),
-                                child: Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                              );
-                            }
-                            return Column(
-                              children: [
-                                for (final session in sessions)
-                                  ListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    leading: const Icon(
-                                      Symbols.devices_rounded,
-                                    ),
-                                    title: Text(
-                                      '${session['userAgent'] ?? ''}'.isEmpty
-                                          ? _label(
-                                              'sessionUnknown',
-                                              'Unknown device',
-                                            )
-                                          : '${session['userAgent']}',
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    subtitle: Text(
-                                      formatCommunityTime(
-                                            session['updatedAt'] ??
-                                                session['createdAt'],
-                                            locale,
-                                          )?.text ??
-                                          '',
-                                    ),
-                                    trailing: TextButton(
-                                      onPressed: () =>
-                                          _revoke('${session['token']}'),
-                                      child: Text(_label('revoke', 'Revoke')),
-                                    ),
+                  const SizedBox(height: 12),
+                  if (_section == 'profile') ...[
+                    surface(
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextField(
+                            controller: _name,
+                            maxLength: 80,
+                            decoration: InputDecoration(
+                              labelText: _label('displayName', 'Display name'),
+                              border: const OutlineInputBorder(),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _handle,
+                            maxLength: 32,
+                            decoration: InputDecoration(
+                              labelText: _label('handle', 'Handle'),
+                              prefixText: '@',
+                              border: const OutlineInputBorder(),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _bio,
+                            minLines: 3,
+                            maxLines: 6,
+                            maxLength: 500,
+                            decoration: InputDecoration(
+                              labelText: _label('bio', 'Bio'),
+                              border: const OutlineInputBorder(),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          FilledButton(
+                            onPressed: _saving ? null : _save,
+                            child: Text(_label('saveProfile', 'Save profile')),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    surface(const AccountAvatar()),
+                  ],
+                  if (_section == 'games') surface(const GameAccountsSection()),
+                  if (_section == 'security') ...[
+                    surface(const AccountSecurity()),
+                    const SizedBox(height: 16),
+                    surface(const ApiTokensSection()),
+                  ],
+                  if (_section == 'relationships')
+                    surface(const RelationshipsSection()),
+                  if (_section == 'sessions')
+                    surface(
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            _label('sessions', 'Sessions'),
+                            style: theme.textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          FutureBuilder(
+                            future: _sessions,
+                            builder: (context, snapshot) {
+                              final sessions = snapshot.data;
+                              if (snapshot.hasError) {
+                                return FilledButton.tonalIcon(
+                                  onPressed: () => setState(
+                                    () => _sessions = _loadSessions(),
                                   ),
-                              ],
-                            );
-                          },
-                        ),
-                      ],
+                                  icon: const Icon(Symbols.refresh_rounded),
+                                  label: Text(
+                                    AppScope.of(context)
+                                        .text('common.actions.retry', 'Retry'),
+                                  ),
+                                );
+                              }
+                              if (sessions == null) {
+                                return const Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                );
+                              }
+                              return Column(
+                                children: [
+                                  for (final session in sessions)
+                                    ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      leading: const Icon(
+                                        Symbols.devices_rounded,
+                                      ),
+                                      title: Text(
+                                        deviceLabel(
+                                              '${session['userAgent'] ?? ''}',
+                                            ).isEmpty
+                                            ? _label(
+                                                'sessionUnknown',
+                                                'Unknown device',
+                                              )
+                                            : deviceLabel(
+                                                '${session['userAgent']}',
+                                              ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      subtitle: Text(
+                                        formatCommunityTime(
+                                              session['updatedAt'] ??
+                                                  session['createdAt'],
+                                              locale,
+                                            )?.text ??
+                                            '',
+                                      ),
+                                      trailing: TextButton(
+                                        onPressed: () =>
+                                            _revoke('${session['token']}'),
+                                        child: Text(_label('revoke', 'Revoke')),
+                                      ),
+                                    ),
+                                ],
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  surface(const AccountAppeals()),
-                  const SizedBox(height: 16),
-                  surface(const DeleteAccount()),
+                  if (_section == 'moderation') ...[
+                    surface(const RestrictionsSection()),
+                    const SizedBox(height: 16),
+                    surface(const AccountAppeals()),
+                  ],
+                  if (_section == 'management') surface(const DeleteAccount()),
                 ],
               ),
             ),

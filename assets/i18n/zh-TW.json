@@ -186,7 +186,10 @@
     },
     "search": {
       "placeholder": "搜尋資料、劇情與社群",
-      "hint": "查找樂曲、角色、劇情對白、說明指南與社群貼文。"
+      "hint": "查找樂曲、角色、劇情對白、說明指南與社群貼文。",
+      "recent": "最近搜尋",
+      "browse": "瀏覽",
+      "results": "{count} 筆結果"
     }
   },
   "navigation": {
@@ -300,7 +303,25 @@
       "tuneDefault": "原色",
       "manual": "說明",
       "loadingTips": "載入提示",
-      "showSpoilerContent": "顯示劇透內容"
+      "showSpoilerContent": "顯示劇透內容",
+      "timeZone": "時區",
+      "zoneLocal": "本地時間",
+      "dateAuto": "自動",
+      "dateOrder": "日期順序",
+      "dateMonth": "月份",
+      "dateDay": "日",
+      "dateSeparator": "分隔符",
+      "dateYear": "年份",
+      "yearAuto": "非本年",
+      "yearAlways": "始終",
+      "yearNever": "不顯示",
+      "dateYearDigits": "年份位數",
+      "dateWeekday": "星期",
+      "timeFormat": "時間格式",
+      "timeHour": "小時",
+      "timeSeconds": "秒",
+      "timeZoneName": "時區標註",
+      "dateTime": "日期與時間"
     }
   },
   "home": {
@@ -412,7 +433,8 @@
       "effects": "效果",
       "scoreRanks": "分數等級",
       "skill": "技能",
-      "skillHint": "技能名"
+      "skillHint": "技能名",
+      "description": "說明"
     },
     "songs": {
       "fields": {
@@ -765,7 +787,11 @@
         "everyOrder": "任意技能順序",
         "bestOrder": "最佳技能順序",
         "powerNeeded": "所需綜合力",
-        "allCharts": "對比所有譜面"
+        "allCharts": "對比所有譜面",
+        "gekisouTiming": "卡鍵",
+        "gekisouTimingOpening": "開段延後",
+        "gekisouTimingEnding": "段尾提前",
+        "gekisouTimingNotes": "{count}鍵"
       }
     },
     "characters": {
@@ -1507,6 +1533,9 @@
         "notFound": "前 {count} 名中未找到"
       },
       "resetKept": "保留"
+    },
+    "comics": {
+      "numbered": "第{number}話"
     }
   },
   "story": {
@@ -2799,7 +2828,8 @@
         "correctionHelp": "正在修改活動收益所需的輸入",
         "back": "返回",
         "requiredMemberCount": "必帶成員超過五人",
-        "luckSampling": "LUCK 計算"
+        "luckSampling": "LUCK 計算",
+        "invalidSamples": "請輸入0或正整數"
       },
       "criterionMax": "單次最高分（衝榜）",
       "criterionMeanHelp": "依 120 種技能順序的平均分排序，適合日常遊玩。",
@@ -3251,7 +3281,10 @@
       "duration": "{days} 天 {time}",
       "unknownDeadline": "未提供截止時間",
       "cached": "正在顯示最近一次取得的活動資訊。",
-      "totalRanking": "樂曲總榜"
+      "totalRanking": "樂曲總榜",
+      "totalTab": "總榜",
+      "challengeTab": "單曲榜",
+      "pointTab": "積分榜"
     },
     "stampMaker": {
       "title": "貼圖製作",
@@ -3331,7 +3364,9 @@
     "playerProfile": {
       "title": "玩家查詢",
       "queryIdle": "輸入玩家 ID",
-      "invalidId": "請檢查玩家 ID"
+      "invalidId": "請檢查玩家 ID",
+      "linked": "我的遊戲帳號",
+      "recent": "最近查詢"
     },
     "songPuzzle": {
       "title": "歌曲封面華容道",
@@ -4051,7 +4086,66 @@
       "signInDescription": "登入以存取您的帳號。",
       "roleRegular": "活躍使用者",
       "roleTrusted": "受信使用者",
-      "roleContributor": "貢獻者"
+      "roleContributor": "貢獻者",
+      "relationships": "封鎖與靜音",
+      "moderation": "限制與申訴",
+      "blockedUsers": "已封鎖的使用者",
+      "mutedUsers": "已靜音的使用者",
+      "restrictions": "限制",
+      "restrictionWrite": "發布",
+      "restrictionUpload": "上傳",
+      "restrictionSignIn": "登入",
+      "restrictionPermanent": "永久",
+      "listEmpty": "無",
+      "preview": "預覽",
+      "joined": "加入時間",
+      "remove": "移除",
+      "removeGameAccount": "移除此遊戲帳號?",
+      "gameAccountRemoved": "已移除遊戲帳號。",
+      "findPlayer": "尋找玩家",
+      "visibilityPublic": "公開",
+      "visibilityPrivate": "私密",
+      "gameAccounts": "遊戲帳號",
+      "unblockUser": "解除封鎖",
+      "unmute": "解除靜音",
+      "gameRank": "等級 {value}",
+      "gameRating": "高分評級 {value}",
+      "appealsTitle": "我的申訴",
+      "appealStatus": {
+        "pending": "審核中",
+        "accepted": "已通過",
+        "rejected": "已駁回",
+        "superseded": "已取代"
+      },
+      "appeal": "申訴",
+      "appealStatement": "申訴內容",
+      "submitAppeal": "送出申訴",
+      "appealSubmitted": "申訴已送出",
+      "appealFailed": "無法送出申訴。",
+      "emailPassword": "信箱與密碼",
+      "apiTokens": "API 權杖",
+      "apiTokenName": "權杖名稱",
+      "apiTokenLifetime": "有效期",
+      "apiTokenDays30": "30 天",
+      "apiTokenDays90": "90 天",
+      "apiTokenDays365": "1 年",
+      "apiTokenCreate": "建立權杖",
+      "apiTokenShown": "請立即複製此權杖",
+      "apiTokenCopy": "複製",
+      "apiTokenCopied": "權杖已複製。",
+      "apiTokenExpires": "到期",
+      "apiTokenUsed": "上次使用",
+      "apiTokenNeverUsed": "從未",
+      "apiTokenRevokeTitle": "要撤銷此權杖嗎?",
+      "apiTokenRevoked": "權杖已撤銷。",
+      "apiTokenScopes": "權限",
+      "apiScope_team_read": "讀取 Box 和隊伍",
+      "apiScope_team_write": "修改 Box 和隊伍",
+      "apiScope_gacha_read": "讀取抽卡記錄",
+      "apiScope_games_read": "讀取遊戲帳號",
+      "apiScope_profile_read": "讀取個人資料",
+      "apiTokenEvents": "最近修改",
+      "apiTokenEventChanged": "修改的 Box 條目"
     },
     "profile": {
       "title": "個人主頁",
@@ -4643,7 +4737,10 @@
         "accepted": "已受理"
       },
       "unmute": "取消靜音",
-      "unblock": "取消封鎖"
+      "unblock": "取消封鎖",
+      "editProfile": "編輯個人資料",
+      "followsYou": "關注了你",
+      "emptyList": "暫無內容"
     },
     "charts": {
       "title": "社群譜面",
@@ -5093,7 +5190,8 @@
         "reports": "檢舉",
         "appeals": "申訴",
         "operations": "操作紀錄",
-        "forums": "板塊"
+        "forums": "板塊",
+        "comments": "留言"
       },
       "metrics": {
         "totalUsers": "使用者總數",
@@ -5105,7 +5203,11 @@
         "pendingReports": "待處理檢舉",
         "pendingOperations": "處理中操作",
         "readyPackages": "就緒資源包",
-        "resourceRuns": "資源任務"
+        "resourceRuns": "資源任務",
+        "reviewComments": "待處理留言",
+        "reviewPosts": "待處理貼文",
+        "pendingDisplayNames": "待審暱稱",
+        "totalComments": "留言"
       },
       "columns": {
         "user": "使用者",
@@ -5258,7 +5360,8 @@
         "openHistory": "開啟目標歷史與治理",
         "openProfile": "開啟公開主頁",
         "manageUser": "開啟使用者管理",
-        "governanceNote": "更新檢舉只會記錄審核狀態，不會自動隱藏內容或限制使用者。"
+        "governanceNote": "更新檢舉只會記錄審核狀態，不會自動隱藏內容或限制使用者。",
+        "block": "攔截內容"
       },
       "history": {
         "open": "檢視歷史記錄",
@@ -5460,7 +5563,10 @@
         "sessionNote": "工作階段有效性與紀錄更新不代表使用者是否在線。",
         "displayTimezone": "顯示時區：{zone}",
         "restrictionRecord": "限制紀錄",
-        "access": "角色與狀態"
+        "access": "角色與狀態",
+        "posts": "貼文",
+        "comments": "留言",
+        "activity": "活動"
       },
       "analytics": {
         "trends": "趨勢",
@@ -5610,6 +5716,34 @@
         "confirmRemove": "移除此內容？",
         "search": "搜尋內容"
       }
+    },
+    "comments": {
+      "search": "搜尋留言",
+      "partial": "已處理 {done} 則 · 失敗 {failed} 則",
+      "updated": "已處理 {count} 則",
+      "selected": "已選 {count} 則",
+      "approve": "通過",
+      "block": "攔截",
+      "hide": "隱藏",
+      "unhide": "取消隱藏",
+      "history": "歷史",
+      "select": "選擇",
+      "selectAll": "全選 {count} 則",
+      "statusReview": "需複核",
+      "statusPending": "待審核",
+      "statusBlocked": "已攔截",
+      "statusHidden": "已隱藏",
+      "reports": "檢舉 {count}",
+      "filterAttention": "待處理",
+      "filterReported": "被檢舉",
+      "filterBlocked": "已攔截",
+      "filterHidden": "已隱藏",
+      "filterAll": "全部",
+      "target": "位置",
+      "targetAll": "全部",
+      "targetForum": "板塊",
+      "targetEntity": "圖鑑頁",
+      "empty": "沒有內容"
     }
   },
   "app": {
@@ -5715,6 +5849,10 @@
     "saveTitle": "存檔匯入方式",
     "saveBody": "Android 可透過 Shizuku 或支援的資料夾存取方式讀取存檔；電腦連接並授權 Android 手機後即可匯入，也支援 iPhone / iPad 本機備份。標準 iOS 版可匯入從電腦匯出的存檔。",
     "saveGuide": "瞭解存檔匯入",
-    "windowsArmPackage": "Windows 11 ARM64 → x64"
+    "windowsArmPackage": "Windows 11 ARM64 → x64",
+    "saveAndroid": "Shizuku · 資料夾存取",
+    "saveDesktopLabel": "電腦",
+    "saveDesktop": "連接的 Android 手機 · iPhone / iPad 本機備份",
+    "saveIos": "從電腦匯出的存檔檔案"
   }
 }
