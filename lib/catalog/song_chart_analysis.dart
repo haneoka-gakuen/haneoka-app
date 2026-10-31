@@ -160,7 +160,10 @@ class _SongChartAnalysisState extends State<SongChartAnalysis> {
                         flex: counts[kind]!,
                         child: Padding(
                           padding: const EdgeInsets.only(right: 2),
-                          child: ColoredBox(color: colours[kind]!),
+                          child: ColoredBox(
+                            color: colours[kind]!,
+                            child: const SizedBox.expand(),
+                          ),
                         ),
                       ),
                 ],
