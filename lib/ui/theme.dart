@@ -58,10 +58,12 @@ TextTheme _typescale(Color color, List<String> fontFallback) {
 ThemeData haneokaTheme(
   Brightness brightness, {
   String seed = 'haneoka',
+  (ColorScheme, ColorScheme)? schemes,
   bool compact = false,
   Locale locale = const Locale('ja'),
 }) {
-  final (light, dark) = haneokaSchemes[seed] ?? haneokaSchemes['haneoka']!;
+  final (light, dark) =
+      schemes ?? haneokaSchemes[seed] ?? haneokaSchemes['haneoka']!;
   final scheme = brightness == Brightness.dark ? dark : light;
   final fontFallback = appFontFallback(locale);
   return ThemeData(

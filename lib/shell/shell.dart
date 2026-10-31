@@ -19,6 +19,7 @@ import 'links.dart';
 import 'navigation.dart';
 import 'page.dart';
 import 'routes.dart';
+import '../ui/season_layer.dart';
 
 /// The website's shell: an expanded drawer on wide windows, a rail on medium
 /// ones, a modal drawer on phones; the page's bar and pane beside it.
@@ -627,11 +628,7 @@ class _DrawerState extends State<_Drawer> {
                       icon: const Icon(Symbols.menu_open_rounded),
                     ),
                   SizedBox(width: widget.modal ? 4 : 12),
-                  Image.asset(
-                    'assets/brand/android-chrome-512x512.png',
-                    width: 32,
-                    height: 32,
-                  ),
+                  BrandMark(decoration: AppScope.of(context).shownDecoration),
                   const SizedBox(width: 12),
                   Text('haneoka', style: theme.textTheme.titleLarge),
                 ],

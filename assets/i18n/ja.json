@@ -322,7 +322,24 @@
       "timeSeconds": "秒",
       "timeZoneName": "タイムゾーン表記",
       "dateTime": "日付と時刻",
-      "usageAnalytics": "利用状況を送信"
+      "usageAnalytics": "利用状況を送信",
+      "seasonEffects": "季節の演出"
+    },
+    "seasons": {
+      "newYear": "お正月",
+      "setsubun": "節分",
+      "lunarNewYear": "旧正月",
+      "valentine": "バレンタインデー",
+      "hinamatsuri": "ひな祭り",
+      "whiteDay": "ホワイトデー",
+      "hanami": "お花見",
+      "aprilFools": "エイプリルフール",
+      "childrensDay": "こどもの日",
+      "tanabata": "七夕",
+      "obon": "お盆",
+      "midAutumn": "中秋・お月見",
+      "halloween": "ハロウィン",
+      "christmas": "クリスマス"
     }
   },
   "home": {
@@ -479,7 +496,43 @@
         "only": "選択した種類のみ",
         "contains": "選択した種類を含む"
       },
-      "skillPoints": "スキル発動位置"
+      "skillPoints": "スキル発動位置",
+      "analysis": {
+        "composition": "ノーツ構成",
+        "tap": "タップ",
+        "flick": "フリック",
+        "long": "ロング",
+        "trace": "トレース",
+        "node": "コンボノード",
+        "sections": "撃奏区間",
+        "section": "区間",
+        "sectionNotes": "ノーツ数",
+        "startCombo": "開始時コンボ",
+        "seconds": "長さ",
+        "scenario": "スコア条件",
+        "greatShare": "Great 割合",
+        "skill": "スキル",
+        "perPower": "スコア / 総合力",
+        "perMinute": "スコア / 総合力 / 分",
+        "base": "スキルなし",
+        "skip": "スキップ",
+        "slotWeights": "スキル位置の重み",
+        "chartId": "譜面 ID",
+        "metric": "順位の指標",
+        "gekisouLive": "撃奏ライブ",
+        "freeLive": "フリーライブ",
+        "placement": "順位",
+        "justShare": "Just率",
+        "recordPerPower": "楽曲記録 / 総合力",
+        "thresholds": "評価ライン",
+        "roomSize": "ルーム人数",
+        "power": "総合力",
+        "rank": "評価",
+        "score": "スコア",
+        "scorePerPlayer": "1人あたりスコア",
+        "powerNeeded": "必要総合力",
+        "reached": "達成度"
+      }
     },
     "anonTokyo": {
       "characters": "キャラクター",
@@ -2210,7 +2263,11 @@
         "image-timeout": "認識がタイムアウトしました。",
         "issues": "要確認",
         "level": "レベル",
-        "unknown": "不明"
+        "unknown": "不明",
+        "chooseVideo": "画面収録を選ぶ",
+        "image-video": "この画面収録を読み込めませんでした。",
+        "imagesHint": "カード一覧の画像を最大 8 枚",
+        "videoHint": "一覧を最後まで一度スクロール"
       },
       "personalLiveScore": "個人Liveスコア",
       "scoreDomain": "スコアの種類",
@@ -2331,7 +2388,23 @@
           "intl-cbt": "グローバル版CBT"
         },
         "unavailableTarget": "対象サーバーに未収録",
-        "incompatibleServer": "このサーバーのカードIDは対象サーバーと対応していません。"
+        "incompatibleServer": "このサーバーのカードIDは対象サーバーと対応していません。",
+        "groupSave": "ゲームのセーブデータ",
+        "tagAll": "育成情報すべて",
+        "sourceFile": "セーブまたは書き出しファイル",
+        "sourceFileHint": "ZIP、iMazing、JSON、CSV",
+        "iosBackupHint": "Finder、Apple Devices、iTunes で作成",
+        "androidHint": "USB 接続とデバッグを有効に",
+        "androidUnavailable": "パソコンの Chrome か Edge が必要",
+        "saveFolderHint": "この端末のゲームデータフォルダ",
+        "sourceApp": "Haneoka App",
+        "sourceAppHint": "スマホでセーブを読み取り、ここへ同期",
+        "groupScreen": "ゲーム画面",
+        "tagCards": "カードとレベル",
+        "screenshotsHint": "この端末で認識",
+        "groupText": "テキスト",
+        "tagList": "テキストの内容による",
+        "pasteHint": "CSV、TSV、コピーしたテキスト"
       },
       "resourceResultsChanged": "育成値や条件が変わりました。結果を更新するには再計算してください。",
       "localDraftChanged": "別のタブでカード一覧が変更されました。現在の入力をエクスポートしてから、保存済みの一覧を読み直してください。",
@@ -5730,6 +5803,37 @@
         "remove": "コンテンツを削除",
         "confirmRemove": "このコンテンツを削除しますか？",
         "search": "コンテンツを検索"
+      },
+      "pool": {
+        "title": "アカウントプール",
+        "refresh": "更新",
+        "account": "アカウント",
+        "state": "状態",
+        "lastSuccess": "最終成功",
+        "failures": "失敗回数",
+        "hold": "一時停止",
+        "release": "再開",
+        "clear": "停止を解除",
+        "remove": "削除",
+        "add": "アカウントを追加",
+        "addLabel": "アカウント JSON",
+        "status": {
+          "ready": "利用可能",
+          "working": "稼働中",
+          "cooling_down": "クールダウン中",
+          "held": "一時停止中",
+          "disabled": "無効",
+          "auth_paused": "ログイン拒否",
+          "auth_uncertain": "ログイン状態不明",
+          "ok": "正常",
+          "collecting": "収集中",
+          "failed": "失敗",
+          "rate_limited": "レート制限",
+          "no_available_account": "利用可能なアカウントなし",
+          "not_configured": "未設定",
+          "invalid_config": "設定が無効",
+          "not_started": "未開始"
+        }
       }
     },
     "comments": {

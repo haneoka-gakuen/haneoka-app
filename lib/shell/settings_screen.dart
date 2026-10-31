@@ -16,17 +16,33 @@ import '../ui/theme.dart';
 import '../ui/tile.dart';
 import 'links.dart';
 import 'page.dart';
+import '../ui/app_image.dart';
+import '../ui/themes.dart';
 
 /// One choice in a settings group (`SettingsOption.astro`): a 56 dp face with
 /// an icon, an image or a palette; the chosen one fills with primary and its
 /// corners tighten.
 class _Option {
-  const _Option(this.value, this.label, {this.icon, this.image, this.swatch});
+  const _Option(
+    this.value,
+    this.label, {
+    this.icon,
+    this.image,
+    this.swatch,
+    this.portrait,
+    this.ring,
+    this.badge,
+  });
   final String value;
   final String label;
   final IconData? icon;
   final String? image;
   final List<Color>? swatch;
+
+  /// A round network picture: a band icon or a character's face.
+  final String? portrait;
+  final Color? ring;
+  final IconData? badge;
 }
 
 /// The website's settings page (`SettingsDocument.astro`): appearance, theme
@@ -62,23 +78,74 @@ class SettingsScreen extends StatelessWidget {
       body: FutureBuilder(
         future: CatalogVisuals.of(state.api),
         builder: (context, snapshot) {
-          final bands = snapshot.data?.bands;
-          final colourOptions = [
-            _Option(
-              'haneoka',
-              t('settings.labels.tuneDefault', 'Original key'),
-              swatch: const [
-                Color(0xFF31356E),
-                Color(0xFFDFE0FF),
-                Color(0xFF79BBC8),
-              ],
-            ),
-            for (final MapEntry(:key, :value) in bandSwatches.entries)
+          final visuals = snapshot.data;
+          final jp = state.apiFor('jp');
+          final now = DateTime.now();
+          final open = openSeasons(now);
+          final born = birthdaysOn(state.themeCharacters, now);
+          final seasonalOpen = open.isNotEmpty || born.isNotEmpty;
+          String characterName(int id) =>
+              t.text(visuals?.characters[id]?['characterName']);
+          String face(ThemeCharacter character) =>
+              jp.asset(character.face).toString();
+          final themeRows = <List<_Option>>[
+            [
               _Option(
-                key,
-                t.text(bands?[int.parse(key.split('-').last)]?['bandName']),
-                swatch: dark ? value.$2 : value.$1,
+                'haneoka',
+                t('settings.labels.tuneDefault', 'Original key'),
+                swatch: const [
+                  Color(0xFF31356E),
+                  Color(0xFFDFE0FF),
+                  Color(0xFF79BBC8),
+                ],
               ),
+              for (final season in open)
+                _Option(
+                  season.seed,
+                  t('settings.seasons.${season.key}', season.id),
+                  icon: season.ornament,
+                ),
+              for (final character in born)
+                _Option(
+                  character.birthdaySeed,
+                  characterName(character.id),
+                  portrait: face(character),
+                  ring: character.color,
+                  badge: birthdayOrnament,
+                ),
+            ],
+            for (final MapEntry(:key, :value) in bandSwatches.entries)
+              [
+                if (visuals?.bands[int.parse(key.split('-').last)]?['icon']
+                    case final String icon)
+                  _Option(
+                    key,
+                    t.text(
+                      visuals?.bands[int.parse(
+                        key.split('-').last,
+                      )]?['bandName'],
+                    ),
+                    portrait: state.api.asset(icon).toString(),
+                  )
+                else
+                  _Option(
+                    key,
+                    t.text(
+                      visuals?.bands[int.parse(
+                        key.split('-').last,
+                      )]?['bandName'],
+                    ),
+                    swatch: dark ? value.$2 : value.$1,
+                  ),
+                for (final character in state.themeCharacters)
+                  if ('band-${character.bandId}' == key)
+                    _Option(
+                      character.seed,
+                      characterName(character.id),
+                      portrait: face(character),
+                      ring: character.color,
+                    ),
+              ],
           ];
           return ListView(
             padding: pagePadding(context),
@@ -101,16 +168,26 @@ class SettingsScreen extends StatelessWidget {
                             onSelected: (v) =>
                                 state.setThemeMode(ThemeMode.values.byName(v)),
                           ),
-                          _Group(
-                            icon: Symbols.format_paint_rounded,
+                          _ThemeGroup(
                             title: t(
                               'settings.labels.themeColor',
                               'Theme color',
                             ),
-                            value: state.seed,
-                            options: colourOptions,
+                            value: state.shownSeed,
+                            rows: themeRows,
                             onSelected: state.setSeed,
                           ),
+                          if (seasonalOpen)
+                            _Switch(
+                              icon: Symbols.auto_awesome_rounded,
+                              label: t(
+                                'settings.labels.seasonEffects',
+                                'Seasonal effects',
+                              ),
+                              value: state.seasonEffects,
+                              onChanged: (v) =>
+                                  state.setFlag('seasonEffects', v),
+                            ),
                           _Group(
                             icon: Symbols.density_medium_rounded,
                             title: t('common.layout.density', 'Spacing'),
@@ -407,6 +484,32 @@ class _Face extends StatelessWidget {
               ),
             ),
           )
+        : option.portrait != null
+        ? Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: size * 0.72,
+                height: size * 0.72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: scheme.surfaceContainerHighest,
+                  border: option.ring == null
+                      ? null
+                      : Border.all(color: option.ring!, width: 2),
+                ),
+                child: ClipOval(
+                  child: AppImage(
+                    candidates: [option.portrait!],
+                    fit: BoxFit.cover,
+                    localized: false,
+                  ),
+                ),
+              ),
+              if (option.badge != null)
+                Positioned(right: -6, bottom: -6, child: _Badge(option.badge!)),
+            ],
+          )
         : option.image != null
         ? SvgPicture.asset(option.image!, width: 28, height: 28)
         : Icon(
@@ -653,4 +756,110 @@ List<Widget> _dateGroups(BuildContext context) {
         onSelected: (value) => SiteDatePreferences.set(key, value),
       ),
   ];
+}
+
+class _Badge extends StatelessWidget {
+  const _Badge(this.icon);
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: scheme.tertiaryContainer,
+      ),
+      child: Icon(icon, size: 14, color: scheme.onTertiaryContainer),
+    );
+  }
+}
+
+/// The theme colour row (`.settings-options--seed`): the original theme and
+/// any open seasonal or birthday themes, then each band's icon followed by
+/// its members' portraits.
+class _ThemeGroup extends StatelessWidget {
+  const _ThemeGroup({
+    required this.title,
+    required this.value,
+    required this.rows,
+    required this.onSelected,
+  });
+  final String title;
+  final String value;
+  final List<List<_Option>> rows;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final current = rows.expand((row) => row).where((o) => o.value == value);
+    final header = Row(
+      children: [
+        Icon(Symbols.format_paint_rounded, color: scheme.onSurfaceVariant),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: theme.textTheme.titleMedium),
+              const SizedBox(height: 4),
+              Text(
+                current.firstOrNull?.label ?? '',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    final faces = Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        for (final row in rows)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.end,
+              children: [
+                for (final option in row)
+                  _Face(
+                    option: option,
+                    selected: option.value == value,
+                    onTap: () => onSelected(option.value),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: LayoutBuilder(
+        builder: (context, constraints) => constraints.maxWidth >= 720
+            ? Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: header),
+                  const SizedBox(width: 24),
+                  faces,
+                ],
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  header,
+                  const SizedBox(height: 16),
+                  Align(alignment: Alignment.centerLeft, child: faces),
+                ],
+              ),
+      ),
+    );
+  }
 }

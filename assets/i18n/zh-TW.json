@@ -322,7 +322,24 @@
       "timeSeconds": "秒",
       "timeZoneName": "時區標註",
       "dateTime": "日期與時間",
-      "usageAnalytics": "傳送使用統計"
+      "usageAnalytics": "傳送使用統計",
+      "seasonEffects": "節日特效"
+    },
+    "seasons": {
+      "newYear": "新年",
+      "setsubun": "節分",
+      "lunarNewYear": "春節",
+      "valentine": "情人節",
+      "hinamatsuri": "女兒節",
+      "whiteDay": "白色情人節",
+      "hanami": "賞櫻",
+      "aprilFools": "愚人節",
+      "childrensDay": "兒童節",
+      "tanabata": "七夕",
+      "obon": "盂蘭盆節",
+      "midAutumn": "中秋節",
+      "halloween": "萬聖節",
+      "christmas": "聖誕節"
     }
   },
   "home": {
@@ -479,7 +496,43 @@
         "only": "僅限所選類型",
         "contains": "包含所選類型"
       },
-      "skillPoints": "技能點位"
+      "skillPoints": "技能點位",
+      "analysis": {
+        "composition": "音符構成",
+        "tap": "點擊",
+        "flick": "滑鍵",
+        "long": "長條",
+        "trace": "追蹤",
+        "node": "連擊節點",
+        "sections": "激奏段",
+        "section": "段",
+        "sectionNotes": "音符數",
+        "startCombo": "開始時連擊",
+        "seconds": "時長",
+        "scenario": "得分情境",
+        "greatShare": "Great 比例",
+        "skill": "技能",
+        "perPower": "分數 / 綜合力",
+        "perMinute": "分數 / 綜合力 / 分鐘",
+        "base": "無技能",
+        "skip": "跳過",
+        "slotWeights": "技能位權重",
+        "chartId": "譜面 ID",
+        "metric": "排名指標",
+        "gekisouLive": "激奏 Live",
+        "freeLive": "自由 Live",
+        "placement": "名次",
+        "justShare": "Just 率",
+        "recordPerPower": "歌曲紀錄 / 綜合力",
+        "thresholds": "評級門檻",
+        "roomSize": "房間人數",
+        "power": "綜合力",
+        "rank": "評級",
+        "score": "分數",
+        "scorePerPlayer": "每人分數",
+        "powerNeeded": "所需綜合力",
+        "reached": "達成度"
+      }
     },
     "anonTokyo": {
       "characters": "角色",
@@ -2210,7 +2263,11 @@
         "image-timeout": "辨識逾時。",
         "issues": "待檢查",
         "level": "等級",
-        "unknown": "未知"
+        "unknown": "未知",
+        "chooseVideo": "選擇螢幕錄影",
+        "image-video": "無法讀取這段螢幕錄影。",
+        "imagesHint": "最多 8 張卡牌列表截圖",
+        "videoHint": "把整個列表滑動一遍"
       },
       "personalLiveScore": "個人 Live 分數",
       "scoreDomain": "分數類型",
@@ -2331,7 +2388,23 @@
           "intl-cbt": "國際服封測"
         },
         "unavailableTarget": "目標服未收錄",
-        "incompatibleServer": "此來源服的卡牌編號無法與目標服對應。"
+        "incompatibleServer": "此來源服的卡牌編號無法與目標服對應。",
+        "groupSave": "遊戲存檔",
+        "tagAll": "全部養成",
+        "sourceFile": "存檔或匯出檔案",
+        "sourceFileHint": "ZIP、iMazing、JSON、CSV",
+        "iosBackupHint": "用 Finder、Apple Devices 或 iTunes 建立",
+        "androidHint": "USB 連接並開啟偵錯",
+        "androidUnavailable": "需要電腦上的 Chrome 或 Edge",
+        "saveFolderHint": "本裝置上的遊戲資料夾",
+        "sourceApp": "Haneoka App",
+        "sourceAppHint": "在手機上讀取存檔，再同步到這裡",
+        "groupScreen": "遊戲畫面",
+        "tagCards": "卡牌和等級",
+        "screenshotsHint": "在本機辨識",
+        "groupText": "文字",
+        "tagList": "取決於文字內容",
+        "pasteHint": "CSV、TSV 或複製的文字"
       },
       "resourceResultsChanged": "養成或條件已變更，請重新計算以更新結果。",
       "localDraftChanged": "另一個分頁已修改卡庫。請先匯出目前輸入，再重新讀取已儲存的卡庫。",
@@ -5730,6 +5803,37 @@
         "remove": "移除內容",
         "confirmRemove": "移除此內容？",
         "search": "搜尋內容"
+      },
+      "pool": {
+        "title": "帳號池",
+        "refresh": "重新整理",
+        "account": "帳號",
+        "state": "狀態",
+        "lastSuccess": "最近成功",
+        "failures": "失敗次數",
+        "hold": "暫停使用",
+        "release": "恢復使用",
+        "clear": "解除暫停",
+        "remove": "移除",
+        "add": "新增帳號",
+        "addLabel": "帳號 JSON",
+        "status": {
+          "ready": "可用",
+          "working": "工作中",
+          "cooling_down": "冷卻中",
+          "held": "已暫停",
+          "disabled": "已停用",
+          "auth_paused": "登入被拒",
+          "auth_uncertain": "登入狀態未知",
+          "ok": "正常",
+          "collecting": "採集中",
+          "failed": "失敗",
+          "rate_limited": "被限流",
+          "no_available_account": "無可用帳號",
+          "not_configured": "未設定",
+          "invalid_config": "設定無效",
+          "not_started": "未開始"
+        }
       }
     },
     "comments": {

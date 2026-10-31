@@ -17,6 +17,7 @@ import 'shell/shell.dart';
 import 'gacha_history/history_page.dart';
 import 'ui/save_screen.dart';
 import 'ui/fonts.dart';
+import 'ui/season_layer.dart';
 import 'ui/theme.dart';
 import 'team_builder/engine_client.dart'
     show runTeamEngineHost, runTeamEngineProcess;
@@ -94,18 +95,25 @@ class HaneokaApp extends StatelessWidget {
     final state = AppScope.of(context);
     return MaterialApp(
       title: 'Haneoka',
-      builder: (context, child) =>
-          SaveHistoryActionScope(onReadHistory: openGameHistory, child: child!),
+      builder: (context, child) => SaveHistoryActionScope(
+        onReadHistory: openGameHistory,
+        child: SeasonLayer(
+          motif: state.seasonEffects ? state.shownDecoration?.$1 : null,
+          child: child!,
+        ),
+      ),
       locale: state.locale,
       theme: haneokaTheme(
         Brightness.light,
-        seed: state.seed,
+        seed: state.shownSeed,
+        schemes: state.schemesFor(state.shownSeed),
         compact: state.compact,
         locale: state.locale,
       ),
       darkTheme: haneokaTheme(
         Brightness.dark,
-        seed: state.seed,
+        seed: state.shownSeed,
+        schemes: state.schemesFor(state.shownSeed),
         compact: state.compact,
         locale: state.locale,
       ),
