@@ -330,17 +330,41 @@ class PlayerProfileView extends StatelessWidget {
                       color: scheme.onSurfaceVariant,
                     ),
                   ),
-                  if (level != null)
+                  if (level != null || profile['totalFavorite'] != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
-                      child: Chip(
-                        label: Text(
-                          rankingLabel(
-                            t,
-                            'cardLevel',
-                            'Lv. {level}',
-                          ).replaceAll('{level}', '$level'),
-                        ),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          if (level != null)
+                            Chip(
+                              label: Text(
+                                rankingLabel(
+                                  t,
+                                  'cardLevel',
+                                  'Lv. {level}',
+                                ).replaceAll('{level}', '$level'),
+                              ),
+                            ),
+                          if (profile['totalFavorite'] != null)
+                            Tooltip(
+                              message: rankingLabel(
+                                t,
+                                'favorites',
+                                'Likes received',
+                              ),
+                              child: Chip(
+                                avatar: const Icon(
+                                  Symbols.favorite_rounded,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  '${profile['totalFavoriteExact'] ?? number.format(profile['totalFavorite'])}',
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                 ],
@@ -357,21 +381,6 @@ class PlayerProfileView extends StatelessWidget {
                 '${namecard['slot'] != null ? ' · ${rankingLabel(t, 'profileCardSlot', 'Slot {slot}').replaceAll('{slot}', '${namecard['slot']}')}' : ''}',
             child: ImageGallery(images: pages, aspectRatio: 16 / 9),
           ),
-        DetailSection(
-          icon: Symbols.person_rounded,
-          title: rankingLabel(t, 'profile', 'Player profile'),
-          child: SpecList(
-            facts: [
-              if (profile['totalFavorite'] != null)
-                Fact(
-                  rankingLabel(t, 'favorites', 'Likes received'),
-                  '${profile['totalFavoriteExact'] ?? number.format(profile['totalFavorite'])}',
-                ),
-              if (level != null)
-                Fact(rankingLabel(t, 'level', 'Rank'), '$level'),
-            ],
-          ),
-        ),
         if (art != null)
           DetailSection(
             icon: Symbols.style_rounded,
