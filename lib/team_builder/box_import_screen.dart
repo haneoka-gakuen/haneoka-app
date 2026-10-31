@@ -20,6 +20,7 @@ import 'box_import.dart';
 import 'controller.dart';
 import 'screenshot_import_screen.dart';
 import 'widgets.dart';
+import 'import_source_tile.dart';
 
 Future<List<BoxCandidate>> _parseFiles(List<Uint8List> data) =>
     Isolate.run(() => parseBoxFiles(data));
@@ -56,6 +57,7 @@ class _BoxImportScreen extends StatefulWidget {
 }
 
 class _BoxImportScreenState extends State<_BoxImportScreen> {
+  var _pasteOpen = false;
   TeamBuilderController get c => widget.c;
   final _text = TextEditingController();
   var _phase = _Phase.select;
@@ -106,8 +108,7 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
       setState(
         () => _saves = [
           for (final save in AccountStore.instance.saves)
-            if (save.server == 'jp' || save.server == 'intl')
-              save,
+            if (save.server == 'jp' || save.server == 'intl') save,
         ],
       );
     });
@@ -117,8 +118,7 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
   Future<void> _addAccount() async {
     final added = [
       for (final save in await addGameAccounts(context))
-        if (save.server == 'jp' || save.server == 'intl')
-          save,
+        if (save.server == 'jp' || save.server == 'intl') save,
     ];
     if (!mounted || added.isEmpty) return;
     setState(
@@ -127,8 +127,7 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
         for (final save in _saves)
           if (!added.any(
             (row) =>
-                row.profileId == save.profileId &&
-                row.server == save.server,
+                row.profileId == save.profileId && row.server == save.server,
           ))
             save,
       ],
@@ -699,65 +698,97 @@ class _BoxImportScreenState extends State<_BoxImportScreen> {
     return '$subject · ${_t('notice.${notice.code}', 'Needs review')}';
   }
 
+  /// The import start, as the website lists it: every source grouped by what
+  /// it reads.
   Widget _selectBody(ThemeData theme) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      OutlinedButton.icon(
-        onPressed: () {
-          final navigator = Navigator.of(context);
-          navigator.pop();
-          openScreenshotImport(navigator.context, c);
-        },
-        icon: const Icon(Symbols.photo_camera_rounded),
-        label: Text(_t('screenshots', 'Screenshots')),
-      ),
-      const SizedBox(height: 8),
-      for (final save in _saves) ...[
-        OutlinedButton.icon(
-          onPressed: () => _readSave(save),
-          icon: const Icon(Symbols.sports_esports_rounded),
-          label: Text('${save.name ?? save.profileId} · ${save.profileId}'),
-        ),
-        const SizedBox(height: 8),
-      ],
-      if (_saves.isEmpty) ...[
-        Text(
-          AppLocalizations.of(context).teamBuilderNoSave,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+      ImportSourceGroup(
+        title: _t('groupSave', 'Game save'),
+        tag: _t('tagAll', 'All progress'),
+        children: [
+          for (final save in _saves)
+            ImportSourceTile(
+              icon: Symbols.sports_esports_rounded,
+              title: save.name ?? save.profileId,
+              hint: save.profileId,
+              onTap: () => _readSave(save),
+            ),
+          ImportSourceTile(
+            icon: Symbols.person_add_rounded,
+            title: AppLocalizations.of(context).importMore,
+            hint: _saves.isEmpty
+                ? AppLocalizations.of(context).teamBuilderNoSave
+                : _t(
+                    'sourceAppHint',
+                    'Reads the save on your phone, then syncs here',
+                  ),
+            onTap: _addAccount,
           ),
-        ),
-        const SizedBox(height: 8),
-      ],
-      FilledButton.tonalIcon(
-        onPressed: _addAccount,
-        icon: const Icon(Symbols.person_add_rounded),
-        label: Text(AppLocalizations.of(context).importMore),
+          ImportSourceTile(
+            icon: Symbols.upload_file_rounded,
+            title: _t('sourceFile', 'Save or export file'),
+            hint: _t('sourceFileHint', 'ZIP, iMazing, JSON or CSV'),
+            onTap: _files,
+          ),
+        ],
       ),
-      const SizedBox(height: 8),
-      OutlinedButton.icon(
-        onPressed: _files,
-        icon: const Icon(Symbols.upload_file_rounded),
-        label: Text(_t('chooseFiles', 'Choose files')),
+      ImportSourceGroup(
+        title: _t('groupScreen', 'From the game screen'),
+        tag: _t('tagCards', 'Cards and levels'),
+        children: [
+          ImportSourceTile(
+            icon: Symbols.screenshot_monitor_rounded,
+            title: _t('screenshots', 'Screenshots or screen recording'),
+            hint: _t('screenshotsHint', 'Recognized on this device'),
+            onTap: () {
+              final navigator = Navigator.of(context);
+              navigator.pop();
+              openScreenshotImport(navigator.context, c);
+            },
+          ),
+        ],
       ),
-      const SizedBox(height: 16),
-      TextField(
-        controller: _text,
-        minLines: 4,
-        maxLines: 8,
-        decoration: InputDecoration(
-          labelText: _t('paste', 'Paste a card list or Box text'),
-          alignLabelWithHint: true,
-          border: const OutlineInputBorder(),
-        ),
-      ),
-      const SizedBox(height: 8),
-      Align(
-        alignment: AlignmentDirectional.centerEnd,
-        child: OutlinedButton(
-          onPressed: _pasted,
-          child: Text(_t('parse', 'Read data')),
-        ),
+      ImportSourceGroup(
+        title: _t('groupText', 'Text'),
+        tag: _t('tagList', 'What the text lists'),
+        children: [
+          ImportSourceTile(
+            icon: Symbols.content_paste_rounded,
+            title: _t('paste', 'Paste a card list or Box text'),
+            hint: _t('pasteHint', 'CSV, TSV or copied text'),
+            expanded: _pasteOpen,
+            onTap: () => setState(() => _pasteOpen = !_pasteOpen),
+          ),
+          if (_pasteOpen)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: _text,
+                    minLines: 4,
+                    maxLines: 8,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      labelText: _t('paste', 'Paste a card list or Box text'),
+                      alignLabelWithHint: true,
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: FilledButton(
+                      onPressed: _pasted,
+                      child: Text(_t('parse', 'Read data')),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     ],
   );

@@ -2335,7 +2335,7 @@
         "channel": "Game channel",
         "channelOfficial": "Global · official",
         "channelPlay": "Global · Google Play",
-        "screenshots": "Screenshots",
+        "screenshots": "Screenshots or screen recording",
         "deviceUnsupported": "This browser cannot use USB devices.",
         "devicePermission": "Allow USB debugging on the phone.",
         "deviceBusy": "Another ADB program is using the phone.",
@@ -2381,11 +2381,11 @@
         "otherSources": "Save folders and backups",
         "selectedEntries": "{count} selected",
         "servers": {
-          "jp": "Japan",
-          "intl": "International",
-          "intl-test": "International test",
-          "jp-cbt": "Japan CBT",
-          "intl-cbt": "International CBT"
+          "jp": "JP",
+          "intl": "Global",
+          "intl-test": "Global test",
+          "jp-cbt": "JP CBT",
+          "intl-cbt": "Global CBT"
         },
         "unavailableTarget": "Not in the target server's catalogue",
         "incompatibleServer": "Card IDs from this server cannot be matched to the target server.",
