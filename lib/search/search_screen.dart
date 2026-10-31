@@ -102,8 +102,9 @@ class _SearchScreenState extends State<SearchScreen> {
           },
         );
     final response = await netClient.get(uri);
-    if (response.statusCode != 200)
+    if (response.statusCode != 200) {
       throw HttpException('${response.statusCode}');
+    }
     return (jsonDecode(utf8.decode(response.bodyBytes)) as Map)
         .cast<String, Object?>();
   }
@@ -156,8 +157,9 @@ class _SearchScreenState extends State<SearchScreen> {
       );
       at = match.end;
     }
-    if (at < source.length)
+    if (at < source.length) {
       spans.add(TextSpan(text: plain(source.substring(at))));
+    }
     return TextSpan(style: style, children: spans);
   }
 
