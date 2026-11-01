@@ -3300,6 +3300,7 @@ class _NativeStoryPlayerScreenState extends State<NativeStoryPlayerScreen>
     await voice.stop();
     if (!mounted || epoch != _epoch) return;
     final destination = await showModalBottomSheet<int>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -3332,7 +3333,9 @@ class _NativeStoryPlayerScreenState extends State<NativeStoryPlayerScreen>
               final speaking = clips.any((clip) => voice.isPlaying(clip.id));
               return ListTile(
                 key: ValueKey((epoch, entries.length - index - 1)),
-                title: entry.speaker.isEmpty ? null : Text(entry.speaker),
+                title: entry.speaker.isEmpty
+                    ? null
+                    : Text(AdvText.plain(entry.speaker)),
                 subtitle: AdvText(entry.text),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -3454,6 +3457,7 @@ class _NativeStoryPlayerScreenState extends State<NativeStoryPlayerScreen>
     if (!mounted || epoch != _epoch) return;
     final preferences = _preferences!, t = AppScope.of(context).text;
     await showModalBottomSheet<void>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,

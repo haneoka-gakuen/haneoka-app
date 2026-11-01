@@ -62,3 +62,7 @@ build/
 
 # Local uncommitted package locations.
 pubspec_overrides.yaml
+
+# Built by scripts/base_pack.py
+/assets/render/base-pack.bin
+/assets/render/base-pack.json

@@ -89,6 +89,7 @@ final class NativeStoryDocument {
         chapter.assets,
         api.asset,
         release,
+        server: api.server,
         commands: chapter.commands,
       ),
       runtime,
@@ -104,6 +105,7 @@ final class NativeStoryAssets {
     Map<String, Object?> assets,
     this.assetUri,
     this.release, {
+    required this.server,
     required Iterable<StoryDecodedCommand> commands,
   }) {
     final voiceReferences = {
@@ -149,7 +151,7 @@ final class NativeStoryAssets {
     }
   }
   final Uri Function(String) assetUri;
-  final String release;
+  final String release, server;
   final _media = <String, Map>{};
   final _ids = <String, String>{};
   final stills = <String, Map<String, Object?>>{};
@@ -208,8 +210,16 @@ final class NativeStoryAssets {
     return pinned(url);
   }
 
+  /// The source on this release; another server's files (the shared story UI
+  /// frames come from Global) follow that server's own current release.
   Uri pinned(String sourcePath) {
     final uri = assetUri(sourcePath);
+    final segments = uri.pathSegments;
+    if (segments.length > 1 &&
+        const {'runtime', 'assets', 'objects'}.contains(segments[0]) &&
+        segments[1] != server) {
+      return uri;
+    }
     return uri.replace(
       queryParameters: {...uri.queryParameters, 'release': release},
     );

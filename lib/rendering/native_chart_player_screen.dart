@@ -358,6 +358,7 @@ class _NativeChartPlayerScreenState extends State<NativeChartPlayerScreen>
     final soundNames = soundPacket['names'] as Map;
     if (!mounted) return;
     await showModalBottomSheet<void>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,

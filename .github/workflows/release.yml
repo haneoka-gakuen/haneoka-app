@@ -61,6 +61,7 @@ jobs:
           # uses the same monotonically increasing code so either can update it.
           echo "ANDROID_BUILD_NUMBER=$((10000 + ${{ github.run_number }}))" >> "$GITHUB_ENV"
       - run: flutter pub get
+      - run: python3 scripts/base_pack.py
       - name: Native Rust target toolchains
         run: |
           python3 - <<'PYTHON'
@@ -161,6 +162,7 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="${GITHUB_REF_NAME#v}"; fi
           echo "APP_VERSION=$version" >> "$GITHUB_ENV"
       - run: flutter pub get
+      - run: python3 scripts/base_pack.py
       - name: Provision Cubism Core
         run: dart run scripts/provision_cubism_core.dart --platform linux --arch ${{ matrix.arch }}
       - run: flutter build linux --release --target-platform=linux-${{ matrix.arch }} --build-name="${{ env.APP_VERSION }}" --build-number="${{ github.run_number }}"
@@ -245,6 +247,7 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="${GITHUB_REF_NAME#v}"; fi
           echo "APP_VERSION=$version" >> "$GITHUB_ENV"
       - run: flutter pub get
+      - run: python scripts/base_pack.py
       - name: Provision Cubism Core
         run: dart run scripts/provision_cubism_core.dart --platform windows --arch x64
       - run: flutter build windows --release --build-name="${{ env.APP_VERSION }}" --build-number="${{ github.run_number }}"
@@ -398,6 +401,7 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="${GITHUB_REF_NAME#v}"; fi
           echo "APP_VERSION=$version" >> "$GITHUB_ENV"
       - run: flutter pub get
+      - run: python3 scripts/base_pack.py
       - name: Provision Cubism Core
         run: dart run scripts/provision_cubism_core.dart --platform ${{ matrix.kind }} --arch ${{ matrix.arch }}
       - name: Configure native macOS architecture

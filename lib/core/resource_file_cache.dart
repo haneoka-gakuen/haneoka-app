@@ -7,6 +7,7 @@ import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
+import 'base_pack.dart';
 import 'net.dart';
 import 'offline_files.dart';
 import 'account_resource.dart';
@@ -298,6 +299,17 @@ final class ResourceFileCache {
     final temporary = File(
       '${file.path}.${DateTime.now().microsecondsSinceEpoch}.${_temporaryId++}.tmp',
     );
+    if (await BasePack.instance.read(uri) case final bytes?) {
+      return storage.protect([file.path, temporary.path], () async {
+        if (!storage.permitFileWrite(category, generation, file.path)) {
+          throw const ResourceCacheCancelled();
+        }
+        await file.parent.create(recursive: true);
+        await temporary.writeAsBytes(bytes, flush: true);
+        await temporary.rename(file.path);
+        return file;
+      });
+    }
     final family = _family(uri);
     final index = family == null
         ? null

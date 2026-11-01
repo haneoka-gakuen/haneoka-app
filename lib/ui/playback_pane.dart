@@ -84,22 +84,9 @@ class PlaybackPane extends StatefulWidget {
   State<PlaybackPane> createState() => _PlaybackPaneState();
 }
 
-/// Back (the Android button or gesture) leaves fullscreen instead of the page.
-class _FullscreenPopEntry extends PopEntry<Object?> {
-  _FullscreenPopEntry(this.exit);
-  final VoidCallback exit;
-  @override
-  final ValueNotifier<bool> canPopNotifier = ValueNotifier(false);
-  @override
-  void onPopInvokedWithResult(bool didPop, Object? result) {
-    if (!didPop) exit();
-  }
-}
-
 class _PlaybackPaneState extends State<PlaybackPane> {
-  OverlayEntry? _overlay;
-  _FullscreenPopEntry? _popEntry;
-  ModalRoute<Object?>? _popRoute;
+  /// The fullscreen presentation, a route so menus and sheets open above it.
+  ModalRoute<void>? _overlay;
   bool _collapsed = false, _hidden = false, _busy = false;
   double? _scrub;
   Timer? _hide;
@@ -139,6 +126,15 @@ class _PlaybackPaneState extends State<PlaybackPane> {
       _collapsed = widget.collapsed;
       if (_collapsed) _clearControlsInteraction();
     }
+    // A chart paused from its own stage button brings the controls back.
+    if (old.playing &&
+        !widget.playing &&
+        widget.onStageActivate == null &&
+        _overlay != null) {
+      _collapsed = false;
+      widget.onCollapsed?.call(false);
+      _hidden = false;
+    }
     _queueOverlayBuild();
     if (old.playing != widget.playing ||
         old.collapsed != widget.collapsed ||
@@ -159,7 +155,7 @@ class _PlaybackPaneState extends State<PlaybackPane> {
     _overlayBuildScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _overlayBuildScheduled = false;
-      if (_uiAlive) _overlay?.markNeedsBuild();
+      if (_uiAlive) _overlay?.changedExternalState();
     });
   }
 
@@ -190,6 +186,7 @@ class _PlaybackPaneState extends State<PlaybackPane> {
       widget.playing &&
       widget.controlsVisible &&
       !widget.busy &&
+      !_collapsed &&
       _scrub == null &&
       !_pointerInsideControls &&
       !_keyboardFocusWithin &&
@@ -293,17 +290,20 @@ class _PlaybackPaneState extends State<PlaybackPane> {
       }
       _clearControlsInteraction();
       ++_presentationEpoch;
-      _overlay = OverlayEntry(
-        builder: (context) => Material(
+      final route = PageRouteBuilder<void>(
+        opaque: true,
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+        pageBuilder: (context, _, _) => Material(
           color: Colors.black,
           child: _presentation(context, fullscreen: true),
         ),
       );
-      Overlay.of(context, rootOverlay: true).insert(_overlay!);
-      _popRoute = ModalRoute.of(context);
-      _popRoute?.registerPopEntry(
-        _popEntry = _FullscreenPopEntry(() {
-          if (_overlay != null) unawaited(_exitFullscreen());
+      _overlay = route;
+      unawaited(
+        Navigator.of(context, rootNavigator: true).push(route).then((_) {
+          // Back leaves fullscreen through the route itself.
+          if (identical(_overlay, route)) unawaited(_exitFullscreen());
         }),
       );
       _showControls();
@@ -316,16 +316,19 @@ class _PlaybackPaneState extends State<PlaybackPane> {
     _hide?.cancel();
     final overlay = _overlay;
     _overlay = null;
-    if (_popEntry case final entry?) {
-      _popRoute?.unregisterPopEntry(entry);
-      entry.canPopNotifier.dispose();
-    }
-    _popEntry = null;
-    _popRoute = null;
     _clearControlsInteraction();
     ++_presentationEpoch;
-    overlay?.remove();
-    overlay?.dispose();
+    if (overlay != null && overlay.isActive) {
+      void remove() {
+        if (overlay.isActive) overlay.navigator?.removeRoute(overlay);
+      }
+
+      if (_disposing) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => remove());
+      } else {
+        remove();
+      }
+    }
     _hidden = false;
     if (_uiAlive) setState(() {});
     if (_desktop) {
@@ -412,9 +415,7 @@ class _PlaybackPaneState extends State<PlaybackPane> {
 
   Widget _controls(BuildContext context, bool fullscreen) {
     final t = AppScope.of(context).text;
-    // Fullscreen keeps its controls (and the way out) whatever the pane's
-    // collapsed preference; they only hide while playing and return on a tap.
-    if ((_collapsed && !fullscreen) || _hidden) return const SizedBox.shrink();
+    if (_collapsed || _hidden) return const SizedBox.shrink();
     final scheme = Theme.of(context).colorScheme;
     return _controlsInteraction(
       fullscreen: fullscreen,
@@ -461,19 +462,18 @@ class _PlaybackPaneState extends State<PlaybackPane> {
                     () => unawaited(_fullscreen()),
                     selected: fullscreen,
                   ),
-                  if (!fullscreen)
-                    _button(
-                      Symbols.expand_more_rounded,
-                      t('common.actions.collapse', 'Collapse'),
-                      () {
-                        _collapsed = true;
-                        _clearControlsInteraction();
-                        _hide?.cancel();
-                        _hidden = false;
-                        widget.onCollapsed?.call(true);
-                        _changed();
-                      },
-                    ),
+                  _button(
+                    Symbols.expand_more_rounded,
+                    t('common.actions.collapse', 'Collapse'),
+                    () {
+                      _collapsed = true;
+                      _clearControlsInteraction();
+                      _hide?.cancel();
+                      _hidden = false;
+                      widget.onCollapsed?.call(true);
+                      _changed();
+                    },
+                  ),
                 ];
                 return AbsorbPointer(
                   absorbing: widget.busy,
@@ -582,27 +582,22 @@ class _PlaybackPaneState extends State<PlaybackPane> {
       ),
     );
     final presentation = fullscreen
-        ? Listener(
-            onPointerDown: (_) {
-              if (_hidden) _showControls();
-            },
-            child: Stack(
-              children: [
-                Positioned.fill(child: stage),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: Visibility(
-                    visible: widget.controlsVisible,
-                    maintainSize: true,
-                    maintainState: true,
-                    maintainAnimation: true,
-                    child: _controls(context, true),
-                  ),
+        ? Stack(
+            children: [
+              Positioned.fill(child: stage),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Visibility(
+                  visible: widget.controlsVisible,
+                  maintainSize: true,
+                  maintainState: true,
+                  maintainAnimation: true,
+                  child: _controls(context, true),
                 ),
-              ],
-            ),
+              ),
+            ],
           )
         : Column(
             children: [
