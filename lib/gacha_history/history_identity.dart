@@ -6,9 +6,7 @@ import '../save/game_save.dart';
 import 'game_history_client.dart';
 
 String historySaveKey(GameSave save) => sha256
-    .convert(
-      utf8.encode('${save.server ?? 'unknown'}:${save.profileId}'),
-    )
+    .convert(utf8.encode('${save.server ?? 'unknown'}:${save.profileId}'))
     .toString();
 
 String? historyPersistKey(Object? document) {

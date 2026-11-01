@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../core/app_state.dart';
-import '../ui/player.dart';
 import '../ui/theme.dart';
 
 /// Lets a page open the shell's navigation on compact windows.
@@ -169,15 +168,11 @@ class _ShellPageState extends State<ShellPage> {
   @override
   Widget build(BuildContext context) {
     final shell = ShellScope.of(context);
-    final compact = shell?.compact ?? false;
+    final compact = shell?.compact ?? MediaQuery.sizeOf(context).width < 600;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    // Over the seasonal background the frame is clear and the pane translucent.
-    final backdrop = AppScope.maybeOf(context)?.seasonBackdrop ?? false;
-    final surface = backdrop
-        ? scheme.surface.withValues(alpha: 0.55)
-        : scheme.surface;
-    final frame = backdrop ? Colors.transparent : scheme.surfaceContainer;
+    final surface = scheme.surface;
+    final frame = scheme.surfaceContainer;
     final barColor = compact ? (_scrolled ? frame : surface) : frame;
     final pane = NotificationListener<ScrollNotification>(
       onNotification: _onScroll,
@@ -188,22 +183,20 @@ class _ShellPageState extends State<ShellPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Edge to edge: the bar's colour runs under the status bar.
           AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             color: barColor,
-            height: ShellMetrics.topBar,
+            height: ShellMetrics.topBar + MediaQuery.paddingOf(context).top,
             padding: EdgeInsets.only(
+              top: MediaQuery.paddingOf(context).top,
               left: 4,
               right: compact ? 4 : ShellMetrics.paneGap,
             ),
             child: Stack(
               fit: StackFit.expand,
               children: [
-                ListenableBuilder(
-                  listenable:
-                      AppScope.maybeOf(context)?.audio ?? const _Silent(),
-                  builder: (context, _) => _bar(context, compact),
-                ),
+                _bar(context, compact),
                 if (_searching && widget.search != null)
                   Positioned.fill(child: _compactSearch(context)),
               ],
@@ -359,10 +352,6 @@ class _ShellPageState extends State<ShellPage> {
     final children = <Widget>[];
     var room = width;
     final slot = _buttonExtent(context) + 2;
-    if (compact && AppScope.maybeOf(context)?.audio.current != null) {
-      children.add(const NowPlaying());
-      room -= slot;
-    }
     if (search != null) {
       if (compact || room < 260) {
         children.add(
@@ -612,13 +601,4 @@ class ShellSearch {
   final ValueChanged<String>? onSubmitted;
   final String? initial;
   final TextInputType? keyboardType;
-}
-
-/// A listenable that never changes, for pages shown without the app's state.
-class _Silent implements Listenable {
-  const _Silent();
-  @override
-  void addListener(VoidCallback listener) {}
-  @override
-  void removeListener(VoidCallback listener) {}
 }

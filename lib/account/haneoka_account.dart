@@ -1,14 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-import 'dart:math';
 
-import 'package:app_links/app_links.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
 
 import '../core/net.dart';
 import '../save/game_save.dart';
@@ -57,87 +53,32 @@ class AccountError implements Exception {
   String toString() => 'AccountError($code)';
 }
 
-/// The reader's Haneoka account in the app: a session of its own, obtained
-/// through the website's sign-in (`/account/app/`, PKCE) and sent as a bearer
-/// token, plus the Our Notes players linked to it.
+/// The reader's Haneoka account in the app: the website's own session, read
+/// from the web view's cookies so native screens are always signed in exactly
+/// when the site is, plus the Our Notes players linked to it.
 class HaneokaAccount extends ChangeNotifier {
   HaneokaAccount._();
   static final HaneokaAccount instance = HaneokaAccount._();
 
   static const _storage = FlutterSecureStorage();
 
+  /// The web view's cookies for the site, provided by the web shell.
+  static Future<String?> Function()? siteCookies;
+
+  /// The `Cookie` header carrying the site's session.
   String? _token;
   Map<String, Object?>? _user;
   List<LinkedPlayer> _players = const [];
   bool _loaded = false;
 
-  bool get signedIn => _token != null && _user != null;
+  bool get signedIn => _user != null;
   Map<String, Object?>? get user => _user;
 
   /// The haneoka profile (`/api/v1/account/profile`): display name, handle,
   /// bio, public UID and its version.
   Map<String, Object?>? profile;
 
-  /// Saves the profile's display name, handle and bio.
-  Future<void> updateProfile({
-    required String displayName,
-    String? handle,
-    String? bio,
-  }) async {
-    final body = await request(
-      'PATCH',
-      '/api/v1/account/profile',
-      body: {
-        'displayName': displayName.trim(),
-        'handle': (handle?.trim().isEmpty ?? true) ? null : handle!.trim(),
-        'bio': (bio?.trim().isEmpty ?? true) ? null : bio!.trim(),
-        'version': profile?['version'],
-      },
-    );
-    if ((body as Map?)?['profile'] case final Map updated) {
-      profile = updated.cast<String, Object?>();
-      _user = {
-        ...?_user,
-        if (updated['displayName'] case final String name when name.isNotEmpty)
-          'name': name,
-      };
-      notifyListeners();
-    }
-  }
-
   List<LinkedPlayer> get players => _players;
-
-  Future<void> changePassword(
-    String currentPassword,
-    String newPassword,
-  ) async {
-    final result = objectOf(
-      await request(
-        'POST',
-        '/api/auth/change-password',
-        body: {
-          'currentPassword': currentPassword,
-          'newPassword': newPassword,
-          'revokeOtherSessions': true,
-        },
-      ),
-    );
-    if (result['token'] case final String token when token.isNotEmpty) {
-      await _useSession(token);
-    } else {
-      await refresh();
-    }
-  }
-
-  Future<void> deleteAccount(String confirmation) async {
-    await request(
-      'DELETE',
-      '/api/v1/account/profile',
-      body: {'confirmation': confirmation},
-    );
-    await _forget();
-    notifyListeners();
-  }
 
   /// The bearer header for requests made outside [request] (uploads).
   Map<String, String> get authorization => {
@@ -152,17 +93,22 @@ class HaneokaAccount extends ChangeNotifier {
     if (_loaded) return;
     _loaded = true;
     try {
-      _token = await _storage.read(key: _tokenKey);
-    } catch (_) {
-      _token = null;
-    }
-    if (_token == null) return;
+      // Earlier versions kept a session of their own; the site's is used now.
+      await _storage.delete(key: _tokenKey);
+    } catch (_) {}
     await refresh();
   }
 
   /// Reads the session and the linked players again.
   Future<void> refresh() async {
-    if (_token == null) return;
+    _token = await siteCookies?.call();
+    if (_token == null || _token!.isEmpty) {
+      if (_user != null) {
+        await _forget();
+        notifyListeners();
+      }
+      return;
+    }
     try {
       final session = await request('GET', '/api/auth/get-session');
       final user = (session as Map?)?['user'];
@@ -215,131 +161,6 @@ class HaneokaAccount extends ChangeNotifier {
           '$provider',
       ],
     );
-  }
-
-  /// Email and password sign-in, straight against the website's account
-  /// service; the session it returns is this app's bearer session.
-  Future<void> signInWithEmail(String email, String password) async {
-    final body = objectOf(
-      await request(
-        'POST',
-        '/api/auth/sign-in/email',
-        body: {'email': email, 'password': password, 'rememberMe': true},
-        authorized: false,
-      ),
-    );
-    final session = body['token'];
-    if (session is! String) throw const AccountError('invalid_grant');
-    await _useSession(session);
-  }
-
-  /// Email-only registration: the website mails a link to set the password.
-  Future<void> register(String email) => request(
-    'POST',
-    '/api/v1/account/register',
-    body: {'email': email},
-    authorized: false,
-  );
-
-  Future<void> requestPasswordReset(String email) => request(
-    'POST',
-    '/api/auth/request-password-reset',
-    body: {'email': email, 'redirectTo': '/account/reset-password'},
-    authorized: false,
-  );
-
-  Future<void> _useSession(String session) async {
-    _token = session;
-    try {
-      await _storage.write(key: _tokenKey, value: session);
-    } catch (_) {
-      // Without a keychain the session lasts until the app closes.
-    }
-    await refresh();
-  }
-
-  /// Provider sign-in: the provider's own page opens in the system browser
-  /// and hands a one-time code back to the app (PKCE), with no website page
-  /// in between.
-  Future<void> signInWithProvider(String provider) async {
-    final random = Random.secure();
-    String token(int bytes) => base64Url
-        .encode(List.generate(bytes, (_) => random.nextInt(256)))
-        .replaceAll('=', '');
-    final verifier = token(48);
-    final state = token(16);
-    final challenge = challengeOf(verifier);
-    final query = <String, String>{'challenge': challenge, 'state': state};
-    final returned = Completer<Uri>();
-    HttpServer? loopback;
-    StreamSubscription<Uri>? links;
-    if (Platform.isAndroid || Platform.isIOS) {
-      // The website hands the code back to `haneoka://auth`.
-      links = AppLinks().uriLinkStream.listen((uri) {
-        if (uri.scheme == 'haneoka' &&
-            uri.host == 'auth' &&
-            !returned.isCompleted) {
-          returned.complete(uri);
-        }
-      });
-    } else {
-      // Desktop builds receive it on a loopback listener (RFC 8252).
-      loopback = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      query['redirect'] = 'http://127.0.0.1:${loopback.port}/auth';
-      loopback.listen((request) async {
-        if (request.uri.path != '/auth') {
-          request.response.statusCode = HttpStatus.notFound;
-          await request.response.close();
-          return;
-        }
-        request.response.headers.contentType = ContentType.html;
-        request.response.write(
-          '<!doctype html><meta charset="utf-8"><title>Haneoka</title>'
-          '<body style="font:16px system-ui;text-align:center;padding:48px">'
-          '&#10003;</body>',
-        );
-        await request.response.close();
-        if (!returned.isCompleted) returned.complete(request.uri);
-      });
-    }
-    final Uri result;
-    try {
-      final opened = await launchUrl(
-        Uri.parse('$_origin/api/v1/account/app/oauth')
-            .replace(queryParameters: {...query, 'provider': provider}),
-        mode: LaunchMode.externalApplication,
-      );
-      if (!opened) throw const AccountError('cancelled');
-      result = await returned.future.timeout(const Duration(minutes: 10));
-    } on TimeoutException {
-      throw const AccountError('cancelled');
-    } finally {
-      await links?.cancel();
-      await loopback?.close(force: true);
-    }
-    final callback = result.queryParameters;
-    if (callback['state'] != state) throw const AccountError('invalid_state');
-    final code = callback['code'];
-    if (code == null) throw AccountError(callback['error'] ?? 'cancelled');
-    final body = await request(
-      'POST',
-      '/api/v1/account/app/token',
-      body: {'code': code, 'verifier': verifier},
-      authorized: false,
-    );
-    final session = (body as Map?)?['token'];
-    if (session is! String) throw const AccountError('invalid_grant');
-    await _useSession(session);
-  }
-
-  Future<void> signOut() async {
-    try {
-      await request('POST', '/api/auth/sign-out', body: const {});
-    } catch (_) {
-      // The session is forgotten here either way.
-    }
-    await _forget();
-    notifyListeners();
   }
 
   /// Links [save]'s player, or updates its summary and visibility.
@@ -426,9 +247,6 @@ class HaneokaAccount extends ChangeNotifier {
     _user = null;
     profile = null;
     _players = const [];
-    try {
-      await _storage.delete(key: _tokenKey);
-    } catch (_) {}
   }
 
   Future<Object?> request(
@@ -444,7 +262,7 @@ class HaneokaAccount extends ChangeNotifier {
       ..headers.addAll({
         'Accept': 'application/json',
         'Origin': _origin,
-        if (authorized && _token != null) 'Authorization': 'Bearer $_token',
+        if (authorized && _token != null) 'Cookie': _token!,
         if (body != null) 'Content-Type': 'application/json',
         ...headers,
       });

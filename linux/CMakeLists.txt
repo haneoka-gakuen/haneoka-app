@@ -126,18 +126,3 @@ if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
   install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
     COMPONENT Runtime)
 endif()
-
-# Build the lottery kernel for the native architecture of this runner.
-find_program(CARGO_EXECUTABLE cargo REQUIRED)
-set(TEAM_ENGINE_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/../native/team_engine")
-set(TEAM_ENGINE_TARGET "${CMAKE_BINARY_DIR}/rust-team-engine")
-set(TEAM_ENGINE_LIBRARY "${TEAM_ENGINE_TARGET}/release/libhaneoka_team_engine.so")
-file(GLOB_RECURSE TEAM_ENGINE_FILES CONFIGURE_DEPENDS "${TEAM_ENGINE_SOURCE}/src/*.rs")
-add_custom_command(OUTPUT "${TEAM_ENGINE_LIBRARY}"
-  COMMAND "${CARGO_EXECUTABLE}" build --release --locked
-    --manifest-path "${TEAM_ENGINE_SOURCE}/Cargo.toml" --target-dir "${TEAM_ENGINE_TARGET}"
-  DEPENDS ${TEAM_ENGINE_FILES} "${TEAM_ENGINE_SOURCE}/Cargo.toml" "${TEAM_ENGINE_SOURCE}/Cargo.lock"
-  VERBATIM)
-add_custom_target(team_engine_kernel DEPENDS "${TEAM_ENGINE_LIBRARY}")
-add_dependencies(${BINARY_NAME} team_engine_kernel)
-install(FILES "${TEAM_ENGINE_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)

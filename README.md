@@ -3,44 +3,42 @@
 [![CI](https://github.com/haneoka-gakuen/haneoka-app/actions/workflows/ci.yml/badge.svg)](https://github.com/haneoka-gakuen/haneoka-app/actions/workflows/ci.yml)
 [![License: MPL-2.0](https://img.shields.io/badge/license-MPL--2.0-2f356f.svg)](LICENSE)
 
-The native [Haneoka](https://haneoka.org) client for *BanG Dream! Our Notes*, on Android, iOS, Windows, macOS and Linux.
+[Haneoka](https://haneoka.org) for *BanG Dream! Our Notes* on Android, iOS, Windows, macOS and Linux. The app shows the live website, so every page and tool is always the current one, and adds what a browser cannot do.
 
 ## Features
 
-- The full catalogue, stories, charts, Live2D and Spine, drawn natively
-- Reads your save from a file, a phone or a backup, and shows what it holds
-- Team builder with the same engine as the website, running on the device
-- Card import from screenshots and screen recordings, recognised on the device
-- Chart editor, community, playlists, event and Arena rankings, and player lookup
-- Character, seasonal and birthday themes
+- The whole website, with the system bars in the page's colours and players in true fullscreen
+- Game accounts read from this phone (Shizuku or the game folder), an Android phone over USB or Wi-Fi, an iPhone backup, or save files
+- Card progress sent to the team builder, refreshed from the game server first
+- Gacha history read from the game server into the gacha history page
+- Provider sign-in through the system browser, and file downloads saved to the device
+
+Accounts imported by earlier versions stay on the device and appear in the account list.
 
 ## Install
 
-Download a build from the [download page](https://haneoka.org/en/download) or [GitHub Releases](https://github.com/haneoka-gakuen/haneoka-app/releases).
+Download a build from the [download page](https://haneoka.org/en/download) or [GitHub Releases](https://github.com/haneoka-gakuen/haneoka-app/releases). Linux packages use the system's WebKitGTK 4.1; Windows uses WebView2.
 
 ## Development
 
-You need Flutter 3.47.7 and the Rust toolchain in `rust-toolchain.toml`.
+You need Flutter 3.47.7.
 
 ```sh
-git submodule update --init --recursive
 flutter pub get
 flutter analyze
-flutter build linux --release --no-pub
+flutter run --dart-define=HANEOKA_ORIGIN=http://127.0.0.1:4319
 ```
 
-Replace `linux` with your target. Packaging for each platform is in [`.github/workflows/release.yml`](.github/workflows/release.yml) and [`scripts/`](scripts).
+`HANEOKA_ORIGIN` points the app at a local preview; it defaults to `https://haneoka.org`. Packaging for each platform is in [`.github/workflows/release.yml`](.github/workflows/release.yml) and [`scripts/`](scripts).
 
 | Path | Contents |
 | --- | --- |
-| `lib/catalog`, `lib/search`, `lib/stories` | Catalogue, search and story playback |
-| `lib/team_builder` | Team builder, Box and card import |
-| `lib/save`, `lib/sources` | Save reading and sources |
-| `lib/chart_editor`, `lib/rendering` | Chart editor and renderers |
-| `lib/community`, `lib/playlists`, `lib/admin` | Community features |
-| `lib/shell` | Navigation, routes and settings |
-| `native/team_engine` | [Team engine](https://github.com/haneoka-gakuen/ournotes-team-builder) submodule |
-| `assets/i18n` | Strings in five languages, shared with the website |
+| `lib/shell` | Web view, page bridge, native colours, sign-in, strings |
+| `lib/accounts` | Game account sheet and its sources |
+| `lib/save`, `lib/sources` | Save reading, account storage and game-server refresh |
+| `lib/gacha_history` | Gacha history read for the website |
+
+The website side of the bridge is `src/lib/app-bridge.ts` in the Haneoka repository: `boxAccount`, `gachaHistory` and `signIn`.
 
 ## License
 

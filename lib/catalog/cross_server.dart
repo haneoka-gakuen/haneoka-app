@@ -28,7 +28,14 @@ const crossCatalogIds = <String, List<String>>{
   'live2d': ['live2dKey', 'id'],
   'spine': ['id'],
 };
-const _opaque = {'real-lives', 'passes', 'missions', 'stories', 'live2d', 'spine'};
+const _opaque = {
+  'real-lives',
+  'passes',
+  'missions',
+  'stories',
+  'live2d',
+  'spine',
+};
 const _nameFields = [
   'prefix',
   'cardName',

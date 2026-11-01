@@ -7,7 +7,6 @@ import 'package:path/path.dart' as p;
 import 'package:pointycastle/export.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-import '../core/storage.dart';
 import '../save/codec.dart';
 import '../save/game_save.dart';
 import 'plist.dart';
@@ -150,14 +149,12 @@ class IosBackup {
       try {
         db?.close();
       } finally {
-        await decrypted?.$2.dispose();
+        await decrypted?.$2.delete(recursive: true);
       }
     }
   }
 
-  Future<(File, OwnedTemporaryDirectory)> _decryptedManifest(
-    _BackupKeys keys,
-  ) async {
+  Future<(File, Directory)> _decryptedManifest(_BackupKeys keys) async {
     final manifestKey = _manifest['ManifestKey'] as Uint8List;
     final protectionClass = ByteData.sublistView(
       manifestKey,
@@ -172,15 +169,13 @@ class IosBackup {
       key,
       await File(p.join(path, 'Manifest.db')).readAsBytes(),
     );
-    final owned = await CacheStorage.instance.createTemporaryDirectory(
-      'backup-',
-    );
+    final owned = await Directory.systemTemp.createTemp('backup-');
     try {
-      final file = File(p.join(owned.directory.path, 'Manifest.db'));
+      final file = File(p.join(owned.path, 'Manifest.db'));
       await file.writeAsBytes(plain, flush: true);
       return (file, owned);
     } catch (_) {
-      await owned.dispose();
+      await owned.delete(recursive: true);
       rethrow;
     }
   }

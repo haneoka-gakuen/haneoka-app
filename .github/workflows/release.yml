@@ -9,11 +9,7 @@ on:
         description: Platform to build
         type: choice
         default: all
-        options: [all, android, linux, windows, windows-compatibility, apple, macos, ios]
-      artifact_run:
-        description: Existing run supplying the Windows compatibility package
-        type: string
-        default: ""
+        options: [all, android, linux, windows, apple, macos, ios]
       only_arm64:
         description: Build only the ARM64 installation-test APK
         type: boolean
@@ -25,23 +21,15 @@ permissions:
 
 env:
   FLUTTER_VERSION: 3.47.7
-  RUSTUP_TOOLCHAIN: 1.97.1
-
+  
 jobs:
   android:
     if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'android'
     runs-on: ubuntu-latest
     env:
       ANDROID_TARGETS: ${{ github.event_name == 'workflow_dispatch' && inputs.only_arm64 && 'android-arm64' || 'android-arm64,android-x64' }}
-      ANDROID_RUST_TARGETS: ${{ github.event_name == 'workflow_dispatch' && inputs.only_arm64 && 'aarch64-linux-android' || 'aarch64-linux-android,x86_64-linux-android' }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
-          targets: ${{ env.ANDROID_RUST_TARGETS }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -61,22 +49,6 @@ jobs:
           # uses the same monotonically increasing code so either can update it.
           echo "ANDROID_BUILD_NUMBER=$((10000 + ${{ github.run_number }}))" >> "$GITHUB_ENV"
       - run: flutter pub get
-      - run: python3 scripts/base_pack.py
-      - name: Native Rust target toolchains
-        run: |
-          python3 - <<'PYTHON'
-          import json, os, pathlib, subprocess, urllib.parse, urllib.request
-          config = pathlib.Path('.dart_tool/package_config.json').resolve()
-          packages = {item['name']: item for item in json.loads(config.read_text())['packages']}
-          targets = os.environ['ANDROID_RUST_TARGETS'].split(',')
-          for name in ['cassiopeia_runtime', 'vega_runtime_ffi']:
-              uri = urllib.parse.urlparse(urllib.parse.urljoin(config.as_uri(), packages[name]['rootUri']))
-              root = pathlib.Path(urllib.request.url2pathname(uri.path))
-              subprocess.run(['rustup', 'show', 'active-toolchain'], cwd=root, check=True)
-              subprocess.run(['rustup', 'target', 'add', *targets], cwd=root, check=True)
-          PYTHON
-      - name: Provision Cubism Core
-        run: dart run scripts/provision_cubism_core.dart --platform android --arch arm64
       - name: Release key
         env:
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -96,11 +68,11 @@ jobs:
             echo "keyAlias=$KEY_ALIAS"
             echo "keyPassword=$KEY_PASSWORD"
           } > android/key.properties
-      - run: flutter build apk --release --target-platform=${{ env.ANDROID_TARGETS }} --build-name="${{ env.APP_VERSION }}" --build-number="${{ env.ANDROID_BUILD_NUMBER }}" --android-project-arg=force-version-code-ignoring-abi=true --split-per-abi --dart-define=cronetHttpNoPlay=true
+      - run: flutter build apk --release --target-platform=${{ env.ANDROID_TARGETS }} --build-name="${{ env.APP_VERSION }}" --build-number="${{ env.ANDROID_BUILD_NUMBER }}" --android-project-arg=force-version-code-ignoring-abi=true --split-per-abi
       - if: github.event_name != 'workflow_dispatch' || !inputs.only_arm64
-        run: flutter build apk --release --target-platform=${{ env.ANDROID_TARGETS }} --build-name="${{ env.APP_VERSION }}" --build-number="${{ env.ANDROID_BUILD_NUMBER }}" --android-project-arg=force-version-code-ignoring-abi=true --dart-define=cronetHttpNoPlay=true
+        run: flutter build apk --release --target-platform=${{ env.ANDROID_TARGETS }} --build-name="${{ env.APP_VERSION }}" --build-number="${{ env.ANDROID_BUILD_NUMBER }}" --android-project-arg=force-version-code-ignoring-abi=true
       - if: github.event_name != 'workflow_dispatch' || !inputs.only_arm64
-        run: flutter build appbundle --release --target-platform=${{ env.ANDROID_TARGETS }} --build-name="${{ env.APP_VERSION }}" --build-number="${{ env.ANDROID_BUILD_NUMBER }}" --android-project-arg=force-version-code-ignoring-abi=true --dart-define=cronetHttpNoPlay=true
+        run: flutter build appbundle --release --target-platform=${{ env.ANDROID_TARGETS }} --build-name="${{ env.APP_VERSION }}" --build-number="${{ env.ANDROID_BUILD_NUMBER }}" --android-project-arg=force-version-code-ignoring-abi=true
       - name: Collect
         run: |
           mkdir dist
@@ -130,15 +102,10 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
       - run: |
           sudo apt-get update
           if [[ "${{ matrix.arch }}" == "x64" ]]; then sudo apt-get remove -y libunwind-14-dev; fi
-          sudo apt-get install -y ninja-build clang cmake pkg-config libgtk-3-dev libasound2-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libmpv-dev libsecret-1-dev libjsoncpp-dev libjavascriptcoregtk-4.1-dev rpm zstd patchelf file adb squashfs-tools flatpak flatpak-builder xvfb xauth
+          sudo apt-get install -y ninja-build clang cmake pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev rpm zstd patchelf file adb squashfs-tools flatpak flatpak-builder xvfb xauth
       - uses: subosito/flutter-action@v2
         if: matrix.arch == 'x64'
         with:
@@ -162,36 +129,18 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="${GITHUB_REF_NAME#v}"; fi
           echo "APP_VERSION=$version" >> "$GITHUB_ENV"
       - run: flutter pub get
-      - run: python3 scripts/base_pack.py
-      - name: Provision Cubism Core
-        run: dart run scripts/provision_cubism_core.dart --platform linux --arch ${{ matrix.arch }}
       - run: flutter build linux --release --target-platform=linux-${{ matrix.arch }} --build-name="${{ env.APP_VERSION }}" --build-number="${{ github.run_number }}"
         env:
           CMAKE_BUILD_PARALLEL_LEVEL: 2
-      - name: Verify player runtime libraries
-        run: |
-          for library in libvega_runtime.so libcassiopeia_native.so libLive2DCubismCore.so libcubism_motion_sync.so; do
-            test -s "build/linux/${{ matrix.arch }}/release/bundle/lib/$library" || { echo "::error::Missing player runtime: $library"; exit 1; }
-          done
       - name: Bundle ADB
         run: python3 scripts/bundle_adb.py --platform linux --arch ${{ matrix.arch }} --dest build/linux/${{ matrix.arch }}/release/bundle/tools/adb
-      - name: AppImage tools
-        run: |
-          mkdir -p build/package-tools
-          curl -fL https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${{ matrix.tool_arch }}.AppImage -o build/package-tools/linuxdeploy
-          curl -fL https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-${{ matrix.tool_arch }}.AppImage -o build/package-tools/linuxdeploy-plugin-appimage
-          curl -fL https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh -o build/package-tools/linuxdeploy-plugin-gtk.sh
-          chmod +x build/package-tools/*
-          echo "$GITHUB_WORKSPACE/build/package-tools" >> "$GITHUB_PATH"
       - name: Installers
-        env:
-          DEPLOY_GTK_VERSION: 3
-        run: python3 scripts/package_linux.py --bundle build/linux/${{ matrix.arch }}/release/bundle --arch ${{ matrix.arch }} --version "$APP_VERSION" --formats tar,deb,rpm,arch,appimage,snap --linuxdeploy build/package-tools/linuxdeploy
+        run: python3 scripts/package_linux.py --bundle build/linux/${{ matrix.arch }}/release/bundle --arch ${{ matrix.arch }} --version "$APP_VERSION" --formats tar,deb,rpm,arch
       - name: Run extracted Linux package
         run: |
           mkdir -p build/package-runtime
           tar -xzf dist/haneoka-linux-${{ matrix.arch }}.tar.gz -C build/package-runtime
-          LD_LIBRARY_PATH="$GITHUB_WORKSPACE/build/package-runtime/lib" ldd build/package-runtime/haneoka-bin | tee "$RUNNER_TEMP/package-dependencies.txt"
+          LD_LIBRARY_PATH="$GITHUB_WORKSPACE/build/package-runtime/lib" ldd build/package-runtime/haneoka | tee "$RUNNER_TEMP/package-dependencies.txt"
           ! grep -q 'not found' "$RUNNER_TEMP/package-dependencies.txt"
           set +e
           LIBGL_ALWAYS_SOFTWARE=1 timeout 10s xvfb-run -a build/package-runtime/haneoka > "$RUNNER_TEMP/package-runtime.log" 2>&1
@@ -202,9 +151,7 @@ jobs:
       - name: Flatpak
         run: |
           mkdir -p build/flatpak
-          (cd build/flatpak && "$GITHUB_WORKSPACE/dist/haneoka-linux-${{ matrix.arch }}.AppImage" --appimage-extract > /dev/null)
-          mv build/flatpak/squashfs-root/usr/share/haneoka build/flatpak/bundle
-          cp -a build/flatpak/squashfs-root/usr/lib/. build/flatpak/bundle/lib/
+          cp -a build/linux/${{ matrix.arch }}/release/bundle build/flatpak/bundle
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
           flatpak install --user -y flathub org.gnome.Platform//48 org.gnome.Sdk//48
           flatpak-builder --user --force-clean --repo=build/flatpak/repo build/flatpak/build packaging/flatpak/org.haneoka.haneoka.yml
@@ -225,12 +172,6 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
-          targets: x86_64-pc-windows-msvc
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -247,9 +188,6 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="${GITHUB_REF_NAME#v}"; fi
           echo "APP_VERSION=$version" >> "$GITHUB_ENV"
       - run: flutter pub get
-      - run: python scripts/base_pack.py
-      - name: Provision Cubism Core
-        run: dart run scripts/provision_cubism_core.dart --platform windows --arch x64
       - run: flutter build windows --release --build-name="${{ env.APP_VERSION }}" --build-number="${{ github.run_number }}"
       - name: Bundle Visual C++ runtime
         shell: pwsh
@@ -314,66 +252,6 @@ jobs:
           name: windows-${{ matrix.arch }}
           path: dist/*
 
-  windows_arm_compatibility:
-    needs: windows
-    if: ${{ !cancelled() && (needs.windows.result == 'success' || inputs.platform == 'windows-compatibility') }}
-    runs-on: windows-11-arm
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: windows-x64
-          path: dist
-          github-token: ${{ github.token }}
-          run-id: ${{ inputs.artifact_run || github.run_id }}
-      - uses: actions/setup-python@v6
-        id: python_x64
-        with:
-          python-version: "3.12"
-          architecture: x64
-      - name: Validate native Core on Windows ARM
-        shell: pwsh
-        run: |
-          Expand-Archive dist/haneoka-windows-x64.zip -DestinationPath bundle
-          @'
-          import ctypes, json, os, struct, sys
-          from pathlib import Path
-          process, native = ctypes.c_ushort(), ctypes.c_ushort()
-          kernel = ctypes.WinDLL('kernel32', use_last_error=True)
-          kernel.GetCurrentProcess.restype = ctypes.c_void_p
-          kernel.IsWow64Process2.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ushort), ctypes.POINTER(ctypes.c_ushort)]
-          if not kernel.IsWow64Process2(kernel.GetCurrentProcess(), ctypes.byref(process), ctypes.byref(native)):
-              raise ctypes.WinError(ctypes.get_last_error())
-          if os.environ['RUNNER_ARCH'].upper() != 'ARM64':
-              raise SystemExit('Expected a Windows ARM64 runner')
-          def machine(path):
-              with path.open('rb') as file:
-                  header = file.read(64)
-                  file.seek(struct.unpack_from('<I', header, 60)[0])
-                  signature = file.read(6)
-              if signature[:4] != b'PE\0\0':
-                  raise SystemExit('Expected a PE binary')
-              return struct.unpack_from('<H', signature, 4)[0]
-          if machine(Path(sys.executable)) != 0x8664:
-              raise SystemExit('Expected the x64 Python executable')
-          root = Path('bundle').resolve()
-          libraries = list(root.rglob('*CubismCore*.dll'))
-          if len(libraries) != 1:
-              raise SystemExit('The complete Windows package must include one Cubism Core')
-          if machine(libraries[0]) != 0x8664 or machine(root / 'haneoka.exe') != 0x8664:
-              raise SystemExit('Expected the complete x64 application and Core')
-          with os.add_dll_directory(str(root)), os.add_dll_directory(str(libraries[0].parent)):
-              core = ctypes.CDLL(str(libraries[0]))
-              for name in ['csmReviveMocInPlace', 'csmInitializeModelInPlace', 'csmUpdateModel', 'csmGetParameterValues', 'csmGetDrawableVertexPositions']:
-                  getattr(core, name)
-              core.csmGetVersion.restype = ctypes.c_uint32
-              version = core.csmGetVersion()
-              if not version:
-                  raise SystemExit('Cubism Core returned no version')
-          print(json.dumps({'host': 'windows_arm64', 'package': 'windows_x64', 'coreVersion': version,
-                            'processMachine': hex(process.value), 'nativeMachine': hex(native.value)}))
-          '@ | & "${{ steps.python_x64.outputs.python-path }}" -
-          if ($LASTEXITCODE -ne 0) { throw 'Windows ARM Core execution failed' }
-
   apple:
     if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'apple' || github.event.inputs.platform == 'macos' || github.event.inputs.platform == 'ios'
     strategy:
@@ -382,12 +260,6 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
-          targets: aarch64-apple-darwin,x86_64-apple-darwin,aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -401,9 +273,6 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="${GITHUB_REF_NAME#v}"; fi
           echo "APP_VERSION=$version" >> "$GITHUB_ENV"
       - run: flutter pub get
-      - run: python3 scripts/base_pack.py
-      - name: Provision Cubism Core
-        run: dart run scripts/provision_cubism_core.dart --platform ${{ matrix.kind }} --arch ${{ matrix.arch }}
       - name: Configure native macOS architecture
         if: matrix.kind == 'macos'
         run: |
@@ -452,13 +321,11 @@ jobs:
           path: dist/*
 
   release:
-    needs: [android, linux, windows, windows_arm_compatibility, apple]
-    if: always() && !(github.event_name == 'workflow_dispatch' && (inputs.only_arm64 || inputs.platform == 'windows-compatibility')) && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    needs: [android, linux, windows, apple]
+    if: always() && !(github.event_name == 'workflow_dispatch' && inputs.only_arm64) && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - uses: actions/download-artifact@v4
         with:
           path: dist

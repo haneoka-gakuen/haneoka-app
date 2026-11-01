@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package the real Flutter Linux bundle as tar, DEB, RPM, Arch and AppImage."""
+"""Package the Flutter Linux bundle as tar, DEB, RPM and Arch; WebKitGTK comes from the system."""
 import argparse
 import gzip
 import hashlib
@@ -48,10 +48,9 @@ def main():
     parser.add_argument('--arch', choices=['x64', 'arm64'], required=True)
     parser.add_argument('--out', type=Path, default=ROOT / 'dist')
     parser.add_argument('--formats', default='tar,deb,arch')
-    parser.add_argument('--linuxdeploy', type=Path)
     args = parser.parse_args()
     formats = set(args.formats.split(','))
-    if formats - {'tar', 'deb', 'rpm', 'arch', 'appimage', 'snap'}:
+    if formats - {'tar', 'deb', 'rpm', 'arch'}:
         raise SystemExit('Unknown package format')
     bundle = args.bundle.resolve()
     if not (bundle / 'haneoka').is_file():
@@ -84,7 +83,7 @@ def main():
         desktop = stage / 'usr/share/applications/org.haneoka.haneoka.desktop'
         desktop.parent.mkdir(parents=True)
         desktop.write_text('[Desktop Entry]\nType=Application\nName=Haneoka\n'
-                           'Comment=Our Notes catalogue and save reader\nExec=haneoka %u\n'
+                           'Comment=Haneoka for Our Notes\nExec=haneoka %u\n'
                            'Icon=org.haneoka.haneoka\nCategories=Game;Utility;\n'
                            'Terminal=false\nMimeType=application/x-haneoka-save;x-scheme-handler/haneoka;\n')
         icon = stage / 'usr/share/icons/hicolor/512x512/apps/org.haneoka.haneoka.png'
@@ -95,40 +94,6 @@ def main():
         mime.write_text('<?xml version="1.0"?><mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">'
                         '<mime-type type="application/x-haneoka-save"><comment>Haneoka save archive</comment>'
                         '<glob pattern="*.haneoka-save"/></mime-type></mime-info>\n')
-        if not args.linuxdeploy:
-            raise SystemExit('--linuxdeploy is required to bundle the Linux runtime')
-        linked = subprocess.check_output(['ldd', bundle / 'haneoka'], text=True)
-        mpv = next(Path(row.split()[2]) for row in linked.splitlines()
-                   if row.strip().startswith('libmpv.so.'))
-        appdir = temp / 'Haneoka.AppDir'
-        shutil.copytree(stage, appdir, symlinks=True)
-        # linuxdeploy expects ELF executables in usr/bin. Keep the launcher
-        # script for native packages, and point AppImage's entry to its ELF.
-        entry = appdir / 'usr/bin/haneoka'
-        entry.unlink()
-        entry.symlink_to('../share/haneoka/haneoka')
-        (appdir / 'AppRun').write_text('#!/bin/sh\nbase=$(dirname "$(readlink -f "$0")")\n'
-            'export LD_LIBRARY_PATH="$base/usr/lib:$base/usr/share/haneoka/lib:${LD_LIBRARY_PATH:-}"\n'
-            f'export LIBMPV_LIBRARY_PATH="$base/usr/lib/{mpv.name}"\n'
-            'exec "$base/usr/share/haneoka/haneoka" "$@"\n')
-        (appdir / 'AppRun').chmod(0o755)
-        env = {**os.environ, 'APPIMAGE_EXTRACT_AND_RUN': '1', 'ARCH': architecture,
-               'OUTPUT': str(output / f'{name}.AppImage')}
-        motion_sync = appdir / 'usr/share/haneoka/lib/libcubism_motion_sync.so'
-        runtime_libraries = ['--library', motion_sync] if motion_sync.is_file() else []
-        run(args.linuxdeploy.resolve(), '--appdir', appdir,
-            '--executable', appdir / 'usr/share/haneoka/haneoka',
-            '--desktop-file', appdir / desktop.relative_to(stage),
-            '--icon-file', appdir / icon.relative_to(stage), '--library', mpv,
-            *runtime_libraries, '--plugin', 'gtk',
-            *(['--output', 'appimage'] if formats & {'appimage', 'snap'} else []), env=env)
-        shutil.copytree(appdir / 'usr/lib', app / 'lib', symlinks=True, dirs_exist_ok=True)
-        (app / 'haneoka').rename(app / 'haneoka-bin')
-        (app / 'haneoka').write_text('#!/bin/sh\nbase=$(dirname "$(readlink -f "$0")")\n'
-            'export LD_LIBRARY_PATH="$base/lib:${LD_LIBRARY_PATH:-}"\n'
-            f'export LIBMPV_LIBRARY_PATH="$base/lib/{mpv.name}"\n'
-            'exec "$base/haneoka-bin" "$@"\n')
-        (app / 'haneoka').chmod(0o755)
         if 'tar' in formats:
             with tarfile.open(output / f'{name}.tar.gz', 'w:gz') as archive:
                 for path in app.iterdir():
@@ -140,9 +105,8 @@ def main():
                 f'Package: haneoka\nVersion: {args.version}\nArchitecture: {deb_arch}\n'
                 'Maintainer: Haneoka contributors <noreply@haneoka.org>\n'
                 'Section: games\nPriority: optional\n'
-                'Depends: libgtk-3-0, libsecret-1-0, libstdc++6, libgstreamer1.0-0, '
-                'libgstreamer-plugins-base1.0-0\n'
-                'Homepage: https://haneoka.org\nDescription: Our Notes catalogue and save reader\n')
+                'Depends: libgtk-3-0, libwebkit2gtk-4.1-0, libstdc++6\n'
+                'Homepage: https://haneoka.org\nDescription: Haneoka for Our Notes\n')
             hashes = []
             for path in sorted(stage.rglob('*')):
                 if path.is_file():
@@ -156,11 +120,10 @@ def main():
         if 'arch' in formats:
             info = stage / '.PKGINFO'
             info.write_text(f'pkgname = haneoka\npkgbase = haneoka\npkgver = {args.version}-1\n'
-                            f'pkgdesc = Our Notes catalogue and save reader\narch = {architecture}\n'
+                            f'pkgdesc = Haneoka for Our Notes\narch = {architecture}\n'
                             f'builddate = {int(time.time())}\npackager = Haneoka contributors\n'
                             'url = https://haneoka.org\nlicense = MPL-2.0\n'
-                            'depend = gtk3\ndepend = libsecret\ndepend = gstreamer\n'
-                            'depend = gst-plugins-base-libs\n')
+                            'depend = gtk3\ndepend = webkit2gtk-4.1\n')
             run('tar', '--owner=0', '--group=0', '--zstd', '-cf', output / f'{name}.pkg.tar.zst', '-C', stage, '.PKGINFO', 'usr')
             info.unlink()
         if 'rpm' in formats:
@@ -169,11 +132,11 @@ def main():
                 (top / directory).mkdir(parents=True)
             spec = top / 'SPECS/haneoka.spec'
             spec.write_text(f'Name: haneoka\nVersion: {args.version}\nRelease: 1\n'
-                            'Summary: Our Notes catalogue and save reader\nLicense: MPL-2.0\n'
+                            'Summary: Haneoka for Our Notes\nLicense: MPL-2.0\n'
                             f'URL: https://haneoka.org\nBuildArch: {architecture}\n'
                             '%global debug_package %{nil}\n%global __strip /bin/true\n'
-                            'Requires: gtk3, libsecret, gstreamer1, gstreamer1-plugins-base\n'
-                            '%description\nOur Notes catalogue and local save reader.\n'
+                            'Requires: gtk3, webkit2gtk4.1\n'
+                            '%description\nHaneoka for BanG Dream! Our Notes.\n'
                             f'%install\nmkdir -p %{{buildroot}}\ncp -a "{stage}/usr" %{{buildroot}}/\n'
                             '%files\n/usr/bin/haneoka\n/usr/share/haneoka\n'
                             '/usr/share/applications/org.haneoka.haneoka.desktop\n'
@@ -184,30 +147,6 @@ def main():
             if len(packages) != 1:
                 raise SystemExit('Expected one RPM artifact')
             shutil.copy2(packages[0], output / f'{name}.rpm')
-        if 'snap' in formats:
-            image = output / f'{name}.AppImage'
-            if not image.exists():
-                raise SystemExit('Create AppImage first so Snap includes the media/runtime libraries.')
-            snap = temp / 'snap'
-            snap.mkdir()
-            run(image, '--appimage-extract', cwd=snap, stdout=subprocess.DEVNULL)
-            extracted = snap / 'squashfs-root'
-            shutil.move(str(extracted / 'usr'), snap / 'usr')
-            shutil.rmtree(extracted)
-            (snap / 'bin').mkdir()
-            (snap / 'bin/haneoka').write_text('#!/bin/sh\n'
-                'export LD_LIBRARY_PATH="$SNAP/usr/lib:$SNAP/usr/share/haneoka/lib:${LD_LIBRARY_PATH:-}"\n'
-                f'export LIBMPV_LIBRARY_PATH="$SNAP/usr/lib/{mpv.name}"\n'
-                'exec "$SNAP/usr/share/haneoka/haneoka" "$@"\n')
-            (snap / 'bin/haneoka').chmod(0o755)
-            (snap / 'meta').mkdir()
-            (snap / 'meta/snap.yaml').write_text(f'name: haneoka\nversion: "{args.version}"\n'
-                'summary: Our Notes catalogue and save reader\n'
-                'description: Our Notes catalogue, community and local save reader.\n'
-                f'architectures: [{deb_arch}]\nbase: core24\ngrade: stable\nconfinement: classic\n'
-                'apps:\n  haneoka:\n    command: bin/haneoka\n'
-                '    desktop: usr/share/applications/org.haneoka.haneoka.desktop\n')
-            run('mksquashfs', snap, output / f'{name}.snap', '-noappend', '-comp', 'xz', '-all-root', '-processors', '2', '-mem', '256M')
     print(f'Created {", ".join(sorted(formats))}: {output}')
 
 

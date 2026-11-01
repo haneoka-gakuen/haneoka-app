@@ -4,22 +4,13 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links_linux
-  audioplayers_linux
   flutter_secure_storage_linux
-  media_kit_libs_linux
-  media_kit_video
-  screen_retriever_linux
   url_launcher_linux
-  window_manager
+  webview_all_linux
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
-  cassiopeia_runtime
-  flutter_soloud
   jni
-  spine_flutter
-  vega_plugin_cubism
-  vega_runtime_ffi
 )
 
 set(PLUGIN_BUNDLED_LIBRARIES)

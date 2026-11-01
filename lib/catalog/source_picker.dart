@@ -79,7 +79,7 @@ Future<void> openCatalogSources(BuildContext context, String path) async {
   );
   if (!context.mounted || selected == null) return;
   if (const ['jp', 'intl'].contains(selected)) {
-    await state.setServer(selected);
+    state.setServer(selected);
     if (context.mounted && CatalogSourceScope.maybeApi(context) != null) {
       final api = CatalogSourceScope.maybeApi(context)!;
       if (const {'jp', 'intl'}.contains(api.server)) {

@@ -22,10 +22,12 @@ import '../save/player_refresh.dart';
 import '../save/export.dart';
 import '../save/game_save.dart';
 import '../save/save_view.dart';
-import '../records/records.dart';
+import '../save/card_catalog.dart';
 import '../shell/page.dart';
 import '../shell/routes.dart';
-import '../team_builder/team_builder_screen.dart';
+import '../shell/links.dart';
+import '../save/song_marks.dart';
+import '../shell/pending_import.dart';
 import 'app_image.dart';
 import 'card_artwork.dart';
 import 'detail.dart';
@@ -216,17 +218,24 @@ class _SaveScreenState extends State<SaveScreen> {
     }
   }
 
+  Future<void> _songProgress() async {
+    PendingProgress.set(songMarks(save));
+    await openLink(
+      context,
+      '/${AppScope.of(context).text.locale}/song-progress/',
+    );
+  }
+
   Future<void> _importTeam() async {
     if (_busy) return;
     setState(() => _busy = true);
     final selected = save;
     try {
       if (!mounted) return;
-      await Navigator.of(context).push<void>(
-        MaterialPageRoute(
-          settings: const RouteSettings(name: '/team-builder'),
-          builder: (_) => TeamBuilderScreen(importSave: selected),
-        ),
+      PendingImport.set(selected);
+      await openLink(
+        context,
+        '/${AppScope.of(context).text.locale}/team-builder/',
       );
     } catch (error) {
       if (mounted) _say('$error');
@@ -323,6 +332,7 @@ class _SaveScreenState extends State<SaveScreen> {
               : null,
           showSyncFromGame: canRefreshFromGame(save),
           onImportTeam: _busy ? null : _importTeam,
+          onSongProgress: _busy ? null : _songProgress,
           showReadHistory: _historyAction != null,
           onReadHistory: _busy || _historyAction == null
               ? null
@@ -346,6 +356,7 @@ class _Profile extends StatelessWidget {
     required this.onSyncFromGame,
     required this.showSyncFromGame,
     required this.onImportTeam,
+    required this.onSongProgress,
     required this.onReadHistory,
     required this.showReadHistory,
     required this.newestFirst,
@@ -356,7 +367,11 @@ class _Profile extends StatelessWidget {
   final VoidCallback onCopyPackage;
   final VoidCallback onSaveFile;
   final VoidCallback onRemove;
-  final VoidCallback? onUpdateSave, onSyncFromGame, onImportTeam, onReadHistory;
+  final VoidCallback? onUpdateSave,
+      onSyncFromGame,
+      onImportTeam,
+      onSongProgress,
+      onReadHistory;
   final bool showSyncFromGame;
   final bool newestFirst, showReadHistory;
   final ValueChanged<bool> onSortChanged;
@@ -961,6 +976,11 @@ class _Profile extends StatelessWidget {
                       onPressed: onImportTeam,
                       icon: const Icon(Symbols.groups_rounded),
                       label: Text(t.importToTeamBuilder),
+                    ),
+                    FilledButton.tonalIcon(
+                      onPressed: onSongProgress,
+                      icon: const Icon(Symbols.checklist_rounded),
+                      label: Text(site('catalog.songProgress.title')),
                     ),
                     if (showSyncFromGame)
                       FilledButton.tonalIcon(

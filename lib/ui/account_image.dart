@@ -45,6 +45,7 @@ class AccountImageProvider extends ImageProvider<AccountImageKey> {
     _accountImageKeys.add(key);
     return SynchronousFuture(key);
   }
+
   @override
   ImageStreamCompleter loadImage(
     AccountImageKey key,
@@ -54,7 +55,9 @@ class AccountImageProvider extends ImageProvider<AccountImageKey> {
     AccountImageKey key,
     ImageDecoderCallback decode,
   ) async {
-    if (key.epoch != AccountResources.instance.epoch) throw const AccountResourceCancelled();
+    if (key.epoch != AccountResources.instance.epoch) {
+      throw const AccountResourceCancelled();
+    }
     final lease = await AccountResources.instance.acquire(key.uri);
     try {
       final codec = await decode(

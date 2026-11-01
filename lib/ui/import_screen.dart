@@ -11,7 +11,6 @@ import 'package:material_new_shapes/material_new_shapes.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../account/account_widgets.dart';
 import '../account/haneoka_account.dart';
 import '../core/app_state.dart';
 import '../core/storage.dart';
@@ -872,7 +871,6 @@ class _AccountsScreenState extends State<AccountsScreen> {
           return ListView(
             padding: pagePadding(context),
             children: [
-              const HaneokaAccountCard(),
               const SizedBox(height: 24),
               Text(
                 t.importedAccounts,

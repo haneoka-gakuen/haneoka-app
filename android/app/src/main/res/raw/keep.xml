@@ -1,2 +1,0 @@
-<resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@drawable/audio_service_skip_previous,@drawable/audio_service_play_arrow,@drawable/audio_service_pause,@drawable/audio_service_skip_next,@drawable/audio_service_stop" />

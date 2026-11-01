@@ -1,7 +1,6 @@
 #include "flutter_window.h"
 
 #include <optional>
-#include <flutter/standard_method_codec.h>
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -26,31 +25,6 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
-  team_channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
-      flutter_controller_->engine()->messenger(), "org.haneoka/team_engine",
-      &flutter::StandardMethodCodec::GetInstance());
-  team_channel_->SetMethodCallHandler([this](const auto& call, auto result) {
-    const auto* args = std::get_if<flutter::EncodableMap>(call.arguments());
-    const std::string* key = nullptr;
-    if (args) {
-      auto found = args->find(flutter::EncodableValue("key"));
-      if (found != args->end()) key = std::get_if<std::string>(&found->second);
-    }
-    if (!key || key->empty()) { result->Error("engine-key", "Missing engine key"); return; }
-    if (call.method_name() == "dispose") {
-      team_engines_.erase(*key); result->Success(); return;
-    }
-    if (call.method_name() != "start") { result->NotImplemented(); return; }
-    if (team_engines_.find(*key) == team_engines_.end()) {
-      auto project = project_;
-      project.set_dart_entrypoint_arguments({"--haneoka-team-engine=" + *key});
-      project.set_ui_thread_policy(flutter::UIThreadPolicy::RunOnSeparateThread);
-      auto engine = std::make_unique<flutter::FlutterEngine>(project);
-      if (!engine->Run()) { result->Error("engine-start", "Could not start team engine"); return; }
-      team_engines_.emplace(*key, std::move(engine));
-    }
-    result->Success();
-  });
 
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
@@ -67,9 +41,6 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
-  if (team_channel_) team_channel_->SetMethodCallHandler(nullptr);
-  team_channel_.reset();
-  team_engines_.clear();
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }

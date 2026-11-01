@@ -1,9 +1,2 @@
 #!/bin/sh
-export LD_LIBRARY_PATH="/app/share/haneoka/lib:${LD_LIBRARY_PATH:-}"
-for library in /app/share/haneoka/lib/libmpv.so.*; do
-  if [ -f "$library" ]; then
-    export LIBMPV_LIBRARY_PATH="$library"
-    break
-  fi
-done
 exec /app/share/haneoka/haneoka "$@"
