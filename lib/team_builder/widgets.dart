@@ -651,7 +651,7 @@ class ValueChip extends StatelessWidget {
 
 String formatNumber(String locale, num value, [int digits = 0]) =>
     (NumberFormat.decimalPattern(locale)
-          ..minimumFractionDigits = digits
+          ..minimumFractionDigits = 0
           ..maximumFractionDigits = digits)
         .format(value);
 

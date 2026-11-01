@@ -510,6 +510,55 @@ class TeamBuilderController extends ChangeNotifier {
 
   ManualTeam manual = const ManualTeam();
   List<TeamEvaluation>? manualResults;
+
+  /// The formation the manual team is compared against, with its evaluation.
+  ({ManualTeam team, List<TeamEvaluation> results, String conditions})?
+  manualBaseline;
+
+  /// The next manual evaluation becomes the baseline.
+  bool manualPin = false;
+
+  /// Shows the manual editor (set by the screen).
+  VoidCallback? openManual;
+
+  /// Everything a manual evaluation depends on except the formation.
+  String get manualConditions {
+    if (view == null || catalog == null) return '';
+    return jsonEncode([
+      store?.owner,
+      catalog?.data['identity'],
+      catalog?.data['crossServer'],
+      view?.engineInputs(true).members.map((row) => row.toJson()).toList(),
+      view?.engineInputs(true).snaps.map((row) => row.toJson()).toList(),
+      view?.player.toJson(),
+      settings.theoretical,
+      settings.unknownPolicy,
+      goalJson(manualGoal()!),
+      songRulesFor(settings, gekiso: settings.manualScoreMode == 'gekiso'),
+    ]);
+  }
+
+  /// Opens a result's formation in the manual editor and pins its evaluation
+  /// as the baseline.
+  void compareTeam(EngineHit hit) {
+    manual = ManualTeam(
+      members: [for (final key in hit.members) cardIdOf(key)],
+      snaps: [for (final key in hit.snaps) key == null ? null : cardIdOf(key)],
+      leader: 0,
+    );
+    updateSettings({
+      if (hit.song != null) 'songs': [hit.song!.toJson()],
+      'manualScoreMode': resultSettings?.goal == GoalKind.gekiso
+          ? 'gekiso'
+          : 'score',
+    });
+    manualResults = null;
+    manualBaseline = null;
+    manualPin = true;
+    openManual?.call();
+    changed();
+  }
+
   bool manualBusy = false;
   ({int slot, List<EngineHit> hits})? manualSuggestions;
   int manualSuggesting = -1;
@@ -573,11 +622,12 @@ class TeamBuilderController extends ChangeNotifier {
     PlayerInput player,
     UnknownPolicy policy,
   })
-  manualInputs() {
+  manualInputs([ManualTeam? team]) {
     final owned = view!.engineInputs(true), all = catalog!.fullGrowthInputs;
+    team ??= manual;
     return (
       members: [
-        for (final id in manual.members)
+        for (final id in team.members)
           if (id != null)
             ?owned.members.where((row) => row.cardId == id).firstOrNull ??
                 (settings.theoretical
@@ -585,7 +635,7 @@ class TeamBuilderController extends ChangeNotifier {
                     : null),
       ],
       snaps: [
-        for (final id in manual.snaps)
+        for (final id in team.snaps)
           if (id != null)
             ?owned.snaps.where((row) => row.cardId == id).firstOrNull ??
                 (settings.theoretical

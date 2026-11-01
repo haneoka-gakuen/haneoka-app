@@ -109,6 +109,11 @@ class _TeamBuilderScreenState extends State<TeamBuilderScreen> {
       state,
       serverOverride: widget.server ?? widget.importSave?.server,
     )..addListener(_changed);
+    controller.openManual = () {
+      if (!mounted) return;
+      setState(() => _manualBuild = true);
+      _selectTab(_Tab.build);
+    };
     controller.activate(
       _tab == _Tab.arena
           ? 'arena'

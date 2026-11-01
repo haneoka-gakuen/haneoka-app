@@ -2924,6 +2924,12 @@
       "topOrders": "Top orders",
       "orderRank": "Rank",
       "orderGap": "From best",
+      "timingBest": "Best timing",
+      "timingEarly": "{ms} ms early",
+      "timingLate": "{ms} ms late",
+      "timingEarlyRange": "{from}–{to} ms early",
+      "timingLateRange": "{from}–{to} ms late",
+      "timingWindow": "{from}–{to} s",
       "maxLevel": "Max level",
       "rewardSearch": "Reward team search",
       "improvementBound": "Up to {percent}% improvement",
@@ -3301,7 +3307,12 @@
       "stepsLabel": "Steps",
       "stepCards": "Import cards",
       "stepCardsDone": "{count} cards",
-      "stepSongs": "Choose songs"
+      "stepSongs": "Choose songs",
+      "editCompare": "Edit and compare",
+      "pinBaseline": "Set as baseline",
+      "baseline": "Baseline",
+      "clearBaseline": "Clear baseline",
+      "maxScore": "Highest"
     },
     "calendar": {
       "title": "Calendar",

@@ -1264,6 +1264,17 @@ class _HitCardState extends State<_HitCard> {
                             },
                       icon: const Icon(Symbols.bookmark_add_rounded),
                     ),
+                    if (hit.song != null &&
+                        hit.aggregate == null &&
+                        widget.settings.arena == null &&
+                        widget.settings.goal != GoalKind.plan)
+                      IconButton(
+                        tooltip: c.tb('editCompare', 'Edit and compare'),
+                        onPressed: c.running || c.stale
+                            ? null
+                            : () => c.compareTeam(hit),
+                        icon: const Icon(Symbols.swap_horiz_rounded),
+                      ),
                     IconButton(
                       tooltip: c.tb('compare', 'Compare'),
                       isSelected: widget.compared,
@@ -1676,6 +1687,19 @@ class _SkillOrdersState extends State<_SkillOrders> {
         song: hit.song!,
         order: orders[index],
         play: PlayModel.fromJson(objectRow(goalJson(request.goal)['play'])),
+        timing: switch (goalJson(request.goal)) {
+          final goal when goal['kind'] == 'score' || goal['kind'] == 'event' =>
+            {
+              'player': request.player.toJson(),
+              'play': goal['play'],
+              'challengeEventId': goal['kind'] == 'score'
+                  ? goal['challengeEventId']
+                  : goal['route'] == 'challenge'
+                  ? goal['eventId']
+                  : null,
+            },
+          _ => null,
+        },
       ),
     );
   }();
@@ -1698,29 +1722,105 @@ class _SkillOrdersState extends State<_SkillOrders> {
     );
   }
 
-  Widget _faces(int index, List<int> firing) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      for (final (position, event) in firing.indexed)
-        Align(
-          widthFactor: position + 1 < firing.length ? 19 / 24 : 1,
-          alignment: Alignment.centerLeft,
-          child: Tooltip(
-            message: _face(orders[index][event]).name,
-            child: ClipOval(
+  /// An order as numbered character faces in firing order.
+  Widget _faces(int index, List<int> firing) {
+    final theme = Theme.of(context);
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (final (position, event) in firing.indexed)
+          () {
+            final member = _face(orders[index][event]);
+            return Tooltip(
+              message: '${position + 1} / ${member.name}',
               child: SizedBox.square(
-                dimension: 24,
-                child: AppImage(
-                  candidates: [_face(orders[index][event]).face],
-                  fit: BoxFit.cover,
-                  alignment: const Alignment(0, -0.5),
+                dimension: 34,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned.fill(
+                      top: 4,
+                      left: 4,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: member.color, width: 2),
+                          borderRadius: BorderRadius.circular(Corner.small),
+                          color: theme.colorScheme.surfaceContainerHighest,
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(
+                            Corner.extraSmall,
+                          ),
+                          child: AppImage(
+                            candidates: [
+                              c.catalog!.characterFace(member.character),
+                            ],
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      constraints: const BoxConstraints(minWidth: 16),
+                      height: 16,
+                      alignment: Alignment.center,
+                      decoration: ShapeDecoration(
+                        shape: const StadiumBorder(),
+                        color: member.color,
+                      ),
+                      child: Text(
+                        '${position + 1}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.surface,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ),
-        ),
-    ],
-  );
+            );
+          }(),
+      ],
+    );
+  }
+
+  String _shift(TimingShift shift) {
+    final early = shift.offsetMs < 0;
+    final ends = [shift.fromMs.abs(), shift.toMs.abs()]..sort();
+    return ends.first == ends.last || shift.fromMs.sign != shift.toMs.sign
+        ? c.tb(
+            early ? 'timingEarly' : 'timingLate',
+            early ? '{ms} ms early' : '{ms} ms late',
+            {'ms': shift.offsetMs.abs()},
+          )
+        : c.tb(
+            early ? 'timingEarlyRange' : 'timingLateRange',
+            early ? '{from}–{to} ms early' : '{from}–{to} ms late',
+            {'from': ends.first, 'to': ends.last},
+          );
+  }
+
+  /// The order's best score with judgement timing and the offsets reaching it.
+  Widget? _timingChip(OrderTiming? timing, String locale) {
+    if (timing == null || timing.best <= timing.score) return null;
+    String seconds(int ms) => formatNumber(locale, ms / 1000, 1);
+    final how = timing.uniformScore == timing.best
+        ? _shift(timing.uniform)
+        : [
+            for (final w in timing.windows)
+              if (w.shift.offsetMs != 0)
+                '${c.tb('timingWindow', '{from}–{to} s', {'from': seconds(w.startMs), 'to': seconds(w.endMs)})} ${_shift(w.shift)}',
+          ].join(' / ');
+    return ValueChip(
+      label: c.tb('timingBest', 'Best timing'),
+      value:
+          '${formatNumber(locale, timing.best)} +${formatNumber(locale, timing.best - timing.score)} / $how',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1853,6 +1953,12 @@ class _SkillOrdersState extends State<_SkillOrders> {
               value: '$rank / ${score.orders.length}',
             ),
             ValueChip(label: c.tb('orderGap', 'From best'), value: gap(value)),
+            FutureBuilder<Timeline>(
+              future: _timeline(current),
+              builder: (context, snapshot) =>
+                  _timingChip(snapshot.data?.timing, locale) ??
+                  const SizedBox.shrink(),
+            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -1912,8 +2018,15 @@ class _SkillOrdersState extends State<_SkillOrders> {
               ),
             ),
             title: Text(_face(orders[entry.index][first]).name),
-            subtitle: Text(gap(entry.value)),
-            trailing: _faces(entry.index, firing),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [Text(gap(entry.value)), _faces(entry.index, firing)],
+              ),
+            ),
           ),
         ExpansionTile(
           tilePadding: EdgeInsets.zero,

@@ -5,6 +5,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../ui/app_image.dart';
 import '../ui/theme.dart';
 import 'box.dart';
 import 'controller.dart';
@@ -66,11 +67,30 @@ class _TeamsTabState extends State<TeamsTab> {
     c.changed();
   }
 
-  TeamSpec get _spec => TeamSpec(
-    [for (final id in manual.members) 'm$id'],
-    [for (final id in manual.snaps) id == null ? null : 's$id'],
-    'm${manual.members[manual.leader]}',
+  TeamSpec _spec(ManualTeam team) => TeamSpec(
+    [for (final id in team.members) 'm$id'],
+    [for (final id in team.snaps) id == null ? null : 's$id'],
+    'm${team.members[team.leader]}',
   );
+
+  String? _autoEvaluated;
+
+  /// With a baseline, every change of formation is evaluated again.
+  void _autoEvaluate() {
+    if ((!c.manualPin && c.manualBaseline == null) ||
+        c.manualResults != null ||
+        c.running ||
+        !_ready ||
+        c.manualSongs.isEmpty) {
+      return;
+    }
+    final context = c.manualContext;
+    if (_autoEvaluated == context) return;
+    _autoEvaluated = context;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _evaluate();
+    });
+  }
 
   String? get _suggestionsContext => c.manualSuggestionsContext;
   set _suggestionsContext(String? value) => c.manualSuggestionsContext = value;
@@ -88,15 +108,16 @@ class _TeamsTabState extends State<TeamsTab> {
     if (!_ready || engine == null || s.songs.isEmpty || c.running) return;
     final generation = c.beginManual();
     c.changed();
-    final inputs = _inputs();
-    try {
-      final evaluations = await engine.evaluate(
+    final conditions = c.manualConditions;
+    Future<List<TeamEvaluation>> run(ManualTeam team) {
+      final inputs = c.manualInputs(team);
+      return engine.evaluate(
         EvaluateRequest(
           members: inputs.members,
           snaps: inputs.snaps,
           player: inputs.player,
           unknownPolicy: inputs.policy,
-          team: _spec,
+          team: _spec(team),
           songs: c.manualSongs,
           play: c.play,
           songRules: c.songRulesFor(s, gekiso: s.manualScoreMode == 'gekiso'),
@@ -131,7 +152,32 @@ class _TeamsTabState extends State<TeamsTab> {
               : null,
         ),
       );
-      if (generation == c.manualGeneration) c.manualResults = evaluations;
+    }
+
+    try {
+      final evaluations = await run(manual);
+      final baseline = c.manualBaseline;
+      final rerun =
+          baseline != null && baseline.conditions != conditions && !c.manualPin
+          ? await run(baseline.team)
+          : null;
+      if (generation == c.manualGeneration) {
+        c.manualResults = evaluations;
+        if (c.manualPin) {
+          c.manualBaseline = (
+            team: manual,
+            results: evaluations,
+            conditions: conditions,
+          );
+        } else if (baseline != null && rerun != null) {
+          c.manualBaseline = (
+            team: baseline.team,
+            results: rerun,
+            conditions: conditions,
+          );
+        }
+        c.manualPin = false;
+      }
     } on EngineCancelled {
       // Cancelled.
     } catch (error) {
@@ -270,17 +316,163 @@ class _TeamsTabState extends State<TeamsTab> {
     );
   }
 
+  /// The pinned formation as faces, with the action that pins or clears it.
+  Widget _baselineBar(bool ready) {
+    final baseline = c.manualBaseline, catalog = c.catalog!;
+    final theme = Theme.of(context);
+    if (baseline == null) {
+      return Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: TextButton.icon(
+          onPressed: ready && !c.running
+              ? () {
+                  c.manualPin = true;
+                  _evaluate();
+                }
+              : null,
+          icon: const Icon(Symbols.push_pin_rounded, size: 18),
+          label: Text(c.tb('pinBaseline', 'Set as baseline')),
+        ),
+      );
+    }
+    final team = baseline.team;
+    final order = [
+      team.leader,
+      for (var i = 0; i < 5; i++)
+        if (i != team.leader) i,
+    ];
+    return Row(
+      children: [
+        Text(
+          c.tb('baseline', 'Baseline'),
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final index in order)
+                SizedBox.square(
+                  dimension: 36,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      if (team.members[index] case final id?)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(Corner.small),
+                          child: SizedBox.square(
+                            dimension: 32,
+                            child: AppImage(
+                              candidates: [catalog.cardImage(true, id)],
+                              fit: BoxFit.cover,
+                              alignment: const Alignment(0, -0.6),
+                            ),
+                          ),
+                        ),
+                      if (team.snaps[index] case final id?)
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(
+                                Corner.extraSmall,
+                              ),
+                              border: Border.all(
+                                color: theme.colorScheme.surface,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(
+                                Corner.extraSmall,
+                              ),
+                              child: SizedBox.square(
+                                dimension: 18,
+                                child: AppImage(
+                                  candidates: [catalog.cardImage(false, id)],
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        IconButton(
+          tooltip: c.tb('clearBaseline', 'Clear baseline'),
+          onPressed: () {
+            c.manualBaseline = null;
+            c.changed();
+          },
+          icon: const Icon(Symbols.close_rounded),
+        ),
+      ],
+    );
+  }
+
+  /// A value over its signed difference from the baseline.
+  Widget _compared(String locale, num value, num? base) {
+    if (base == null) return Text(formatNumber(locale, value));
+    final theme = Theme.of(context);
+    final change = value - base;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(formatNumber(locale, value)),
+        Text(
+          '${change > 0
+              ? '+'
+              : change < 0
+              ? '−'
+              : '±'}${formatNumber(locale, change.abs())}',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: change > 0
+                ? theme.colorScheme.primary
+                : change < 0
+                ? theme.colorScheme.error
+                : theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _evaluationResults(BuildContext context) {
     final results = c.manualResults;
     if (results == null) {
       return ToolSection(
-        children: [Text(c.tb('resultsEmpty', 'Results appear here'))],
+        children: [
+          _baselineBar(false),
+          Text(c.tb('resultsEmpty', 'Results appear here')),
+        ],
       );
     }
     final catalog = c.catalog!, s = c.settings, locale = c.state.text.locale;
+    final baseline = c.manualBaseline?.conditions == c.manualConditions
+        ? c.manualBaseline
+        : null;
+    TeamEvaluation? baseOf(SongRef song) => baseline?.results
+        .where(
+          (row) =>
+              row.song.songId == song.songId &&
+              row.song.difficulty == song.difficulty,
+        )
+        .firstOrNull;
     return ToolSection(
       title: c.tb('evaluateTeam', 'Evaluate on the chosen songs'),
       children: [
+        _baselineBar(_ready),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: DataTable(
@@ -320,12 +512,34 @@ class _TeamsTabState extends State<TeamsTab> {
                         '${catalog.songTitle(row.song.songId)} ${catalog.difficultyLabel(row.song.songId, row.song.difficulty)}',
                       ),
                     ),
-                    DataCell(Text(formatNumber(locale, row.power))),
-                    DataCell(Text(formatNumber(locale, row.score.mean))),
                     DataCell(
-                      Text(
-                        '${formatNumber(locale, row.score.min)} – ${formatNumber(locale, row.score.max)}',
+                      _compared(locale, row.power, baseOf(row.song)?.power),
+                    ),
+                    DataCell(
+                      _compared(
+                        locale,
+                        row.score.mean,
+                        baseOf(row.song)?.score.mean,
                       ),
+                    ),
+                    DataCell(
+                      baseOf(row.song) == null
+                          ? Text(
+                              '${formatNumber(locale, row.score.min)} – ${formatNumber(locale, row.score.max)}',
+                            )
+                          : Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '${formatNumber(locale, row.score.min)} – ',
+                                ),
+                                _compared(
+                                  locale,
+                                  row.score.max,
+                                  baseOf(row.song)?.score.max,
+                                ),
+                              ],
+                            ),
                     ),
                     DataCell(
                       IconButton(
@@ -390,6 +604,7 @@ class _TeamsTabState extends State<TeamsTab> {
   Widget build(BuildContext context) {
     final catalog = c.catalog!;
     final view = c.view!;
+    _autoEvaluate();
     if (_suggestionsContext != c.manualSuggestionContext) _suggestions = null;
     final theme = Theme.of(context);
     final locale = c.state.text.locale;

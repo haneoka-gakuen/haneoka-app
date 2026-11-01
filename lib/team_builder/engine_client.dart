@@ -45,6 +45,7 @@ class TimelineRequest {
     required this.song,
     required this.order,
     this.play = ap,
+    this.timing,
   });
   factory TimelineRequest.fromJson(Map<String, Object?> json) =>
       TimelineRequest(
@@ -62,6 +63,7 @@ class TimelineRequest {
         song: SongRef.fromJson(objectRow(json['song'])),
         order: intListOf(json['order']),
         play: PlayModel.fromJson(objectRow(json['play'])),
+        timing: json['timing'] is Map ? objectRow(json['timing']) : null,
       );
   Map<String, Object?> toJson() => {
     'members': [for (final row in members) row.toJson()],
@@ -72,6 +74,7 @@ class TimelineRequest {
     'song': song.toJson(),
     'order': order,
     'play': play.toJson(),
+    if (timing != null) 'timing': timing,
   };
   final List<MemberInput> members;
   final List<SnapInput> snaps;
@@ -85,10 +88,80 @@ class TimelineRequest {
   /// Formation slot firing at each chart skill event.
   final List<int> order;
   final PlayModel play;
+
+  /// Normal lives: player, play and challenge event for the order's best
+  /// judgement timing (`live::timing`).
+  final Map<String, Object?>? timing;
+}
+
+/// A timing offset that keeps every judgement (negative is early) and the
+/// offsets around it reaching the same score.
+typedef TimingShift = ({int offsetMs, int fromMs, int toMs});
+
+/// Best judgement timing of one order for cumulative snapshots.
+class OrderTiming {
+  OrderTiming(
+    this.score,
+    this.best,
+    this.uniform,
+    this.uniformScore,
+    this.windows,
+  );
+  static OrderTiming? fromJson(Object? value) {
+    if (value is! Map) return null;
+    final json = objectRow(value);
+    TimingShift shift(Map<String, Object?> row) => (
+      offsetMs: intOf(row['offsetMs']),
+      fromMs: intOf(row['fromMs']),
+      toMs: intOf(row['toMs']),
+    );
+    final uniform = objectRow(json['uniform']);
+    return OrderTiming(
+      numOf(json['score']).toDouble(),
+      numOf(json['best']).toDouble(),
+      shift(uniform),
+      numOf(uniform['score']).toDouble(),
+      [
+        for (final row in json['windows'] as List)
+          (
+            shift: shift(objectRow(row)),
+            startMs: intOf(objectRow(row)['startMs']),
+            endMs: intOf(objectRow(row)['endMs']),
+          ),
+      ],
+    );
+  }
+
+  Map<String, Object?> toJson() {
+    Map<String, Object?> shift(TimingShift s) => {
+      'offsetMs': s.offsetMs,
+      'fromMs': s.fromMs,
+      'toMs': s.toMs,
+    };
+    return {
+      'score': score,
+      'best': best,
+      'uniform': {...shift(uniform), 'score': uniformScore},
+      'windows': [
+        for (final w in windows)
+          {...shift(w.shift), 'startMs': w.startMs, 'endMs': w.endMs},
+      ],
+    };
+  }
+
+  final double score, best, uniformScore;
+  final TimingShift uniform;
+  final List<({TimingShift shift, int startMs, int endMs})> windows;
 }
 
 class Timeline {
-  Timeline(this.durationMs, this.density, this.fever, this.windows);
+  Timeline(
+    this.durationMs,
+    this.density,
+    this.fever,
+    this.windows, [
+    this.timing,
+  ]);
   factory Timeline.fromJson(Map<String, Object?> json) => Timeline(
     intOf(json['durationMs']),
     intListOf(json['density']),
@@ -100,6 +173,7 @@ class Timeline {
       for (final row in json['windows'] as List)
         SkillWindow.fromJson(objectRow(row)),
     ],
+    OrderTiming.fromJson(json['timing']),
   );
   Map<String, Object?> toJson() => {
     'durationMs': durationMs,
@@ -108,6 +182,7 @@ class Timeline {
       for (final r in fever) [r.$1, r.$2],
     ],
     'windows': [for (final w in windows) w.toJson()],
+    if (timing != null) 'timing': timing!.toJson(),
   };
   final int durationMs;
 
@@ -115,6 +190,7 @@ class Timeline {
   final List<int> density;
   final List<(int, int)> fever;
   final List<SkillWindow> windows;
+  final OrderTiming? timing;
 }
 
 typedef _Call = (
