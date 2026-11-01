@@ -33,6 +33,7 @@ import 'native_chart_document.dart';
 import 'native_chart_playback.dart';
 import 'native_chart_preferences.dart';
 import 'chart_overview_source.dart';
+import 'render_budget.dart';
 
 /// Normal selected-catalog chart path. The diagnostic native-renderer route is
 /// separate and retains its immutable visual comparison receipts.
@@ -93,9 +94,10 @@ class _NativeChartPlayerScreenState extends State<NativeChartPlayerScreen>
       player.document?.key == _document?.key &&
       player.canCoalesceFrameRequests;
 
-  late final Ticker _ticker = createTicker((_) async {
+  final _throttle = FrameThrottle();
+  late final Ticker _ticker = createTicker((elapsed) async {
     final player = _player;
-    if (player == null) return;
+    if (player == null || !_throttle.admit(elapsed)) return;
     if (_drainingFrames) {
       _pendingHardwareTick = _canContinueFrameDrain(player, _frameDebtEpoch);
       return;
@@ -200,7 +202,11 @@ class _NativeChartPlayerScreenState extends State<NativeChartPlayerScreen>
       if (widget.document case final document?) {
         doc = document;
       } else {
-        final api = CatalogSourceScope.resolve(context, api: widget.api, server: widget.server);
+        final api = CatalogSourceScope.resolve(
+          context,
+          api: widget.api,
+          server: widget.server,
+        );
         final song =
             widget.song ?? await api.catalog('songs', widget.songId) as Map;
         doc = await NativeChartDocument.fromSong(
@@ -257,6 +263,24 @@ class _NativeChartPlayerScreenState extends State<NativeChartPlayerScreen>
     });
   }
 
+  /// What failed to load, next to the action that loads it again.
+  Widget _failed(VoidCallback retry) {
+    final t = AppScope.of(context).text;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        spacing: 12,
+        children: [
+          Text(t('common.loading.failed', 'Loading failed')),
+          FilledButton.tonal(
+            onPressed: retry,
+            child: Text(t('common.actions.retry', 'Retry')),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _overview() => FutureBuilder<ChartOverviewSource>(
     future: _overviewFuture,
     builder: (context, snapshot) {
@@ -264,14 +288,7 @@ class _NativeChartPlayerScreenState extends State<NativeChartPlayerScreen>
         return const Center(child: CircularProgressIndicator());
       }
       if (snapshot.hasError) {
-        return Center(
-          child: FilledButton.tonal(
-            onPressed: () => setState(() => _loadOverview(_document!)),
-            child: Text(
-              AppScope.of(context).text('common.actions.retry', 'Retry'),
-            ),
-          ),
-        );
+        return _failed(() => setState(() => _loadOverview(_document!)));
       }
       final source = snapshot.data;
       if (source == null) {
@@ -895,7 +912,7 @@ class _NativeChartPlayerScreenState extends State<NativeChartPlayerScreen>
 
   @override
   Widget build(BuildContext context) => DisplayFrameRateScope(
-    targetHz: _watchMode ? 120 : null,
+    targetHz: _watchMode ? 60 : null,
     child: PlayerOrientationScope(
       landscape: _watchMode,
       child: _buildPlayer(context),
@@ -907,21 +924,14 @@ class _NativeChartPlayerScreenState extends State<NativeChartPlayerScreen>
         builder: (context, constraints) {
           final t = AppScope.of(context).text;
           final doc = _document, error = _error ?? player.error;
-          if (error != null) {
-            return Center(
-              child: FilledButton.tonal(
-                onPressed: _retry,
-                child: Text(t('common.actions.retry', 'Retry')),
-              ),
-            );
-          }
+          if (error != null) return _failed(_retry);
           if (doc == null) {
             return const Center(child: CircularProgressIndicator());
           }
           final viewport = (
             constraints.maxWidth,
             constraints.maxHeight,
-            MediaQuery.devicePixelRatioOf(context),
+            renderPixelRatio(context),
           );
           _queueViewport(
             player,
@@ -1023,12 +1033,7 @@ class _NativeChartPlayerScreenState extends State<NativeChartPlayerScreen>
       body: player == null
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-          ? Center(
-              child: FilledButton.tonal(
-                onPressed: _retry,
-                child: Text(t('common.actions.retry', 'Retry')),
-              ),
-            )
+          ? _failed(_retry)
           : !_watchMode
           ? _overview()
           : ListenableBuilder(

@@ -67,6 +67,7 @@ import 'story_seek_host.dart';
 import 'story_save_store.dart';
 import 'story_render_profile.dart';
 import '../stories/story_sequence.dart';
+import 'render_budget.dart';
 
 /// The ordinary selected-episode host. Media, source command history and the
 /// measured game UI run together; model availability is reported independently.
@@ -188,6 +189,7 @@ class _NativeStoryPlayerScreenState extends State<NativeStoryPlayerScreen>
   final _transitionSources = <String, Future<NativeStoryTransitionSource>>{};
   Completer<void> _uiReady = Completer<void>();
   late final Ticker _ticker = createTicker(_tick);
+  final _throttle = FrameThrottle();
 
   @override
   void initState() {
@@ -2903,6 +2905,7 @@ class _NativeStoryPlayerScreenState extends State<NativeStoryPlayerScreen>
   }
 
   void _tick(Duration elapsed) async {
+    if (!_throttle.admit(elapsed)) return;
     final player = _player, now = elapsed.inMicroseconds;
     final motionNow = _motionClock.elapsedMicroseconds;
     final motionDelta = _lastMotionTickerUs == 0
@@ -3799,9 +3802,7 @@ class _NativeStoryPlayerScreenState extends State<NativeStoryPlayerScreen>
                         height: stageHeight,
                         child: LayoutBuilder(
                           builder: (context, constraints) {
-                            final ratio = MediaQuery.devicePixelRatioOf(
-                              context,
-                            );
+                            final ratio = renderPixelRatio(context);
                             _pixelRatio = ratio;
                             final w = (constraints.maxWidth * ratio).round(),
                                 h = (constraints.maxHeight * ratio).round();

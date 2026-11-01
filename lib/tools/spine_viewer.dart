@@ -13,6 +13,7 @@ import '../shell/page.dart';
 import '../ui/detail.dart';
 import 'model_view.dart';
 import 'spine_runtime.dart';
+import '../rendering/render_budget.dart';
 
 class NativeSpineViewer extends StatefulWidget {
   const NativeSpineViewer({super.key, required this.id, required this.title});
@@ -35,7 +36,9 @@ class _NativeSpineViewerState extends State<NativeSpineViewer>
   Color? _background;
   StreamSubscription<void>? _accountChanges;
   Future<void>? _loading;
+  final _throttle = FrameThrottle();
   late final Ticker _ticker = createTicker((time) {
+    if (!_throttle.admit(time)) return;
     final delta = _last == null
         ? 0.0
         : (time - _last!).inMicroseconds / 1000000;
@@ -63,7 +66,8 @@ class _NativeSpineViewerState extends State<NativeSpineViewer>
       _api = api;
       _reload();
     }
-    final ticking = TickerMode.valuesOf(context).enabled && (_model?.playing ?? false);
+    final ticking =
+        TickerMode.valuesOf(context).enabled && (_model?.playing ?? false);
     if (ticking && !_ticker.isActive) {
       _last = null;
       _ticker.start();
@@ -164,8 +168,10 @@ class _NativeSpineViewerState extends State<NativeSpineViewer>
     final t = AppScope.of(context).text, model = _model;
     return ShellPage(
       title: widget.title,
-      status: SizedBox.square(dimension: 24,
-        child: _busy ? const CircularProgressIndicator(strokeWidth: 2) : null),
+      status: SizedBox.square(
+        dimension: 24,
+        child: _busy ? const CircularProgressIndicator(strokeWidth: 2) : null,
+      ),
       actions: [
         BarAction(
           icon: _fullscreen
@@ -195,12 +201,12 @@ class _NativeSpineViewerState extends State<NativeSpineViewer>
           label: t('media.models.labels.downloadModel', 'Download model ZIP'),
           onPressed: model == null || _busy
               ? null
-              : () => _action(
-                  () async {
-                    final bytes = await model.package();
-                    if (mounted && identical(_model, model)) await saveModelFile('${widget.id}.zip', bytes);
-                  },
-                ),
+              : () => _action(() async {
+                  final bytes = await model.package();
+                  if (mounted && identical(_model, model)) {
+                    await saveModelFile('${widget.id}.zip', bytes);
+                  }
+                }),
         ),
       ],
       body: model == null

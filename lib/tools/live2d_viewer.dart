@@ -16,6 +16,7 @@ import '../shell/page.dart';
 import '../ui/detail.dart';
 import 'live2d_runtime.dart';
 import 'model_view.dart';
+import '../rendering/render_budget.dart';
 
 class NativeLive2DViewer extends StatefulWidget {
   const NativeLive2DViewer({super.key, required this.id, required this.title});
@@ -46,7 +47,9 @@ class _NativeLive2DViewerState extends State<NativeLive2DViewer>
   Color? _background;
   StreamSubscription<void>? _accountChanges;
   Future<void>? _loading;
+  final _throttle = FrameThrottle();
   late final Ticker _ticker = createTicker((time) {
+    if (!_throttle.admit(time)) return;
     final delta = _last == null
         ? 0.0
         : (time - _last!).inMicroseconds / 1000000;
@@ -409,10 +412,8 @@ class _NativeLive2DViewerState extends State<NativeLive2DViewer>
                         transform: _transform,
                         drag: _drag,
                         painter: NativeLive2DPainter(model, _background),
-                        onViewport: (size) => model.configure(
-                          size,
-                          MediaQuery.devicePixelRatioOf(context),
-                        ),
+                        onViewport: (size) =>
+                            model.configure(size, renderPixelRatio(context)),
                         onLook: _sway
                             ? (point) => model.look(point, sway: true)
                             : null,
