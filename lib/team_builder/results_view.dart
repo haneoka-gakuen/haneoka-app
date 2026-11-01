@@ -1788,37 +1788,244 @@ class _SkillOrdersState extends State<_SkillOrders> {
     );
   }
 
-  String _shift(TimingShift shift) {
-    final early = shift.offsetMs < 0;
-    final ends = [shift.fromMs.abs(), shift.toMs.abs()]..sort();
-    return ends.first == ends.last || shift.fromMs.sign != shift.toMs.sign
-        ? c.tb(
-            early ? 'timingEarly' : 'timingLate',
-            early ? '{ms} ms early' : '{ms} ms late',
-            {'ms': shift.offsetMs.abs()},
-          )
-        : c.tb(
-            early ? 'timingEarlyRange' : 'timingLateRange',
-            early ? '{from}–{to} ms early' : '{from}–{to} ms late',
-            {'from': ends.first, 'to': ends.last},
-          );
-  }
-
-  /// The order's best score with judgement timing and the offsets reaching it.
+  /// The order's score with the timed notes hit early.
   Widget? _timingChip(OrderTiming? timing, String locale) {
     if (timing == null || timing.best <= timing.score) return null;
-    String seconds(int ms) => formatNumber(locale, ms / 1000, 1);
-    final how = timing.uniformScore == timing.best
-        ? _shift(timing.uniform)
-        : [
-            for (final w in timing.windows)
-              if (w.shift.offsetMs != 0)
-                '${c.tb('timingWindow', '{from}–{to} s', {'from': seconds(w.startMs), 'to': seconds(w.endMs)})} ${_shift(w.shift)}',
-          ].join(' / ');
     return ValueChip(
       label: c.tb('timingBest', 'Best timing'),
       value:
-          '${formatNumber(locale, timing.best)} +${formatNumber(locale, timing.best - timing.score)} / $how',
+          '${formatNumber(locale, timing.best)} +${formatNumber(locale, timing.best - timing.score)}',
+    );
+  }
+
+  static String _clock(int ms) {
+    final seconds = ms / 1000;
+    return '${seconds ~/ 60}:${(seconds % 60).toStringAsFixed(2).padLeft(5, '0')}';
+  }
+
+  /// Which notes to hit early: each counting window as a strip of its counted
+  /// notes with the step notes numbered, then each step's time and gain.
+  Widget _timingDetails(OrderTiming? timing, int order, String locale) {
+    if (timing == null || timing.best <= timing.score) {
+      return const SizedBox.shrink();
+    }
+    final theme = Theme.of(context), scheme = theme.colorScheme;
+    Widget badge(int step) => Container(
+      width: 20,
+      height: 20,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: scheme.primary),
+      child: Text(
+        '$step',
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: scheme.onPrimary,
+          fontWeight: FontWeight.w700,
+          height: 1,
+        ),
+      ),
+    );
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(Corner.large),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 8,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  c.tb('timingNotes', 'Notes to hit early'),
+                  style: theme.textTheme.titleSmall,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 2,
+                ),
+                decoration: ShapeDecoration(
+                  shape: const StadiumBorder(),
+                  color: scheme.primaryContainer,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  spacing: 4,
+                  children: [
+                    Icon(
+                      Symbols.fast_rewind_rounded,
+                      size: 16,
+                      color: scheme.onPrimaryContainer,
+                    ),
+                    Text(
+                      c.tb('timingAdvance', 'About {ms} ms early', {
+                        'ms': timing.advanceMs,
+                      }),
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: scheme.onPrimaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          for (final window in timing.windows.where((w) => w.steps.isNotEmpty))
+            () {
+              final member = _face(orders[order][window.event]);
+              final span = math.max(1, window.endMs - window.startMs);
+              final marked = {for (final s in window.steps) s.timeMs};
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: 8,
+                children: [
+                  Row(
+                    spacing: 8,
+                    children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: member.color, width: 2),
+                          borderRadius: BorderRadius.circular(Corner.small),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: AppImage(
+                          candidates: [
+                            c.catalog!.characterFace(member.character),
+                          ],
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          member.name,
+                          style: theme.textTheme.labelLarge,
+                        ),
+                      ),
+                      Text(
+                        '${_clock(window.startMs)} – ${_clock(window.endMs)}',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(
+                    height: 52,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final width = constraints.maxWidth - 20;
+                        double x(int ms) =>
+                            10 + (ms - window.startMs) / span * width;
+                        return Stack(
+                          children: [
+                            Positioned(
+                              left: 10,
+                              right: 10,
+                              top: 25,
+                              height: 2,
+                              child: ColoredBox(color: scheme.outlineVariant),
+                            ),
+                            for (final ms in {...window.notes})
+                              if (!marked.contains(ms))
+                                Positioned(
+                                  left: x(ms) - 3,
+                                  top: 23,
+                                  width: 6,
+                                  height: 6,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: scheme.outline,
+                                    ),
+                                  ),
+                                ),
+                            for (final s in window.steps)
+                              Positioned(
+                                left: x(s.timeMs) - 10,
+                                top: s.step.isOdd ? 3 : 29,
+                                child: badge(s.step),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  for (final (index, s) in window.steps.indexed)
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        border: index == 0
+                            ? null
+                            : Border(
+                                top: BorderSide(color: scheme.outlineVariant),
+                              ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          spacing: 8,
+                          children: [
+                            badge(s.step),
+                            Expanded(
+                              child: Text(
+                                c.tb('timingStep', 'Step {step}', {
+                                  'step': s.step,
+                                }),
+                              ),
+                            ),
+                            Text(_clock(s.timeMs)),
+                            if (s.notes > 1)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 1,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: scheme.secondaryContainer,
+                                  borderRadius: BorderRadius.circular(
+                                    Corner.extraSmall,
+                                  ),
+                                ),
+                                child: Text(
+                                  c.tb('timingChord', '{count} together', {
+                                    'count': s.notes,
+                                  }),
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    color: scheme.onSecondaryContainer,
+                                  ),
+                                ),
+                              ),
+                            SizedBox(
+                              width: 64,
+                              child: Text(
+                                '+${formatNumber(locale, s.gain)}',
+                                textAlign: TextAlign.end,
+                                style: TextStyle(color: scheme.primary),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            }(),
+          Text(
+            c.tb(
+              'timingFirstNotes',
+              'Hit the first notes after activation as usual',
+            ),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1960,6 +2167,11 @@ class _SkillOrdersState extends State<_SkillOrders> {
                   const SizedBox.shrink(),
             ),
           ],
+        ),
+        FutureBuilder<Timeline>(
+          future: _timeline(current),
+          builder: (context, snapshot) =>
+              _timingDetails(snapshot.data?.timing, current, locale),
         ),
         const SizedBox(height: 12),
         FutureBuilder<Timeline>(

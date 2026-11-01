@@ -94,64 +94,62 @@ class TimelineRequest {
   final Map<String, Object?>? timing;
 }
 
-/// A timing offset that keeps every judgement (negative is early) and the
-/// offsets around it reaching the same score.
-typedef TimingShift = ({int offsetMs, int fromMs, int toMs});
-
-/// Best judgement timing of one order for cumulative snapshots.
-class OrderTiming {
-  OrderTiming(
-    this.score,
-    this.best,
-    this.uniform,
-    this.uniformScore,
-    this.windows,
-  );
-  static OrderTiming? fromJson(Object? value) {
-    if (value is! Map) return null;
-    final json = objectRow(value);
-    TimingShift shift(Map<String, Object?> row) => (
-      offsetMs: intOf(row['offsetMs']),
-      fromMs: intOf(row['fromMs']),
-      toMs: intOf(row['toMs']),
-    );
-    final uniform = objectRow(json['uniform']);
-    return OrderTiming(
-      numOf(json['score']).toDouble(),
-      numOf(json['best']).toDouble(),
-      shift(uniform),
-      numOf(uniform['score']).toDouble(),
-      [
-        for (final row in json['windows'] as List)
+/// A cumulative snapshot's counting window: its counted notes and the steps
+/// whose notes are hit one frame early.
+class TimingWindow {
+  TimingWindow.fromJson(Map<String, Object?> json)
+    : event = intOf(json['event']),
+      startMs = intOf(json['startMs']),
+      endMs = intOf(json['endMs']),
+      unit = intOf(json['unit']),
+      notes = intListOf(json['notes']),
+      steps = [
+        for (final row in json['steps'] as List)
           (
-            shift: shift(objectRow(row)),
-            startMs: intOf(objectRow(row)['startMs']),
-            endMs: intOf(objectRow(row)['endMs']),
+            step: intOf(objectRow(row)['step']),
+            timeMs: intOf(objectRow(row)['timeMs']),
+            notes: intOf(objectRow(row)['notes']),
+            gain: numOf(objectRow(row)['gain']),
           ),
-      ],
-    );
-  }
+      ];
+  Map<String, Object?> toJson() => {
+    'event': event,
+    'startMs': startMs,
+    'endMs': endMs,
+    'unit': unit,
+    'notes': notes,
+    'steps': [
+      for (final s in steps)
+        {'step': s.step, 'timeMs': s.timeMs, 'notes': s.notes, 'gain': s.gain},
+    ],
+  };
+  final int event, startMs, endMs, unit;
+  final List<int> notes;
+  final List<({int step, int timeMs, int notes, double gain})> steps;
+}
 
-  Map<String, Object?> toJson() {
-    Map<String, Object?> shift(TimingShift s) => {
-      'offsetMs': s.offsetMs,
-      'fromMs': s.fromMs,
-      'toMs': s.toMs,
-    };
-    return {
-      'score': score,
-      'best': best,
-      'uniform': {...shift(uniform), 'score': uniformScore},
-      'windows': [
-        for (final w in windows)
-          {...shift(w.shift), 'startMs': w.startMs, 'endMs': w.endMs},
-      ],
-    };
-  }
-
-  final double score, best, uniformScore;
-  final TimingShift uniform;
-  final List<({TimingShift shift, int startMs, int endMs})> windows;
+/// Best judgement timing of one order for cumulative snapshots
+/// (`live::timing`).
+class OrderTiming {
+  OrderTiming.fromJson(Map<String, Object?> json)
+    : score = numOf(json['score']),
+      best = numOf(json['best']),
+      advanceMs = intOf(json['advanceMs']),
+      windows = [
+        for (final row in json['windows'] as List)
+          TimingWindow.fromJson(objectRow(row)),
+      ];
+  static OrderTiming? parse(Object? value) =>
+      value is Map ? OrderTiming.fromJson(objectRow(value)) : null;
+  Map<String, Object?> toJson() => {
+    'score': score,
+    'best': best,
+    'advanceMs': advanceMs,
+    'windows': [for (final w in windows) w.toJson()],
+  };
+  final double score, best;
+  final int advanceMs;
+  final List<TimingWindow> windows;
 }
 
 class Timeline {
@@ -173,7 +171,7 @@ class Timeline {
       for (final row in json['windows'] as List)
         SkillWindow.fromJson(objectRow(row)),
     ],
-    OrderTiming.fromJson(json['timing']),
+    OrderTiming.parse(json['timing']),
   );
   Map<String, Object?> toJson() => {
     'durationMs': durationMs,
