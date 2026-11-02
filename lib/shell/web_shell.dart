@@ -137,9 +137,9 @@ class _WebShellState extends State<WebShell> {
             AppScope.of(context).setServer(server!);
           }
           if (!userScript) unawaited(controller.runJavaScript(script));
-          if (_error != null || _loaded || !mounted) return;
-          _slowTimer?.cancel();
-          setState(() => _loaded = true);
+          // A page that never reports its first paint still replaces the
+          // launch page, a moment after it finished loading.
+          Future<void>.delayed(const Duration(seconds: 3), _showPage);
         },
         onWebResourceError: (error) {
           if (error.isForMainFrame == false || !mounted) return;
@@ -198,6 +198,12 @@ class _WebShellState extends State<WebShell> {
             : '${decoded.last}'.trim(),
       );
     }
+  }
+
+  void _showPage() {
+    if (_error != null || _loaded || !mounted) return;
+    _slowTimer?.cancel();
+    setState(() => _loaded = true);
   }
 
   /// A connection that takes long says so on the launch page; the load goes on.
@@ -354,6 +360,8 @@ class _WebShellState extends State<WebShell> {
     }
     final args = (message['args'] as Map?)?.cast<String, Object?>() ?? {};
     switch (message['method']) {
+      case 'painted':
+        return _showPage();
       case 'theme':
         if (_error != null) return;
         if (PageTheme.read(args, _theme) case final theme?) {

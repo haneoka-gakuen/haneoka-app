@@ -221,6 +221,8 @@ const _script = r'''
   };
   const watch = () => {
     theme();
+    // The app keeps its launch page up until the page has actually drawn.
+    requestAnimationFrame(() => requestAnimationFrame(() => post({ method: "painted", args: {} })));
     const own = (node) => node instanceof HTMLStyleElement && "haneokaApp" in node.dataset;
     new MutationObserver((records) => {
       if (records.some((record) => record.type !== "childList" || ![...record.addedNodes, ...record.removedNodes].every(own))) queue();

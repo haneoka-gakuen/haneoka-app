@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 import '../core/net.dart';
@@ -11,7 +10,6 @@ import '../save/game_save.dart';
 import '../save/save_view.dart';
 
 const _origin = 'https://haneoka.org';
-const _tokenKey = 'haneoka-session';
 
 /// A player linked to the Haneoka account (`community_game_account`).
 class LinkedPlayer {
@@ -60,8 +58,6 @@ class HaneokaAccount extends ChangeNotifier {
   HaneokaAccount._();
   static final HaneokaAccount instance = HaneokaAccount._();
 
-  static const _storage = FlutterSecureStorage();
-
   /// The web view's cookies for the site, provided by the web shell.
   static Future<String?> Function()? siteCookies;
 
@@ -92,10 +88,6 @@ class HaneokaAccount extends ChangeNotifier {
   Future<void> load() async {
     if (_loaded) return;
     _loaded = true;
-    try {
-      // Earlier versions kept a session of their own; the site's is used now.
-      await _storage.delete(key: _tokenKey);
-    } catch (_) {}
     await refresh();
   }
 

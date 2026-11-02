@@ -2,6 +2,10 @@
 cmake_minimum_required(VERSION 3.14)
 project(haneoka LANGUAGES CXX)
 
+# webview_all_windows still includes <experimental/coroutine>, which current
+# MSVC rejects unless this is defined.
+add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
 set(BINARY_NAME "haneoka")
