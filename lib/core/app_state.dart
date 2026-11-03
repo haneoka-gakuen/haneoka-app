@@ -6,13 +6,11 @@ import 'i18n.dart';
 /// What the native account screens need from the app: the release server,
 /// the website's text in the page's language and the API client.
 class AppState extends ChangeNotifier {
-  AppState(this.server, this.text) : api = HaneokaApi(server: server) {
-    _apis[server] = api;
-  }
+  AppState(this.server, this.text);
 
   String server;
   SiteText text;
-  HaneokaApi api;
+  HaneokaApi get api => apiFor(server);
   final _apis = <String, HaneokaApi>{};
 
   /// The website's own song-title choice is not visible natively; titles use
@@ -42,7 +40,6 @@ class AppState extends ChangeNotifier {
   void setServer(String value) {
     if (value == server) return;
     server = value;
-    api = apiFor(value);
     notifyListeners();
   }
 }
