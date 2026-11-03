@@ -62,6 +62,7 @@ class _WebShellState extends State<WebShell> {
   final _links = AppLinks();
   StreamSubscription<Uri>? _linkSubscription;
   bool _loaded = false;
+  bool _launchVisible = true;
 
   /// The main frame's load error, shown on the launch page with Retry.
   String? _error;
@@ -280,6 +281,7 @@ class _WebShellState extends State<WebShell> {
     setState(() {
       _error = error;
       _loaded = false;
+      _launchVisible = true;
     });
   }
 
@@ -479,8 +481,11 @@ class _WebShellState extends State<WebShell> {
           if (theme.locale case final locale?) {
             unawaited(state.setLocale(locale));
           }
+          final backgroundChanged = theme.background != _theme.background;
           widget.theme.value = theme;
-          unawaited(_controller.setBackgroundColor(theme.background));
+          if (backgroundChanged) {
+            unawaited(_controller.setBackgroundColor(theme.background));
+          }
         }
         return;
       case 'download':
@@ -685,28 +690,37 @@ class _WebShellState extends State<WebShell> {
                           key: ValueKey(controller),
                           controller: controller,
                         ),
-                      IgnorePointer(
-                        ignoring: _loaded,
-                        child: AnimatedOpacity(
-                          opacity: _loaded ? 0 : 1,
-                          duration: const Duration(milliseconds: 250),
-                          child: LaunchScreen(
-                            t: _t,
-                            progress: _progress,
-                            slow: _slow,
-                            error: _error,
-                            errorTitle: _initialized
-                                ? _t['offline']
-                                : _t['startupFailed'],
-                            onRetry: _retry,
-                            onSaves: _openSaves,
-                            onOpenBrowser: () => launchUrl(
-                              _requestedPage ?? _home,
-                              mode: LaunchMode.externalApplication,
+                      if (_launchVisible)
+                        IgnorePointer(
+                          ignoring: _loaded,
+                          child: AnimatedOpacity(
+                            opacity: _loaded ? 0 : 1,
+                            duration: const Duration(milliseconds: 250),
+                            onEnd: () {
+                              if (mounted && _loaded) {
+                                setState(() => _launchVisible = false);
+                              }
+                            },
+                            child: TickerMode(
+                              enabled: !_loaded,
+                              child: LaunchScreen(
+                                t: _t,
+                                progress: _progress,
+                                slow: _slow,
+                                error: _error,
+                                errorTitle: _initialized
+                                    ? _t['offline']
+                                    : _t['startupFailed'],
+                                onRetry: _retry,
+                                onSaves: _openSaves,
+                                onOpenBrowser: () => launchUrl(
+                                  _requestedPage ?? _home,
+                                  mode: LaunchMode.externalApplication,
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),

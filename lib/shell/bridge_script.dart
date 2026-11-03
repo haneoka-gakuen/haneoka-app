@@ -93,10 +93,11 @@ const _script = r'''
   // The colour the page shows at its top or bottom edge, as it will be once a
   // running colour transition ends, so the system bars change with the page.
   const rgba = (value) => {
-    const match = /rgba?\(([^)]+)\)/u.exec(value || "");
+    const match = /^(?:rgba?\(|color\(srgb\s+)([^)]+)\)/u.exec(value || "");
     if (!match) return null;
     const [r, g, b, a = 1] = match[1].split(/[\s,/]+/u).filter(Boolean).map(Number);
-    return { r, g, b, a };
+    const scale = value.startsWith("color(") ? 255 : 1;
+    return { r: r * scale, g: g * scale, b: b * scale, a };
   };
   const over = (top, bottom) => {
     const a = top.a + bottom.a * (1 - top.a);
@@ -104,40 +105,58 @@ const _script = r'''
     const mix = (key) => (top[key] * top.a + bottom[key] * bottom.a * (1 - top.a)) / a;
     return { r: mix("r"), g: mix("g"), b: mix("b"), a };
   };
+  const edgeSelector = ".app-shell, .app-shell__body, .top-app-bar, .scrim, .sheet-scrim, .sheet, dialog, [popover], [data-app-fullscreen]";
   let duration = 0;
+  let styles, animations, opacities, surfaces, fills, boxes, backdrops;
+  const cached = (cache, element, read) => {
+    if (!cache.has(element)) cache.set(element, read(element));
+    return cache.get(element);
+  };
+  const computed = (element) => cached(styles, element, (node) => getComputedStyle(node));
+  const motion = (element) => cached(animations, element, (node) => node.getAnimations?.() ?? []);
+  const box = (element) => cached(boxes, element, (node) => node.getBoundingClientRect());
+  const contains = (element, x, y) => {
+    const rect = box(element);
+    return x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom
+      && computed(element).visibility !== "hidden";
+  };
   const target = (element, property, current) => {
-    const transition = element.getAnimations?.().find((animation) => animation.transitionProperty === property);
+    const transition = motion(element).find((animation) => animation.transitionProperty === property);
     if (!transition) return current;
     const timing = transition.effect.getComputedTiming();
     duration = Math.max(duration, Math.max(0, timing.endTime - (transition.currentTime ?? 0)));
     return transition.effect.getKeyframes().at(-1)?.[property === "background-color" ? "backgroundColor" : property] ?? current;
   };
-  const fill = (element) => {
-    const colour = rgba(target(element, "background-color", getComputedStyle(element).backgroundColor));
-    if (!colour) return null;
-    let opacity = 1;
-    for (let node = element; node; node = node.parentElement) opacity *= Number(target(node, "opacity", getComputedStyle(node).opacity));
-    return { ...colour, a: colour.a * opacity };
-  };
+  const opacity = (element) => element ? cached(opacities, element, (node) =>
+    Number(target(node, "opacity", computed(node).opacity)) * opacity(node.parentElement)) : 1;
+  const fill = (element) => cached(fills, element, (node) => {
+    const colour = rgba(target(node, "background-color", computed(node).backgroundColor));
+    return colour ? { ...colour, a: colour.a * opacity(node) } : null;
+  });
   // Content scrolling past an edge is not the edge: use its scroll container.
-  const surface = (element) => {
-    let found = element;
-    for (let node = element; node && node !== document.body; node = node.parentElement) {
-      const { overflowY } = getComputedStyle(node);
-      if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight) found = node;
+  const surface = (element) => cached(surfaces, element, (node) => {
+    let found = node;
+    for (let parent = node; parent && parent !== document.body; parent = parent.parentElement) {
+      const { overflowY } = computed(parent);
+      if ((overflowY === "auto" || overflowY === "scroll") && parent.scrollHeight > parent.clientHeight) found = parent;
+      if (computed(parent).position === "fixed") break;
     }
     return found;
-  };
+  });
+  let underneath = [];
   // Every layer painted at one point, composited top-down: page, scrims, sheets.
   const point = (x, y) => {
     let colour = { r: 0, g: 0, b: 0, a: 0 };
     const seen = new Set();
-    for (const hit of document.elementsFromPoint(x, y)) {
+    // Modal inertness hides the underlying shell from hit testing, not from paint.
+    const hits = [...document.elementsFromPoint(x, y).filter((node) => !underneath.includes(node) && !node.closest(".nav, .nav-scrim")),
+      ...underneath.filter((node) => contains(node, x, y))];
+    for (const hit of hits) {
       if (colour.a >= 0.99) break;
-      if (hit instanceof HTMLDialogElement && hit.open) {
-        const box = hit.getBoundingClientRect();
-        if (y < box.top || y > box.bottom || x < box.left || x > box.right) {
-          const scrim = rgba(getComputedStyle(hit, "::backdrop").backgroundColor);
+      if (hit instanceof HTMLDialogElement && hit.matches(":modal")) {
+        const rect = box(hit);
+        if (y < rect.top || y > rect.bottom || x < rect.left || x > rect.right) {
+          const scrim = cached(backdrops, hit, (node) => rgba(getComputedStyle(node, "::backdrop").backgroundColor));
           if (scrim && scrim.a > 0) colour = over(colour, scrim);
           continue;
         }
@@ -148,18 +167,19 @@ const _script = r'''
       const own = fill(layer);
       if (own && own.a > 0) colour = over(colour, own);
     }
-    const page = rgba(getComputedStyle(document.documentElement).backgroundColor);
+    const page = rgba(computed(document.documentElement).backgroundColor);
     return colour.a < 0.99 ? over(colour, page && page.a ? page : { r: 255, g: 255, b: 255, a: 1 }) : colour;
   };
   // Colour runs along one edge, as fractions of its width.
   const edge = (y) => {
     const runs = [];
     const step = 4;
-    for (let x = step / 2; x < innerWidth; x += step) {
-      const colour = css(point(x, y));
+    for (let start = 0; start < innerWidth; start += step) {
+      const width = Math.min(step, innerWidth - start);
+      const color = css(point(start + width / 2, y));
       const last = runs.at(-1);
-      if (last?.color === colour) last.width += step;
-      else runs.push({ color: colour, width: step });
+      if (last?.color === color) last.width += width;
+      else runs.push({ color, width });
     }
     return runs.map((run) => ({ color: run.color, width: run.width / innerWidth }));
   };
@@ -167,24 +187,21 @@ const _script = r'''
   const token = (style, name) => style.getPropertyValue(name).trim();
   let reported = "";
   const theme = () => {
-    const root = getComputedStyle(document.documentElement);
+    if (document.hidden || fullscreen) return;
+    styles = new WeakMap(); animations = new WeakMap(); opacities = new WeakMap();
+    surfaces = new WeakMap(); fills = new WeakMap(); boxes = new WeakMap(); backdrops = new WeakMap();
+    const root = computed(document.documentElement);
     duration = 0;
-    // Hit testing skips inert and pointer-events: none content that is still
-    // painted; lift both for this synchronous read, before any frame.
-    const inert = [...document.querySelectorAll("[inert]")];
-    for (const element of inert) element.inert = false;
-    const hits = document.createElement("style");
-    hits.dataset.haneokaApp = "";
-    hits.textContent = "* { pointer-events: auto !important; }";
-    document.documentElement.append(hits);
-    let top, bottom;
-    try {
-      top = edge(1);
-      bottom = edge(innerHeight - 1);
-    } finally {
-      hits.remove();
-      for (const element of inert) element.inert = true;
-    }
+    underneath = [".top-app-bar", ".app-shell__main", ".app-shell", "body", "html"]
+      .map((selector) => document.querySelector(selector)).filter(Boolean);
+    const overlays = [...document.querySelectorAll(".scrim, .sheet-scrim, .sheet.is-open, dialog[open], [popover]")];
+    const covered = (y) => overlays.some((node) => {
+      const rect = box(node);
+      return rect.width > 0 && rect.top <= y && rect.bottom > y && computed(node).visibility !== "hidden";
+    });
+    const colours = (y) => document.querySelector("[data-shell]") && !covered(y)
+      ? [{ color: css(point(innerWidth / 2, y)), width: 1 }] : edge(y);
+    const top = colours(1), bottom = colours(innerHeight - 1);
     const message = {
       method: "theme",
       args: {
@@ -192,7 +209,7 @@ const _script = r'''
         bar: top,
         bottom,
         duration: Math.round(duration),
-        background: getComputedStyle(document.body).backgroundColor,
+        background: computed(document.body).backgroundColor,
         locale: document.documentElement.dataset.locale || document.documentElement.lang,
         colors: Object.fromEntries(
           ["primary", "on-primary", "primary-container", "on-primary-container", "secondary", "on-secondary",
@@ -209,15 +226,22 @@ const _script = r'''
     reported = text;
     channel.postMessage(JSON.stringify(message));
   };
+  const spatial = new Set(["transform", "translate", "scale", "width", "height", "left", "right", "top", "bottom", "clip-path"]);
+  const moving = (animation) => {
+    if (animation.playState !== "running" || animation.effect?.getComputedTiming().activeDuration === Infinity) return false;
+    if (animation.transitionProperty) return spatial.has(animation.transitionProperty);
+    return animation.effect.getKeyframes().some((frame) => Object.keys(frame).some((key) => spatial.has(key) || key === "opacity"));
+  };
   let queued = false;
   const queue = () => {
-    if (queued) return;
+    if (queued || document.hidden) return;
     queued = true;
     requestAnimationFrame(() => {
       queued = false;
       theme();
       // Follow motion (a sliding drawer, a fading scrim) until it settles.
-      if (document.getAnimations().some((animation) => animation.playState === "running" && animation.effect?.getComputedTiming().activeDuration !== Infinity)) queue();
+      if (!fullscreen && [...document.querySelectorAll(edgeSelector), document.documentElement].some((node) =>
+        node.getAnimations().some(moving))) queue();
     });
   };
   const watch = () => {
@@ -226,19 +250,26 @@ const _script = r'''
       post({ method: "painted", args: {} });
     }));
     theme();
-    const own = (node) => node instanceof HTMLStyleElement && "haneokaApp" in node.dataset;
+    const affects = (node) => node instanceof Element && (
+      node === document.documentElement || node === document.body || node.matches(edgeSelector)
+    );
     new MutationObserver((records) => {
-      if (records.some((record) => record.type !== "childList" || ![...record.addedNodes, ...record.removedNodes].every(own))) queue();
+      if (records.some((record) => affects(record.target) || (record.type === "childList" &&
+        [...record.addedNodes, ...record.removedNodes].some((node) => node instanceof Element &&
+          (node.matches(edgeSelector) || node.querySelector(edgeSelector)))))) queue();
     }).observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["class", "open", "data-theme", "hidden"],
+      attributeFilter: ["class", "style", "open", "data-theme", "data-nav", "data-locale", "lang", "hidden"],
       childList: true,
       subtree: true,
     });
-    for (const type of ["scroll", "transitionstart", "transitionend", "animationstart", "animationend", "resize"]) addEventListener(type, queue, { capture: true, passive: true });
+    // The app bar's scroll state changes its class; content scrolling keeps the same edge surfaces.
+    for (const type of ["transitionstart", "transitionend", "transitioncancel", "animationstart", "animationend", "animationcancel"]) {
+      addEventListener(type, (event) => { if (affects(event.target)) queue(); }, { capture: true, passive: true });
+    }
+    for (const type of ["resize", "pageshow"]) addEventListener(type, queue);
+    for (const type of ["visibilitychange", "fullscreenchange", "astro:after-swap"]) document.addEventListener(type, queue);
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", queue);
-    addEventListener("pageshow", queue);
-    document.addEventListener("astro:after-swap", queue);
   };
   if (document.readyState === "loading") addEventListener("DOMContentLoaded", watch, { once: true });
   else watch();
