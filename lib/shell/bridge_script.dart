@@ -205,7 +205,9 @@ const _script = r'''
     });
     const colours = (y) => document.querySelector("[data-shell]") && !covered(y)
       ? [{ color: css(point(innerWidth / 2, y)), width: 1 }] : edge(y);
-    const top = colours(1), bottom = colours(innerHeight - 1);
+    const header = document.querySelector(".top-app-bar") || document.body;
+    const top = [{ color: target(header, "background-color", computed(header).backgroundColor), width: 1 }];
+    const bottom = colours(innerHeight - 1);
     const message = {
       method: "theme",
       args: {
