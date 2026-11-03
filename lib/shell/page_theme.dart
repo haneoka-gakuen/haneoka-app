@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 /// The page's own Material colours, so native bars and sheets are the
 /// website's surfaces rather than a second theme.
 class PageTheme {
-  const PageTheme({
+  PageTheme({
     required this.dark,
     required this.bar,
     required this.bottom,
@@ -11,12 +11,17 @@ class PageTheme {
     required this.background,
     required this.scheme,
     required this.locale,
-  });
+    ThemeData? data,
+  }) : _inheritedData = data;
+
+  final ThemeData? _inheritedData;
 
   final bool dark;
 
-  /// What the page shows at its top and bottom edges, under the system bars.
+  /// The top app bar background, used for the system status bar.
   final List<EdgeRun> bar;
+
+  /// The page surface at the bottom system bar.
   final List<EdgeRun> bottom;
 
   /// The page's own colour transition, so the bars change in step with it.
@@ -47,10 +52,13 @@ class PageTheme {
     final colors = message['colors'];
     final dark = message['dark'] == true;
     Color? token(String name) => colors is Map ? cssColor(colors[name]) : null;
-    final base = ColorScheme.fromSeed(
-      seedColor: token('primary') ?? previous.scheme.primary,
-      brightness: dark ? Brightness.dark : Brightness.light,
-    );
+    final seed = token('primary') ?? previous.scheme.primary;
+    final base = previous.dark == dark && previous.scheme.primary == seed
+        ? previous.scheme
+        : ColorScheme.fromSeed(
+            seedColor: seed,
+            brightness: dark ? Brightness.dark : Brightness.light,
+          );
     final scheme = base.copyWith(
       primary: token('primary'),
       onPrimary: token('on-primary'),
@@ -88,6 +96,9 @@ class PageTheme {
       ),
       background: background,
       scheme: scheme,
+      data: scheme == previous.scheme && background == previous.background
+          ? previous.data
+          : null,
       locale: switch (message['locale']) {
         final String tag when tag.isNotEmpty => tag,
         _ => null,
@@ -95,16 +106,20 @@ class PageTheme {
     );
   }
 
-  ThemeData get data => ThemeData(
-    colorScheme: scheme,
-    scaffoldBackgroundColor: background,
-    snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
-    bottomSheetTheme: BottomSheetThemeData(
-      backgroundColor: scheme.surfaceContainerLow,
-      showDragHandle: true,
-    ),
-    listTileTheme: const ListTileThemeData(minVerticalPadding: 12),
-  );
+  late final ThemeData data =
+      _inheritedData ??
+      ThemeData(
+        colorScheme: scheme,
+        scaffoldBackgroundColor: background,
+        snackBarTheme: const SnackBarThemeData(
+          behavior: SnackBarBehavior.floating,
+        ),
+        bottomSheetTheme: BottomSheetThemeData(
+          backgroundColor: scheme.surfaceContainerLow,
+          showDragHandle: true,
+        ),
+        listTileTheme: const ListTileThemeData(minVerticalPadding: 12),
+      );
 }
 
 /// One stretch of an edge in one colour; [width] is a fraction of the edge.
