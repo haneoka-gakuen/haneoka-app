@@ -738,7 +738,7 @@ class _WebShellState extends State<WebShell> {
   }
 }
 
-/// What the page shows along one edge, drawn under a system bar.
+/// The page supplies the background drawn under a system bar.
 class _Edge extends StatelessWidget {
   const _Edge({
     required this.runs,

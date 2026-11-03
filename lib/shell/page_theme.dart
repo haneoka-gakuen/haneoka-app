@@ -18,8 +18,10 @@ class PageTheme {
 
   final bool dark;
 
-  /// What the page shows at its top and bottom edges, under the system bars.
+  /// The top app bar background, used for the system status bar.
   final List<EdgeRun> bar;
+
+  /// The page surface at the bottom system bar.
   final List<EdgeRun> bottom;
 
   /// The page's own colour transition, so the bars change in step with it.

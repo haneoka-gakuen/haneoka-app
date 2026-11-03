@@ -157,7 +157,7 @@ const _script = r'''
     }
     for (const hit of hits) {
       if (colour.a >= 0.99) break;
-      if (hit instanceof HTMLDialogElement && hit.matches(":modal")) {
+      if (hit.localName === "dialog" && hit.open) {
         const rect = box(hit);
         if (y < rect.top || y > rect.bottom || x < rect.left || x > rect.right) {
           const scrim = cached(backdrops, hit, (node) => rgba(getComputedStyle(node, "::backdrop").backgroundColor));
