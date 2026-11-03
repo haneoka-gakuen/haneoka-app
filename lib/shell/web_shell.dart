@@ -83,7 +83,11 @@ class _WebShellState extends State<WebShell> {
     SiteLinks.load = _loadPage;
     AccountStore.instance.addListener(_accountsChanged);
     HaneokaAccount.siteCookies = _siteCookies;
-    unawaited(_start());
+    unawaited(
+      WidgetsBinding.instance.waitUntilFirstFrameRasterized.then((_) async {
+        if (mounted) await _start();
+      }),
+    );
   }
 
   @override

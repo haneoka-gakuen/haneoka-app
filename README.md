@@ -41,7 +41,7 @@ flutter run --dart-define=HANEOKA_ORIGIN=http://127.0.0.1:4319
 
 The website side of the bridge is `src/lib/app-bridge.ts` in the Haneoka repository: `boxAccount`, `gachaHistory` and `signIn`.
 
-The native launch screen renders before bundled text and WebView initialization. Initialization has a 20-second deadline; page loading has a separate 30-second deadline. A Haneoka document's first-paint signal or a document-readiness check reveals the page. Network and initialization failures retain Retry and Open in browser; game-save screens remain available without the website. Retrying keeps cookies, account data and imported saves.
+The native launch screen renders before bundled text and WebView initialization. Native public API clients are created on first use, keeping Cronet/JNI initialization out of app startup; the WebView starts after Flutter's first frame is rasterized. Intel Android builds use Skia for graphics compatibility. Initialization has a 20-second deadline; page loading has a separate 30-second deadline. A Haneoka document's first-paint signal or a document-readiness check reveals the page. Network and initialization failures retain Retry and Open in browser; game-save screens remain available without the website. Retrying keeps cookies, account data and imported saves.
 
 ## License
 
