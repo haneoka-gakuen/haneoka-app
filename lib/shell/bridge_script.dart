@@ -149,8 +149,12 @@ const _script = r'''
     let colour = { r: 0, g: 0, b: 0, a: 0 };
     const seen = new Set();
     // Modal inertness hides the underlying shell from hit testing, not from paint.
-    const hits = [...document.elementsFromPoint(x, y).filter((node) => !underneath.includes(node) && !node.closest(".nav, .nav-scrim")),
-      ...underneath.filter((node) => contains(node, x, y))];
+    const hits = document.elementsFromPoint(x, y).filter((node) => !node.closest(".nav, .nav-scrim"));
+    for (const node of underneath) {
+      if (hits.includes(node) || !contains(node, x, y)) continue;
+      const ancestor = hits.findIndex((hit) => hit.contains(node));
+      hits.splice(ancestor < 0 ? hits.length : ancestor, 0, node);
+    }
     for (const hit of hits) {
       if (colour.a >= 0.99) break;
       if (hit instanceof HTMLDialogElement && hit.matches(":modal")) {
