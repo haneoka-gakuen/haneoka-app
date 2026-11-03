@@ -32,6 +32,10 @@ class Strings {
 
 const _strings = <String, Map<String, String>>{
   'en': {
+    'startupFailed': 'Could not start the app',
+    'webviewFailed': 'Could not start the web view',
+    'loadTimeout': 'The page took too long to load',
+    'openBrowser': 'Open in browser',
     'slow': 'Still connecting. Check the network or proxy.',
     'loading': 'Loading {percent}%',
     'connecting': 'Connecting to haneoka.org',
@@ -86,6 +90,10 @@ const _strings = <String, Map<String, String>>{
     'saveFailed': 'Could not save the file',
   },
   'ja': {
+    'startupFailed': 'アプリを起動できませんでした',
+    'webviewFailed': 'Webビューを起動できませんでした',
+    'loadTimeout': 'ページの読み込みがタイムアウトしました',
+    'openBrowser': 'ブラウザーで開く',
     'slow': '接続に時間がかかっています。ネットワークまたはプロキシを確認してください。',
     'loading': '読み込み中 {percent}%',
     'connecting': 'haneoka.org に接続中',
@@ -140,6 +148,10 @@ const _strings = <String, Map<String, String>>{
     'saveFailed': 'ファイルを保存できませんでした',
   },
   'ko': {
+    'startupFailed': '앱을 시작할 수 없습니다',
+    'webviewFailed': '웹뷰를 시작할 수 없습니다',
+    'loadTimeout': '페이지 불러오기 시간이 초과되었습니다',
+    'openBrowser': '브라우저에서 열기',
     'slow': '연결이 지연되고 있습니다. 네트워크나 프록시를 확인하세요.',
     'loading': '불러오는 중 {percent}%',
     'connecting': 'haneoka.org에 연결 중',
@@ -194,6 +206,10 @@ const _strings = <String, Map<String, String>>{
     'saveFailed': '파일을 저장하지 못했습니다',
   },
   'zh-CN': {
+    'startupFailed': '应用启动失败',
+    'webviewFailed': '网页视图启动失败',
+    'loadTimeout': '网页加载超时',
+    'openBrowser': '在浏览器中打开',
     'slow': '连接较慢，请检查网络或代理。',
     'loading': '正在加载 {percent}%',
     'connecting': '正在连接 haneoka.org',
@@ -248,6 +264,10 @@ const _strings = <String, Map<String, String>>{
     'saveFailed': '无法保存文件',
   },
   'zh-TW': {
+    'startupFailed': '應用程式啟動失敗',
+    'webviewFailed': '網頁檢視啟動失敗',
+    'loadTimeout': '網頁載入逾時',
+    'openBrowser': '在瀏覽器中開啟',
     'slow': '連線較慢，請檢查網路或代理。',
     'loading': '正在載入 {percent}%',
     'connecting': '正在連線 haneoka.org',

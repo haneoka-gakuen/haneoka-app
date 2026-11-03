@@ -84,6 +84,7 @@ const _script = r'''
     screen.orientation.unlock = () => post({ method: "orientation", args: { orientation: "any" } });
   }
 
+  const installDocument = () => {
   // The app is what the download page offers.
   const style = document.createElement("style");
   style.textContent = '.nav li:has(> a[href$="/download/"]), .nav a[href$="/download/"] { display: none !important; }';
@@ -220,9 +221,11 @@ const _script = r'''
     });
   };
   const watch = () => {
+    if (!document.documentElement.dataset.locale || !document.querySelector("main")) return;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      post({ method: "painted", args: {} });
+    }));
     theme();
-    // The app keeps its launch page up until the page has actually drawn.
-    requestAnimationFrame(() => requestAnimationFrame(() => post({ method: "painted", args: {} })));
     const own = (node) => node instanceof HTMLStyleElement && "haneokaApp" in node.dataset;
     new MutationObserver((records) => {
       if (records.some((record) => record.type !== "childList" || ![...record.addedNodes, ...record.removedNodes].every(own))) queue();
@@ -261,5 +264,8 @@ const _script = r'''
     },
     true,
   );
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", installDocument, { once: true });
+  else installDocument();
 })();
 ''';

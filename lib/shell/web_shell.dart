@@ -7,7 +7,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:material_symbols_icons/symbols.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_all/webview_all.dart';
@@ -27,6 +26,7 @@ import '../save/account_store.dart';
 import '../save/export.dart';
 import '../save/player_refresh.dart';
 import 'bridge_script.dart';
+import 'launch.dart';
 import 'page_theme.dart';
 import 'pending_import.dart';
 import 'site.dart';
@@ -52,7 +52,13 @@ class WebShell extends StatefulWidget {
 }
 
 class _WebShellState extends State<WebShell> {
-  final _controller = WebViewController();
+  WebViewController? _web;
+  WebViewController get _controller => _web!;
+  bool _initialized = false;
+  int _attempt = 0;
+  int _document = 0;
+  Uri? _requestedPage;
+  Timer? _deadline;
   final _links = AppLinks();
   StreamSubscription<Uri>? _linkSubscription;
   bool _loaded = false;
@@ -74,7 +80,7 @@ class _WebShellState extends State<WebShell> {
   @override
   void initState() {
     super.initState();
-    SiteLinks.load = _controller.loadRequest;
+    SiteLinks.load = _loadPage;
     AccountStore.instance.addListener(_accountsChanged);
     HaneokaAccount.siteCookies = _siteCookies;
     unawaited(_start());
@@ -86,13 +92,33 @@ class _WebShellState extends State<WebShell> {
     AccountStore.instance.removeListener(_accountsChanged);
     HaneokaAccount.siteCookies = null;
     _slowTimer?.cancel();
+    _deadline?.cancel();
+    _attempt++;
     _linkSubscription?.cancel();
     super.dispose();
   }
 
   Future<void> _start() async {
+    final attempt = ++_attempt;
+    _initialized = false;
+    _startLoading();
+    try {
+      await _configure(attempt).timeout(const Duration(seconds: 20));
+    } catch (error, stack) {
+      debugPrint('WebView startup: $error\n$stack');
+      if (mounted && attempt == _attempt) {
+        _attempt++;
+        _fail(_t['webviewFailed']);
+      }
+    }
+  }
+
+  Future<void> _configure(int attempt) async {
+    bool active() => mounted && attempt == _attempt;
+    final controller = WebViewController();
+    if (!active()) return;
+    setState(() => _web = controller);
     final info = await PackageInfo.fromPlatform();
-    final controller = _controller;
     await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
     await controller.setBackgroundColor(_theme.background);
     final agent = await controller.getUserAgent();
@@ -101,7 +127,9 @@ class _WebShellState extends State<WebShell> {
     );
     await controller.addJavaScriptChannel(
       bridgeChannel,
-      onMessageReceived: (message) => _message(message.message),
+      onMessageReceived: (message) {
+        if (active()) unawaited(_message(message.message));
+      },
     );
     final script = bridgeScript(
       version: info.version,
@@ -118,101 +146,174 @@ class _WebShellState extends State<WebShell> {
       await android.setMediaPlaybackRequiresUserGesture(false);
       await android.setOnShowFileSelector(_chooseFiles);
     }
+    if (!active()) return;
     // The Android plugin keeps only a weak reference to the delegate.
     await controller.setNavigationDelegate(
       _navigation = NavigationDelegate(
-        onNavigationRequest: _navigate,
-        onPageStarted: (_) {
-          if (!userScript) unawaited(controller.runJavaScript(script));
+        onNavigationRequest: (request) =>
+            active() ? _navigate(request) : NavigationDecision.prevent,
+        onPageStarted: (url) {
+          if (!active()) return;
+          _document++;
+          _requestedPage = Uri.tryParse(url);
+          if (!_loaded) _startLoading();
+          if (!userScript) _inject(script);
         },
         onProgress: (progress) {
-          if (!mounted || _loaded) return;
+          if (!active() || _loaded || _error != null) return;
           setState(() => _progress = progress);
-          if (progress == 100) _checkLoaded();
+          if (progress == 100) unawaited(_checkLoaded());
         },
         onPageFinished: (url) {
+          if (!active()) return;
           _readSession(url);
           final server = Uri.tryParse(url)?.pathSegments.firstOrNull;
-          if (mounted && (server == 'jp' || server == 'intl')) {
+          if (server == 'jp' || server == 'intl') {
             AppScope.of(context).setServer(server!);
           }
-          if (!userScript) unawaited(controller.runJavaScript(script));
-          // A page that never reports its first paint still replaces the
-          // launch page, a moment after it finished loading.
-          Future<void>.delayed(const Duration(seconds: 3), _showPage);
+          if (!userScript) _inject(script);
+          unawaited(_checkLoaded());
         },
         onWebResourceError: (error) {
-          if (error.isForMainFrame == false || !mounted) return;
-          _slowTimer?.cancel();
-          setState(() {
-            _error = error.description.isEmpty
-                ? 'error ${error.errorCode}'
-                : error.description;
-            _loaded = false;
-          });
+          if (!active() || error.isForMainFrame == false) return;
+          if (error.url?.isNotEmpty == true &&
+              Uri.tryParse(error.url!) != _requestedPage) {
+            return;
+          }
+          if (error.isForMainFrame == true) {
+            _fail(
+              error.description.isEmpty
+                  ? 'Error ${error.errorCode}'
+                  : error.description,
+            );
+          } else if (!_loaded) {
+            unawaited(_checkLoaded());
+          }
+        },
+        onHttpError: (error) {
+          if (!active() || error.request?.uri != _requestedPage) return;
+          _fail('HTTP ${error.response?.statusCode ?? ''}'.trim());
         },
       ),
     );
-    final initial = await _links.getInitialLink();
-    _startLoading();
-    await controller.loadRequest(_page(initial) ?? _home);
+    final initial = await _links.getInitialLink().timeout(
+      const Duration(seconds: 3),
+      onTimeout: () => null,
+    );
+    if (!active()) return;
+    _initialized = true;
+    _requestedPage ??= _page(initial) ?? _home;
+    await controller.loadRequest(_requestedPage!);
+    if (!active()) return;
     if (initial?.scheme == 'haneoka' && initial?.host == 'saves') _openSaves();
+    await _linkSubscription?.cancel();
     _linkSubscription = _links.uriLinkStream.listen((uri) {
       if (uri.scheme == 'haneoka' && uri.host == 'saves') {
         _openSaves();
       } else if (_page(uri) case final page?) {
-        controller.loadRequest(page);
+        unawaited(_loadPage(page));
       }
     });
   }
 
-  /// A load that ends without the website: the platform does not always
-  /// report it (Android skips the error callback when a proxy fails), so the
-  /// page itself is asked. Only Haneoka's documents carry `data-locale`.
+  void _inject(String script) {
+    unawaited(
+      _controller.runJavaScript(script).catchError((Object error) {
+        debugPrint('Page bridge: $error');
+      }),
+    );
+  }
+
   Future<void> _checkLoaded() async {
-    await Future<void>.delayed(const Duration(seconds: 2));
-    if (!mounted || _loaded || _error != null) return;
-    final Object answer;
-    try {
-      answer = await _controller.runJavaScriptReturningResult(
-        'JSON.stringify([document.documentElement.dataset.locale || "", '
-        '(document.body?.innerText.match(/net::ERR_[A-Z_]+/) || [document.title || ""])[0]])',
-      );
-    } catch (_) {
+    final attempt = _attempt, document = _document;
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    if (!mounted ||
+        _loaded ||
+        _web == null ||
+        attempt != _attempt ||
+        document != _document) {
       return;
     }
-    final decoded = jsonDecode(
-      answer is String && answer.startsWith('"')
-          ? jsonDecode(answer) as String
-          : '$answer',
-    );
-    if (!mounted || _loaded || _error != null || decoded is! List) return;
-    if ('${decoded.first}'.isNotEmpty) {
-      _slowTimer?.cancel();
-      setState(() => _loaded = true);
-    } else {
-      _slowTimer?.cancel();
-      setState(
-        () => _error = '${decoded.last}'.trim().isEmpty
-            ? _t['offline']
-            : '${decoded.last}'.trim(),
-      );
+    try {
+      Object? answer = await _controller
+          .runJavaScriptReturningResult(
+            'JSON.stringify({locale:document.documentElement.dataset.locale || "",'
+            'main:!!document.querySelector("main"),ready:document.readyState,'
+            'error:(document.body?.innerText.match(/net::ERR_[A-Z_]+/) || [""])[0]})',
+          )
+          .timeout(const Duration(seconds: 3));
+      for (var i = 0; i < 2 && answer is String; i++) {
+        answer = jsonDecode(answer);
+      }
+      if (!mounted ||
+          _loaded ||
+          attempt != _attempt ||
+          document != _document ||
+          answer is! Map) {
+        return;
+      }
+      if (answer['locale'] != '' && answer['main'] == true) {
+        _showPage();
+      } else if ('${answer['error'] ?? ''}'.isNotEmpty) {
+        _fail('${answer['error']}');
+      }
+    } catch (error) {
+      debugPrint('Page readiness: $error');
     }
   }
 
   void _showPage() {
     if (_error != null || _loaded || !mounted) return;
     _slowTimer?.cancel();
+    _deadline?.cancel();
     setState(() => _loaded = true);
   }
 
-  /// A connection that takes long says so on the launch page; the load goes on.
+  void _fail(String error) {
+    if (!mounted) return;
+    _slowTimer?.cancel();
+    _deadline?.cancel();
+    setState(() {
+      _error = error;
+      _loaded = false;
+    });
+  }
+
   void _startLoading() {
     _slowTimer?.cancel();
+    _deadline?.cancel();
     _slow = false;
     _slowTimer = Timer(const Duration(seconds: 8), () {
       if (mounted && !_loaded) setState(() => _slow = true);
     });
+    final attempt = _attempt, document = _document;
+    _deadline = Timer(const Duration(seconds: 30), () async {
+      await _checkLoaded();
+      if (mounted && !_loaded && attempt == _attempt && document == _document) {
+        _fail(_t['loadTimeout']);
+      }
+    });
+  }
+
+  Future<void> _loadPage(Uri page) async {
+    _requestedPage = page;
+    if (!_initialized) {
+      await _start();
+      return;
+    }
+    final attempt = _attempt;
+    setState(() {
+      _error = null;
+      _progress = 0;
+    });
+    _document++;
+    _startLoading();
+    try {
+      await _controller.loadRequest(page).timeout(const Duration(seconds: 15));
+    } catch (error) {
+      debugPrint('Page navigation: $error');
+      if (mounted && attempt == _attempt) _fail(_t['offline']);
+    }
   }
 
   Future<void> _retry() async {
@@ -220,11 +321,11 @@ class _WebShellState extends State<WebShell> {
       _error = null;
       _progress = 0;
     });
-    _startLoading();
-    final current = Uri.tryParse(await _controller.currentUrl() ?? '');
-    await _controller.loadRequest(
-      current != null && current.host == origin.host ? current : _home,
-    );
+    if (!_initialized) {
+      await _start();
+    } else {
+      await _loadPage(_requestedPage ?? _home);
+    }
   }
 
   /// The site's cookies in the web view, for native requests that act as the
@@ -320,11 +421,16 @@ class _WebShellState extends State<WebShell> {
   }
 
   /// The site's account page lists the device's saves; it hears of changes.
-  void _accountsChanged() => unawaited(
-    _controller.runJavaScript(
-      'dispatchEvent(new Event("haneoka-app-accounts"))',
-    ),
-  );
+  void _accountsChanged() {
+    if (!_initialized) return;
+    unawaited(
+      _controller
+          .runJavaScript('dispatchEvent(new Event("haneoka-app-accounts"))')
+          .catchError((Object error) {
+            debugPrint('Account notification: $error');
+          }),
+    );
+  }
 
   /// The game accounts read on this device and how to read more; works
   /// without the website.
@@ -510,6 +616,10 @@ class _WebShellState extends State<WebShell> {
   }
 
   Future<void> _back() async {
+    if (!_initialized) {
+      await SystemNavigator.pop();
+      return;
+    }
     if (_fullscreen) {
       await _controller.runJavaScript('window.__haneokaAppExitFullscreen?.()');
       return;
@@ -566,19 +676,30 @@ class _WebShellState extends State<WebShell> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      WebViewWidget(controller: _controller),
+                      if (_web case final controller?)
+                        WebViewWidget(
+                          key: ValueKey(controller),
+                          controller: controller,
+                        ),
                       IgnorePointer(
                         ignoring: _loaded,
                         child: AnimatedOpacity(
                           opacity: _loaded ? 0 : 1,
                           duration: const Duration(milliseconds: 250),
-                          child: _Launch(
+                          child: LaunchScreen(
                             t: _t,
                             progress: _progress,
                             slow: _slow,
                             error: _error,
+                            errorTitle: _initialized
+                                ? _t['offline']
+                                : _t['startupFailed'],
                             onRetry: _retry,
                             onSaves: _openSaves,
+                            onOpenBrowser: () => launchUrl(
+                              _requestedPage ?? _home,
+                              mode: LaunchMode.externalApplication,
+                            ),
                           ),
                         ),
                       ),
@@ -622,133 +743,4 @@ class _Edge extends StatelessWidget {
       ],
     ),
   );
-}
-
-/// The launch page: the app's own screen until the website has drawn, with
-/// the load's real progress, what is wrong when it cannot load, and save
-/// reading, which needs neither the website nor a sign-in.
-class _Launch extends StatelessWidget {
-  const _Launch({
-    required this.t,
-    required this.progress,
-    required this.slow,
-    required this.error,
-    required this.onRetry,
-    required this.onSaves,
-  });
-  final Strings t;
-  final int progress;
-  final bool slow;
-  final String? error;
-  final VoidCallback onRetry;
-  final VoidCallback onSaves;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final failed = error != null;
-    return ColoredBox(
-      color: theme.scaffoldBackgroundColor,
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              const Spacer(flex: 3),
-              Image.asset(
-                'assets/brand/android-chrome-512x512.png',
-                width: 96,
-                height: 96,
-              ),
-              const SizedBox(height: 16),
-              Text('haneoka', style: theme.textTheme.headlineSmall),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: 240,
-                height: 72,
-                child: failed
-                    ? Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Symbols.cloud_off_rounded,
-                                size: 20,
-                                color: scheme.error,
-                              ),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  t['offline'],
-                                  style: theme.textTheme.titleSmall,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            error!,
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      )
-                    : Column(
-                        children: [
-                          LinearProgressIndicator(
-                            value: progress > 0 ? progress / 100 : null,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            progress > 0
-                                ? t.format('loading', {'percent': progress})
-                                : t['connecting'],
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                          if (slow)
-                            Text(
-                              t['slow'],
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: scheme.onSurfaceVariant,
-                              ),
-                            ),
-                        ],
-                      ),
-              ),
-              const Spacer(flex: 2),
-              if (failed) ...[
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: onRetry,
-                    icon: const Icon(Symbols.refresh_rounded),
-                    label: Text(t['retry']),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.tonalIcon(
-                  onPressed: onSaves,
-                  icon: const Icon(Symbols.sports_esports_rounded),
-                  label: Text(t['readSave']),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }

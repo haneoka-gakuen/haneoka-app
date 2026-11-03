@@ -8,6 +8,7 @@
 ## Features
 
 - The whole website, with the system bars in the page's colours and players in true fullscreen
+- Startup progress and retry, with game-save access available while the website is offline
 - Game accounts read from this phone (Shizuku or the game folder), an Android phone over USB or Wi-Fi, an iPhone backup, or save files
 - Card progress sent to the team builder, refreshed from the game server first
 - Gacha history read from the game server into the gacha history page
@@ -33,12 +34,14 @@ flutter run --dart-define=HANEOKA_ORIGIN=http://127.0.0.1:4319
 
 | Path | Contents |
 | --- | --- |
-| `lib/shell` | Web view, page bridge, native colours, sign-in, strings |
+| `lib/shell` | Web view, startup and recovery screens, page bridge, native colours, sign-in, strings |
 | `lib/accounts` | Game account sheet and its sources |
 | `lib/save`, `lib/sources` | Save reading, account storage and game-server refresh |
 | `lib/gacha_history` | Gacha history read for the website |
 
 The website side of the bridge is `src/lib/app-bridge.ts` in the Haneoka repository: `boxAccount`, `gachaHistory` and `signIn`.
+
+The native launch screen renders before bundled text and WebView initialization. Initialization has a 20-second deadline; page loading has a separate 30-second deadline. A Haneoka document's first-paint signal or a document-readiness check reveals the page. Network and initialization failures retain Retry and Open in browser; game-save screens remain available without the website. Retrying keeps cookies, account data and imported saves.
 
 ## License
 
