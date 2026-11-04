@@ -1,7 +1,7 @@
 name: haneoka
 description: "Haneoka for BanG Dream! Our Notes, with your game accounts on every platform."
 publish_to: 'none'
-version: 0.2.2+64
+version: 0.2.3+65
 
 environment:
   sdk: ^3.13.5

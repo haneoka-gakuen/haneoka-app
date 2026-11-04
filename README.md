@@ -30,6 +30,8 @@ flutter analyze
 flutter run --dart-define=HANEOKA_ORIGIN=http://127.0.0.1:4319
 ```
 
+For Android, add `--dart-define=cronetHttpNoPlay=true` to bundle Cronet independently of Google Play services, as the release workflow does. If Cronet cannot initialize, native requests use Dart HTTP with the existing system proxy routing.
+
 `HANEOKA_ORIGIN` points the app at a local preview; it defaults to `https://haneoka.org`. Packaging for each platform is in [`.github/workflows/release.yml`](.github/workflows/release.yml) and [`scripts/`](scripts).
 
 | Path | Contents |
@@ -43,7 +45,7 @@ The website side of the bridge is `src/lib/app-bridge.ts` in the Haneoka reposit
 
 The status bar uses the top app bar’s background colour, including its colour transitions. Drawers, sheets, dialogs and scrims do not affect it. The bottom system bar follows the page surface and open sheets or dialogs. Navigation drawers leave both native bars unchanged. Colour sampling only reads the page; scroll state follows the app bar’s class, content updates do not trigger sampling, and only edge motion schedules further frames. Repeated samples share computed styles and geometry. After the launch fade, the launch widget and its tickers are removed.
 
-The native launch screen renders before bundled text and WebView initialization. Native public API clients are created on first use, keeping Cronet/JNI initialization out of app startup; the WebView starts after Flutter's first frame is rasterized. Intel Android builds use Skia for graphics compatibility. Initialization has a 20-second deadline; page loading has a separate 30-second deadline. A Haneoka document's first-paint signal or a document-readiness check reveals the page. Network and initialization failures retain Retry and Open in browser; game-save screens remain available without the website. Retrying keeps cookies, account data and imported saves.
+The native launch screen renders before bundled text and WebView initialization. Native public API clients are created on first use, keeping Cronet/JNI initialization out of app startup; the WebView starts after Flutter's first frame is rasterized. Android builds use Skia for graphics compatibility across ARM and Intel devices; website rendering stays hardware accelerated in the system WebView. Initialization has a 20-second deadline; page loading has a separate 30-second deadline. A Haneoka document's first-paint signal or a document-readiness check reveals the page. Network and initialization failures retain Retry and Open in browser; game-save screens remain available without the website. Retrying keeps cookies, account data and imported saves.
 
 ## License
 
