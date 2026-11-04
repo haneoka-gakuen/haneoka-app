@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 
 import '../save/game_save.dart';
@@ -33,48 +35,53 @@ class AndroidSaveSource {
   static Future<int> readWithShizuku(
     GameRelease release,
     SaveCollector collector,
-  ) async => _offer(
-    await _channel.invokeListMethod<Map<Object?, Object?>>('shizukuRead', {
-      'package': release.packageId,
-    }),
-    collector,
-  );
+  ) => _read('shizukuRead', {'package': release.packageId}, collector);
 
   static Future<int> readFolder(
     String uri,
     SaveCollector collector, {
     GameRelease? release,
-  }) async => _offer(
-    await _channel.invokeListMethod<Map<Object?, Object?>>('readFolder', {
-      'uri': uri,
-    }),
-    collector,
-    release,
-  );
+  }) => _read('readFolder', {'uri': uri}, collector, release);
 
-  static int _offer(
-    List<Map<Object?, Object?>>? files,
+  static Future<int> _read(
+    String method,
+    Map<String, String> arguments,
     SaveCollector collector, [
     GameRelease? fallback,
-  ]) {
+  ]) async {
+    final batch = await _channel.invokeMapMethod<String, Object?>(
+      method,
+      arguments,
+    );
+    if (batch == null) return 0;
     var saves = 0;
-    for (final file in files ?? const <Map<Object?, Object?>>[]) {
-      final modified = file['modified'] as int?;
-      final found = collector.offer(
-        SaveCandidate(
-          bytes: file['bytes'] as Uint8List,
-          source: file['source'] as String,
-          group: file['group'] as String,
-          modifiedAt: modified == null || modified == 0
-              ? null
-              : DateTime.fromMillisecondsSinceEpoch(modified),
-          release:
-              GameRelease.fromPackage(file['package'] as String? ?? '') ??
-              fallback,
-        ),
-      );
-      if (found) saves++;
+    try {
+      for (final item in batch['files'] as List) {
+        final file = item as Map;
+        final staged = File(file['path'] as String);
+        try {
+          final modified = file['modified'] as int?;
+          final found = await collector.offerAsync(
+            SaveCandidate(
+              bytes: await staged.readAsBytes(),
+              source: file['source'] as String,
+              group: file['group'] as String,
+              modifiedAt: modified == null || modified == 0
+                  ? null
+                  : DateTime.fromMillisecondsSinceEpoch(modified),
+              release:
+                  GameRelease.fromPackage(file['package'] as String? ?? '') ??
+                  fallback,
+            ),
+          );
+          if (found) saves++;
+        } finally {
+          await staged.delete();
+        }
+      }
+      return saves;
+    } finally {
+      await _channel.invokeMethod<void>('releaseRead', {'id': batch['id']});
     }
-    return saves;
   }
 }

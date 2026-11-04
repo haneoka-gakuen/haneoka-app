@@ -1,5 +1,5 @@
-import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:archive/archive_io.dart';
@@ -54,11 +54,15 @@ class FileSaveSource {
     return null;
   }
 
-  void addBytes(Uint8List bytes, String name, {DateTime? modifiedAt}) {
+  Future<void> addBytes(
+    Uint8List bytes,
+    String name, {
+    DateTime? modifiedAt,
+  }) async {
     if (_isZip(bytes)) {
-      _zip(bytes, name);
+      await _zip(bytes, name);
     } else {
-      _offer(
+      await _offer(
         SaveCandidate(
           bytes: bytes,
           source: name,
@@ -93,16 +97,11 @@ class FileSaveSource {
       await handle.close();
     }
     if (_isZip(header)) {
-      final stream = InputFileStream(file.path);
-      try {
-        _archive(ZipDecoder().decodeStream(stream), file.path);
-      } finally {
-        await stream.close();
-      }
+      await _zip(null, file.path, path: file.path);
       return;
     }
     if (stat.size > SaveCodec.maxFileBytes) return;
-    _offer(
+    await _offer(
       SaveCandidate(
         bytes: await file.readAsBytes(),
         source: file.path,
@@ -113,51 +112,41 @@ class FileSaveSource {
     );
   }
 
-  void _zip(Uint8List bytes, String name) =>
-      _archive(ZipDecoder().decodeBytes(bytes), name);
-
-  void _archive(Archive archive, String name) {
-    final release = _appRelease(archive) ?? this.release ?? pathRelease(name);
-    for (final entry in archive.files) {
-      if (!entry.isFile ||
-          entry.size == 0 ||
-          entry.size > SaveCodec.maxFileBytes) {
-        continue;
+  Future<void> _zip(Uint8List? bytes, String name, {String? path}) async {
+    final messages = ReceivePort();
+    Isolate? worker;
+    try {
+      worker = await Isolate.spawn(
+        _readArchive,
+        (messages.sendPort, path, bytes, name, release),
+        onError: messages.sendPort,
+        onExit: messages.sendPort,
+      );
+      await for (final message in messages) {
+        if (message == null) break;
+        if (message case [String error, String stack]) {
+          throw RemoteError(error, stack);
+        }
+        final (resume, data, candidate) = message as _ArchiveDocument;
+        _offerDocument(data, candidate);
+        resume.send(null);
       }
-      if (p.split(entry.name).any(skippedDirectories.contains)) continue;
-      final dos = entry.lastModDateTime;
-      final modified = DateTime(
-        dos.year,
-        dos.month,
-        dos.day,
-        dos.hour,
-        dos.minute,
-        dos.second,
-      );
-      _offer(
-        SaveCandidate(
-          bytes: entry.content,
-          source: '$name!${entry.name}',
-          modifiedAt: modified,
-          release: release ?? pathRelease(entry.name),
-          group: '$name!${p.dirname(entry.name)}',
-        ),
-      );
-      entry.clear();
+    } finally {
+      worker?.kill(priority: Isolate.immediate);
+      messages.close();
     }
   }
 
-  void _offer(SaveCandidate candidate) {
-    if (collector.offer(candidate)) return;
-    if (candidate.bytes.length > SaveCodec.maxFileBytes) return;
-    Object? document;
-    try {
-      document = jsonDecode(utf8.decode(candidate.bytes));
-    } on FormatException {
+  Future<void> _offer(SaveCandidate candidate) async {
+    final document = await decodeSaveAsync(candidate.bytes);
+    if (document != null) _offerDocument(document, candidate);
+  }
+
+  void _offerDocument(Map<String, Object?> document, SaveCandidate candidate) {
+    if (collector.offerDocument(document, candidate)) {
       return;
     }
-    if (document is! Map<String, Object?> ||
-        document['schema'] != 'haneoka-game-save-v1') {
+    if (document['schema'] != 'haneoka-game-save-v1') {
       return;
     }
     final player = document['player'];
@@ -192,7 +181,7 @@ class FileSaveSource {
         .firstOrNull;
     if (metadata == null || metadata.size > SaveCodec.maxFileBytes) return null;
     try {
-      final plist = parsePlist(metadata.content);
+      final plist = parsePlist(_archiveBytes(metadata));
       return plist is Map
           ? GameRelease.fromPackage('${plist['softwareVersionBundleId']}')
           : null;
@@ -207,4 +196,97 @@ class FileSaveSource {
       bytes[1] == 0x4b &&
       bytes[2] == 3 &&
       bytes[3] == 4;
+}
+
+typedef _ArchiveDocument = (SendPort, Map<String, Object?>, SaveCandidate);
+
+Future<void> _readArchive(
+  (SendPort, String?, Uint8List?, String, GameRelease?) request,
+) async {
+  final (output, path, bytes, name, fallback) = request;
+  final input = path == null ? null : InputFileStream(path);
+  try {
+    final archive = input == null
+        ? ZipDecoder().decodeBytes(bytes!)
+        : ZipDecoder().decodeStream(input);
+    final release =
+        FileSaveSource._appRelease(archive) ??
+        fallback ??
+        FileSaveSource.pathRelease(name);
+    for (final entry in archive.files) {
+      if (!entry.isFile ||
+          entry.size == 0 ||
+          entry.size > SaveCodec.maxFileBytes ||
+          p.split(entry.name).any(skippedDirectories.contains)) {
+        continue;
+      }
+      final resume = ReceivePort();
+      try {
+        final content = _archiveBytes(entry);
+        final data = SaveCodec.decode(content);
+        if (data == null) continue;
+        final dos = entry.lastModDateTime;
+        final candidate = SaveCandidate(
+          bytes: content,
+          source: '$name!${entry.name}',
+          modifiedAt: DateTime(
+            dos.year,
+            dos.month,
+            dos.day,
+            dos.hour,
+            dos.minute,
+            dos.second,
+          ),
+          release: release ?? FileSaveSource.pathRelease(entry.name),
+          group: '$name!${p.dirname(entry.name)}',
+        );
+        output.send((resume.sendPort, data, candidate));
+        // Wait for the collector before decompressing the next document.
+        await resume.first;
+      } finally {
+        resume.close();
+        entry.clear();
+      }
+    }
+  } finally {
+    input?.closeSync();
+  }
+}
+
+Uint8List _archiveBytes(ArchiveFile file) {
+  final output = _SaveOutput();
+  file.writeContent(output);
+  return output.getBytes();
+}
+
+class _SaveOutput extends OutputMemoryStream {
+  void _reserve(int count) {
+    if (length + count > SaveCodec.maxFileBytes) {
+      throw const FormatException('Archive entry exceeds the save size limit');
+    }
+  }
+
+  @override
+  void writeByte(int value) {
+    _reserve(1);
+    super.writeByte(value);
+  }
+
+  @override
+  void writeBytes(List<int> bytes, {int? length}) {
+    _reserve(length ?? bytes.length);
+    super.writeBytes(bytes, length: length);
+  }
+
+  @override
+  void writeStream(InputStream stream) {
+    _reserve(stream.length);
+    super.writeStream(stream);
+  }
+
+  @override
+  void writeBackReference(int distance, int count) {
+    _reserve(count);
+    super.writeBackReference(distance, count);
+  }
 }

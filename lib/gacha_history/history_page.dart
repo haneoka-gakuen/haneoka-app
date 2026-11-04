@@ -532,7 +532,7 @@ class _HistoryPageState extends State<HistoryPage> {
             );
             if (rawRelease == null) return;
           }
-          FileSaveSource(
+          await FileSaveSource(
             collector,
             release: declaredRelease ?? rawRelease,
           ).addBytes(bytes, file.path ?? file.name);

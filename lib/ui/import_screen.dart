@@ -92,13 +92,17 @@ class _ImportScreenState extends State<ImportScreen> {
   }
 
   Future<void> _refreshAndroid() async {
-    final status = await AndroidSaveSource.shizukuStatus();
-    final grant = await AndroidSaveSource.canGrantGameFolder();
-    if (!mounted) return;
-    setState(() {
-      _shizuku = status;
-      _canGrant = grant;
-    });
+    try {
+      final status = await AndroidSaveSource.shizukuStatus();
+      final grant = await AndroidSaveSource.canGrantGameFolder();
+      if (!mounted) return;
+      setState(() {
+        _shizuku = status;
+        _canGrant = grant;
+      });
+    } catch (error) {
+      if (mounted) _say('$error');
+    }
   }
 
   AppLocalizations get t => AppLocalizations.of(context);
@@ -153,12 +157,17 @@ class _ImportScreenState extends State<ImportScreen> {
     ..showSnackBar(SnackBar(content: Text(message)));
 
   /// Runs one import; every account found is kept, and one opens directly.
-  Future<void> _run(Future<void> Function(SaveCollector collector) read) async {
+  Future<void> _run(
+    Future<void> Function(SaveCollector collector) read, {
+    Future<bool> Function()? prepare,
+  }) async {
     if (!mounted || _busy) return;
     setState(() => _busy = true);
     final collector = SaveCollector();
     CacheStorage.instance.beginImport();
     try {
+      if (prepare != null && !await prepare()) return;
+      if (!mounted) return;
       await read(collector);
       if (!mounted) return;
       if (collector.saves.isEmpty) {
@@ -230,40 +239,49 @@ class _ImportScreenState extends State<ImportScreen> {
   }
 
   Future<void> _readShizuku() async {
-    var status = await AndroidSaveSource.shizukuStatus();
-    if (status == ShizukuStatus.needsPermission &&
-        await AndroidSaveSource.requestShizuku()) {
-      status = ShizukuStatus.ready;
-    }
-    if (!mounted) return;
-    setState(() => _shizuku = status);
-    if (status != ShizukuStatus.ready) {
-      if (status == ShizukuStatus.notRunning) {
-        await AndroidSaveSource.openShizuku();
-      }
-      return;
-    }
-    await _run((collector) async {
-      for (final release in GameRelease.values.where(
-        (value) =>
-            widget.updateSave?.release == null ||
-            value.server == widget.updateSave!.release!.server,
-      )) {
-        await AndroidSaveSource.readWithShizuku(release, collector);
-      }
-    });
+    await _run(
+      (collector) async {
+        for (final release in GameRelease.values.where(
+          (value) =>
+              widget.updateSave?.release == null ||
+              value.server == widget.updateSave!.release!.server,
+        )) {
+          await AndroidSaveSource.readWithShizuku(release, collector);
+        }
+      },
+      prepare: () async {
+        var status = await AndroidSaveSource.shizukuStatus();
+        if (status == ShizukuStatus.needsPermission &&
+            await AndroidSaveSource.requestShizuku()) {
+          status = ShizukuStatus.ready;
+        }
+        if (!mounted) return false;
+        setState(() => _shizuku = status);
+        if (status != ShizukuStatus.ready) {
+          if (status == ShizukuStatus.notRunning) {
+            await AndroidSaveSource.openShizuku();
+          }
+          return false;
+        }
+        return true;
+      },
+    );
   }
 
   Future<void> _grantFolder() async {
-    final release =
-        widget.updateSave?.release ??
-        await chooseGameSaveRelease(context, initial: _defaultRelease);
-    if (release == null || !mounted) return;
-    final uri = await AndroidSaveSource.grantGameFolder(release);
-    if (!mounted || uri == null) return;
+    GameRelease? release;
+    String? uri;
     await _run(
       (collector) =>
-          AndroidSaveSource.readFolder(uri, collector, release: release),
+          AndroidSaveSource.readFolder(uri!, collector, release: release),
+      prepare: () async {
+        release =
+            widget.updateSave?.release ??
+            await chooseGameSaveRelease(context, initial: _defaultRelease);
+        if (release == null || !mounted) return false;
+        uri = await AndroidSaveSource.grantGameFolder(release!);
+        return uri != null;
+      },
     );
   }
 
@@ -275,32 +293,40 @@ class _ImportScreenState extends State<ImportScreen> {
 
   Future<void> _pickFiles({bool folder = false}) async {
     if (folder) {
-      final path = await FilePicker.getDirectoryPath();
-      if (!mounted || path == null) return;
+      String? path;
       await _run(
         (collector) => FileSaveSource(
           collector,
           release: widget.updateSave?.release,
-        ).addPath(path),
+        ).addPath(path!),
+        prepare: () async {
+          path = await FilePicker.getDirectoryPath();
+          return path != null;
+        },
       );
       return;
     }
-    final picked = await FilePicker.pickFiles();
-    if (!mounted || picked.isEmpty) return;
-    await _run((collector) async {
-      final source = FileSaveSource(
-        collector,
-        release: widget.updateSave?.release,
-      );
-      for (final file in picked) {
-        final path = file.path;
-        if (path != null) {
-          await source.addPath(path);
-        } else {
-          source.addBytes(await file.readAsBytes(), file.name);
+    List<PlatformFile> picked = [];
+    await _run(
+      (collector) async {
+        final source = FileSaveSource(
+          collector,
+          release: widget.updateSave?.release,
+        );
+        for (final file in picked) {
+          final path = file.path;
+          if (path != null) {
+            await source.addPath(path);
+          } else {
+            await source.addBytes(await file.readAsBytes(), file.name);
+          }
         }
-      }
-    });
+      },
+      prepare: () async {
+        picked = await FilePicker.pickFiles();
+        return picked.isNotEmpty;
+      },
+    );
   }
 
   Future<void> _readConnected() async {
