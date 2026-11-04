@@ -167,7 +167,7 @@ class AdbSaveSource {
         progress?.call('${dir.substring(0, 8)}…/$name');
         final bytes = await _cat(serial, file);
         final seconds = stat.length > 1 ? int.tryParse(stat[1]) : null;
-        found |= collector.offer(
+        found |= await collector.offerAsync(
           SaveCandidate(
             bytes: bytes,
             source: '${release.packageId}/$dir/$name',

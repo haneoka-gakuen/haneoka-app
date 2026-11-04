@@ -125,7 +125,7 @@ class SaveCollector {
   onDocument;
   final Map<String, GameSave> _byProfile = {};
   final Map<_SaveGroup, Set<String>> _profilesOfGroup = {};
-  final List<(_SaveGroup, SaveDocument)> _documents = [];
+  final Map<(_SaveGroup, SaveDocumentKind), SaveDocument> _documents = {};
   int unreadable = 0;
 
   /// Returns true when the file was a save document.
@@ -133,6 +133,11 @@ class SaveCollector {
     final data = SaveCodec.decode(candidate.bytes);
     if (data == null) return false;
     return offerDocument(data, candidate);
+  }
+
+  Future<bool> offerAsync(SaveCandidate candidate) async {
+    final data = await decodeSaveAsync(candidate.bytes);
+    return data != null && offerDocument(data, candidate);
   }
 
   /// A JSON save exported by Haneoka, with the same account grouping and
@@ -150,7 +155,11 @@ class SaveCollector {
       candidate.group ?? candidate.source,
     );
     if (kind != SaveDocumentKind.cache) {
-      _documents.add((group, document));
+      final key = (group, kind);
+      final previous = _documents[key];
+      if (previous == null || _newer(document, previous)) {
+        _documents[key] = document;
+      }
       _bindDocuments();
       return true;
     }
@@ -190,7 +199,8 @@ class SaveCollector {
     for (final save in _byProfile.values) {
       save.documents.removeWhere((kind, _) => kind != SaveDocumentKind.cache);
     }
-    for (final (group, document) in _documents) {
+    for (final MapEntry(key: (group, _), value: document)
+        in _documents.entries) {
       final profiles = _profilesOfGroup[group];
       if (profiles != null && profiles.length == 1) {
         _place(_byProfile[profiles.single]!, document);
@@ -200,13 +210,15 @@ class SaveCollector {
 
   static void _place(GameSave save, SaveDocument document) {
     final current = save.documents[document.kind];
-    if (current == null ||
-        (document.modifiedAt != null &&
-            (current.modifiedAt == null ||
-                document.modifiedAt!.isAfter(current.modifiedAt!)))) {
+    if (current == null || _newer(document, current)) {
       save.documents[document.kind] = document;
     }
   }
+
+  static bool _newer(SaveDocument incoming, SaveDocument previous) =>
+      incoming.modifiedAt != null &&
+      (previous.modifiedAt == null ||
+          incoming.modifiedAt!.isAfter(previous.modifiedAt!));
 
   static SaveDocumentKind? _kindOf(Map<String, Object?> data) {
     if (data.containsKey('_player')) return SaveDocumentKind.cache;

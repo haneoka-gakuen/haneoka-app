@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:pointycastle/export.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import '../core/storage.dart';
 import '../save/codec.dart';
 import '../save/game_save.dart';
 import 'plist.dart';
@@ -105,36 +106,38 @@ class IosBackup {
     final decrypted = keys == null ? null : await _decryptedManifest(keys);
     final database = decrypted?.$1 ?? File(p.join(path, 'Manifest.db'));
     Database? db;
+    PreparedStatement? statement;
     try {
       db = sqlite3.open(database.path, mode: OpenMode.readOnly);
       final domains = {
         for (final release in GameRelease.values)
           'AppDomain-${release.packageId}': release,
       };
-      final rows = db.select(
+      statement = db.prepare(
         'SELECT fileID, domain, relativePath, file FROM Files WHERE flags = 1 AND domain IN '
         '(${List.filled(domains.length, '?').join(',')})',
-        domains.keys.toList(),
       );
-      for (final row in rows) {
+      final rows = statement.selectCursor(domains.keys.toList());
+      var count = 0;
+      while (rows.moveNext()) {
+        if (++count % 32 == 0) await Future<void>.delayed(Duration.zero);
+        final row = rows.current;
         final relative = row['relativePath'] as String;
         if (p.split(relative).any(_skipped.contains)) continue;
         final fileId = row['fileID'] as String;
         final stored = File(p.join(path, fileId.substring(0, 2), fileId));
         if (!await stored.exists()) continue;
         final meta = _FileMeta.read(row['file'] as Uint8List?);
-        if (meta.size > SaveCodec.maxFileBytes) continue;
+        if (meta.size > SaveCodec.maxFileBytes ||
+            await stored.length() > SaveCodec.maxFileBytes + 16) {
+          continue;
+        }
         var bytes = await stored.readAsBytes();
         if (keys != null) {
           if (meta.wrappedKey == null) continue;
-          bytes = keys.decryptFile(
-            bytes,
-            meta.protectionClass,
-            meta.wrappedKey!,
-            meta.size,
-          );
+          bytes = await _decryptBackupFile(keys, bytes, meta);
         }
-        collector.offer(
+        await collector.offerAsync(
           SaveCandidate(
             bytes: bytes,
             source: '${row['domain']}/$relative',
@@ -144,17 +147,20 @@ class IosBackup {
           ),
         );
       }
-      return rows.length;
+      return count;
     } finally {
       try {
+        statement?.close();
         db?.close();
       } finally {
-        await decrypted?.$2.delete(recursive: true);
+        await decrypted?.$2.dispose();
       }
     }
   }
 
-  Future<(File, Directory)> _decryptedManifest(_BackupKeys keys) async {
+  Future<(File, OwnedTemporaryDirectory)> _decryptedManifest(
+    _BackupKeys keys,
+  ) async {
     final manifestKey = _manifest['ManifestKey'] as Uint8List;
     final protectionClass = ByteData.sublistView(
       manifestKey,
@@ -165,17 +171,15 @@ class IosBackup {
       protectionClass,
       Uint8List.sublistView(manifestKey, 4),
     );
-    final plain = _aesCbcDecrypt(
-      key,
-      await File(p.join(path, 'Manifest.db')).readAsBytes(),
+    final owned = await CacheStorage.instance.createTemporaryDirectory(
+      'backup-',
     );
-    final owned = await Directory.systemTemp.createTemp('backup-');
     try {
-      final file = File(p.join(owned.path, 'Manifest.db'));
-      await file.writeAsBytes(plain, flush: true);
+      final file = File(p.join(owned.directory.path, 'Manifest.db'));
+      await _decryptManifest(p.join(path, 'Manifest.db'), file.path, key);
       return (file, owned);
     } catch (_) {
-      await owned.delete(recursive: true);
+      await owned.dispose();
       rethrow;
     }
   }
@@ -194,6 +198,50 @@ Future<_BackupKeys> _unlockBackup(
   Map<String, Object?> manifest,
   String password,
 ) => Isolate.run(() => _BackupKeys.unlock(manifest, password));
+
+Future<Uint8List> _decryptBackupFile(
+  _BackupKeys keys,
+  Uint8List bytes,
+  _FileMeta meta,
+) => Isolate.run(
+  () => keys.decryptFile(
+    bytes,
+    meta.protectionClass,
+    meta.wrappedKey!,
+    meta.size,
+  ),
+);
+
+Future<void> _decryptManifest(String source, String target, Uint8List key) =>
+    Isolate.run(() {
+      final input = File(source).openSync();
+      try {
+        final output = File(target).openSync(mode: FileMode.write);
+        try {
+          final size = input.lengthSync();
+          if (size % 16 != 0) {
+            throw const FormatException('Truncated backup manifest');
+          }
+          final cipher = CBCBlockCipher(AESEngine())
+            ..init(false, ParametersWithIV(KeyParameter(key), Uint8List(16)));
+          while (input.positionSync() < size) {
+            final bytes = input.readSync(64 * 1024);
+            final plain = Uint8List(bytes.length);
+            for (var offset = 0; offset < bytes.length; offset += 16) {
+              cipher.processBlock(bytes, offset, plain, offset);
+            }
+            final end = input.positionSync() == size
+                ? _unpaddedLength(plain)
+                : plain.length;
+            output.writeFromSync(plain, 0, end);
+          }
+        } finally {
+          output.closeSync();
+        }
+      } finally {
+        input.closeSync();
+      }
+    });
 
 class BackupPasswordException implements Exception {}
 
@@ -360,11 +408,15 @@ Uint8List _aesCbcDecrypt(Uint8List key, Uint8List data) {
   for (var offset = 0; offset < out.length; offset += 16) {
     cipher.processBlock(data, offset, out, offset);
   }
+  return Uint8List.sublistView(out, 0, _unpaddedLength(out));
+}
+
+int _unpaddedLength(Uint8List out) {
   final pad = out.isEmpty ? 0 : out.last;
   if (pad >= 1 &&
       pad <= 16 &&
       out.sublist(out.length - pad).every((b) => b == pad)) {
-    return Uint8List.sublistView(out, 0, out.length - pad);
+    return out.length - pad;
   }
-  return out;
+  return out.length;
 }

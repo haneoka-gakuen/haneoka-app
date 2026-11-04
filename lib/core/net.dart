@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:cronet_http/cronet_http.dart';
 import 'package:cupertino_http/cupertino_http.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
@@ -26,15 +27,26 @@ Future<http.StreamedResponse> sendFileRequest(http.BaseRequest request) {
 }
 
 http.Client _androidDirectClient({bool fileTransfer = false}) {
-  final engine = CronetEngine.build(
-    cacheMode: fileTransfer ? CacheMode.disabled : CacheMode.memory,
-    cacheMaxSize: fileTransfer ? 0 : 8 << 20,
-    enableBrotli: true,
-    enableHttp2: !fileTransfer,
-    enableQuic: !fileTransfer,
-    userAgent: 'haneoka-app',
-  );
-  return CronetClient.fromCronetEngine(engine, closeEngine: true);
+  try {
+    final engine = CronetEngine.build(
+      cacheMode: fileTransfer ? CacheMode.disabled : CacheMode.memory,
+      cacheMaxSize: fileTransfer ? 0 : 8 << 20,
+      enableBrotli: true,
+      enableHttp2: !fileTransfer,
+      enableQuic: !fileTransfer,
+      userAgent: 'haneoka-app',
+    );
+    return CronetClient.fromCronetEngine(engine, closeEngine: true);
+  } catch (error) {
+    debugPrint('Cronet unavailable; using Dart HTTP: $error');
+    return IOClient(
+      HttpClient()
+        ..connectionTimeout = const Duration(seconds: 15)
+        ..maxConnectionsPerHost = 12
+        ..idleTimeout = const Duration(seconds: 30)
+        ..userAgent = 'haneoka-app',
+    );
+  }
 }
 
 http.Client _client() {
