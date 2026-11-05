@@ -1,81 +1,25 @@
 name: haneoka
-description: "Reads your Our Notes save on every platform and shows everything it holds."
+description: "Haneoka for BanG Dream! Our Notes, with your game accounts on every platform."
 publish_to: 'none'
-version: 0.1.13+61
+version: 0.2.3+65
 
 environment:
   sdk: ^3.13.5
 
 dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   game_data_exporter:
     git:
       url: https://github.com/haneoka-gakuen/game-data-exporter.git
       ref: fbc0f99dd60e511e10dd0d92063c8f96d8237e2f
       path: dart
-  vega_runtime_ffi:
-    git:
-      url: https://github.com/haneoka-gakuen/vega.git
-      ref: dbd403ca49fbeb00d3778485f75b447e3aa8cbad
-      path: packages/runtime-ffi/dart
-  vega_plugin_cubism:
-    git:
-      url: https://github.com/haneoka-gakuen/vega-plugin-cubism.git
-      ref: e59032b8c0f38698d37ad718882180dbeecca8aa
-      path: dart
-  render_contracts:
-    git:
-      url: https://github.com/haneoka-gakuen/render-kernel-flutter.git
-      ref: 235abdfab633a49acd7e78d81710bb7de9195d04
-      path: packages/render_contracts
-  render_kernel_flutter:
-    git:
-      url: https://github.com/haneoka-gakuen/render-kernel-flutter.git
-      ref: 0b5accea1bfece918b1dec627636977c7cc3d188
-  vega_renderer_flutter:
-    git:
-      url: https://github.com/haneoka-gakuen/vega-renderer-flutter.git
-      ref: 4112747ed390ee7cfb5bfaf8c25b0fcfaf0c213e
-  cassiopeia_renderer_flutter:
-    git:
-      url: https://github.com/haneoka-gakuen/cassiopeia-renderer-flutter.git
-      ref: 8532551895c013d41eedc872c6585718f4619ca4
-  cassiopeia_runtime:
-    git:
-      url: https://github.com/haneoka-gakuen/cassiopeia.git
-      ref: 9bc194e433372fe1784f94a609de9755e894ce51
-      path: dart
-  vega_protocol:
-    git:
-      url: https://github.com/haneoka-gakuen/vega.git
-      ref: 4aa5e3a76c540e142be75293d4d34463c138f3d0
-      path: packages/protocol/dart
-  vega_plugin_haneoka:
-    git:
-      url: https://github.com/haneoka-gakuen/vega-plugin-haneoka.git
-      ref: 465926dc75604db4988f759adf9d41f5852ffcf1
-      path: dart
-  cassiopeia_plugin_our_notes:
-    git:
-      url: https://github.com/haneoka-gakuen/cassiopeia-plugin-our-notes.git
-      ref: 0d2891b3e6e02c56f44b27800412a7be43f40f30
-      path: dart
-  flutter_gpu:
-    sdk: flutter
-  haneoka_render_profile:
-    git:
-      url: https://github.com/haneoka-gakuen/haneoka-render-profile.git
-      ref: 951d2bb4f6e67e3ef9b51e2ac6ea55ee7216e9e5
-  haneoka_render_profile_flutter:
-    git:
-      url: https://github.com/haneoka-gakuen/haneoka-render-profile.git
-      ref: 6baf2d21b3a8e213e8ec1b57980f0184a39ad91d
-      path: flutter
-  image: ^4.12.0
-  jni: ^1.1.0
-  ffi: ^2.2.0
+  webview_all: ^1.4.5
+  webview_all_android: ^1.4.5
   app_links: ^7.2.2
   archive: ^4.5.0
-  audioplayers: ^6.8.1
   cached_network_image: ^4.0.4
   cronet_http: ^1.10.0
   crypto: ^3.0.7
@@ -85,48 +29,23 @@ dependencies:
       ref: 6e91ce3e73ab079114de3684367318287b08d893
       path: pkgs/cupertino_http
   file_picker: ^13.1.0
-  flutter:
-    sdk: flutter
   flutter_cache_manager: ^3.4.5
-  flutter_localizations:
-    sdk: flutter
-  flutter_secure_storage: ^11.2.0
   flutter_svg: ^2.3.0
-  flutter_widget_from_html_core: ^0.17.4
   http: ^1.6.0
-  html: ^0.15.7
   intl: any
-  unorm_dart: ^0.3.2
-  material_color_utilities: ^0.13.0
+  jni: ^1.1.0
   material_new_shapes: ^1.0.0
   material_symbols_icons: ^4.2960.0
-  media_kit: ^1.2.6
-  media_kit_libs_video: ^1.0.7
-  media_kit_video: ^2.0.1
   package_info_plus: ^10.2.2
   path: ^1.9.1
-  path_parsing: ^1.1.0
   path_provider: ^2.1.6
   photo_view: ^0.15.0
   pointycastle: ^4.0.0
-  timezone: ^0.10.1
   shared_preferences: ^2.5.6
   sqlite3: ^3.7.0
-  two_dimensional_scrollables: ^0.5.5
+  timezone: ^0.10.1
+  unorm_dart: ^0.3.2
   url_launcher: ^6.3.3
-  audio_service: ^0.18.19
-  audio_session: ^0.2.4
-  flutter_soloud:
-    git:
-      url: https://github.com/haneoka-gakuen/flutter_soloud.git
-      ref: 421afc8897576929b3b4812d9e29c31f0a900adc
-  window_manager: ^0.5.2
-  spine_flutter: 4.2.36
-  firebase_core: ^5.1.0
-  firebase_analytics: ^13.0.1
-dependency_overrides:
-  media_kit_libs_windows_video:
-    path: third_party/media_kit_libs_windows_video
 
 dev_dependencies:
   flutter_lints: ^6.0.0
@@ -137,45 +56,6 @@ flutter:
   uses-material-design: true
   assets:
     - LICENSE
-    - third_party/chart_editor/
-    - assets/i18n/
     - assets/brand/
-    - assets/brand/oauth/
+    - assets/i18n/
     - assets/settings/
-    - assets/render/
-    - assets/fonts/OFL.txt
-  fonts:
-    - family: Roboto
-      fonts:
-        - asset: assets/fonts/Roboto-Regular.ttf
-        - asset: assets/fonts/Roboto-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/Roboto-Bold.ttf
-          weight: 700
-    # One variable font per writing system, with the complete upstream glyph set.
-    - family: Noto Sans SC
-      fonts:
-        - asset: assets/fonts/NotoSansSC-Variable.ttf
-    - family: Noto Sans TC
-      fonts:
-        - asset: assets/fonts/NotoSansTC-Variable.ttf
-    - family: Noto Sans JP
-      fonts:
-        - asset: assets/fonts/NotoSansJP-Variable.ttf
-    - family: Noto Sans KR
-      fonts:
-        - asset: assets/fonts/NotoSansKR-Variable.ttf
-    # The stamp maker's pinned faces (`stamp-maker-font-sources.json`),
-    # converted from the website's WOFF2 mirrors.
-    - family: YurukaStd
-      fonts:
-        - asset: assets/stamp-fonts/YurukaStd.ttf
-          weight: 900
-    - family: SSFangTangTi
-      fonts:
-        - asset: assets/stamp-fonts/SSFangTangTi.ttf
-
-hooks:
-  user_defines:
-    flutter_soloud:
-      prebuild_tag: v1.0.2

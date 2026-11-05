@@ -4,4 +4,6 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Debug builds may point HANEOKA_ORIGIN at a local preview over plain HTTP. -->
+    <application android:usesCleartextTraffic="true" />
 </manifest>

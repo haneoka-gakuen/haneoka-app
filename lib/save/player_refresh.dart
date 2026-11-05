@@ -22,11 +22,11 @@ class PlayerRefreshError implements Exception {
 
 const _lists = ['_memberCards', '_supportCards', '_characters', '_bandItems'];
 
-final _client = GameHistoryClient(
+final gameClient = GameHistoryClient(
   proxyFor: (uri) => systemProxyFor(uri).httpProxy,
 );
 
-GameHistoryRegion? _region(GameSave save) => switch (save.region) {
+GameHistoryRegion? gameHistoryRegion(GameSave save) => switch (save.region) {
   'jp' => GameHistoryRegion.jp,
   'tw' => GameHistoryRegion.hmt,
   'en' => GameHistoryRegion.en,
@@ -38,9 +38,11 @@ SavedGameSession? _session(GameSave save) => SavedGameSession.fromPersist(
   save.documents[SaveDocumentKind.persist]?.data,
 );
 
+SavedGameSession? gameSession(GameSave save) => _session(save);
+
 /// Whether [save] carries a certification the game server can accept.
 bool canRefreshFromGame(GameSave save) =>
-    _session(save) != null && _region(save) != null;
+    _session(save) != null && gameHistoryRegion(save) != null;
 
 Set<Object?> _ids(Object? rows) => {
   for (final row in rows is List ? rows : const []) (row as Map)['_masterId'],
@@ -50,13 +52,13 @@ Set<Object?> _ids(Object? rows) => {
 /// save's lists. Cards are never lost in the game, so a response missing
 /// cards the save already has is refused rather than stored.
 Future<GameSave> refreshFromGame(GameSave save) async {
-  final session = _session(save), region = _region(save);
+  final session = _session(save), region = gameHistoryRegion(save);
   if (session == null || region == null) {
     throw const PlayerRefreshError('no_session');
   }
   final Map<String, List<Map<String, Object?>>> fresh;
   try {
-    fresh = await _client.readPlayerData(session, region);
+    fresh = await gameClient.readPlayerData(session, region);
   } on GameHistoryException catch (error) {
     throw PlayerRefreshError(error.code);
   }

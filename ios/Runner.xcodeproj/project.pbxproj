@@ -116,7 +116,6 @@
 			buildConfigurationList = 97C147051CF9000F007C117D /* Build configuration list for PBXNativeTarget "Runner" */;
 			buildPhases = (
 				9740EEB61CF901F6004384FC /* Run Script */,
-				A11E0A1A0A1A0A1A0A1A0001 /* Rust Team Engine */,
 				97C146EA1CF9000F007C117D /* Sources */,
 				97C146EB1CF9000F007C117D /* Frameworks */,
 				97C146EC1CF9000F007C117D /* Resources */,
@@ -222,18 +221,6 @@
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
 		};
-		A11E0A1A0A1A0A1A0A1A0001 /* Rust Team Engine */ = {
-            isa = PBXShellScriptBuildPhase;
-            alwaysOutOfDate = 1;
-            buildActionMask = 2147483647;
-            files = ();
-            inputPaths = ();
-            name = "Rust Team Engine";
-            outputPaths = ("$(BUILT_PRODUCTS_DIR)/libhaneoka_team_engine.a");
-            runOnlyForDeploymentPostprocessing = 0;
-            shellPath = /bin/sh;
-            shellScript = "/bin/sh \"$PROJECT_DIR/../scripts/build_team_engine_apple.sh\"";
-        };
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */

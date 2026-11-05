@@ -1,4 +1,5 @@
 import '../core/site_date.dart';
+
 import 'package:flutter/material.dart';
 
 import 'package:material_new_shapes/material_new_shapes.dart';
@@ -12,7 +13,6 @@ import '../ui/app_image.dart';
 import '../ui/shapes.dart';
 import '../ui/theme.dart';
 import 'haneoka_account.dart';
-import 'profile_screen.dart';
 import 'sign_in_screen.dart';
 
 void _say(BuildContext context, String text) =>
@@ -139,16 +139,15 @@ class _HaneokaAccountCardState extends State<HaneokaAccountCard> {
                       label: Text(t.openProfile),
                     ),
                   FilledButton.tonalIcon(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const AccountProfileScreen(),
-                      ),
-                    ),
+                    onPressed: () =>
+                        openLink(context, '/${site.locale}/account/'),
                     icon: const Icon(Symbols.manage_accounts_rounded),
                     label: Text(site('account.page.profile', 'Profile')),
                   ),
                   OutlinedButton.icon(
-                    onPressed: _busy ? null : () => _run(account.signOut),
+                    onPressed: _busy
+                        ? null
+                        : () => openLink(context, '/${site.locale}/account/'),
                     icon: const Icon(Symbols.logout_rounded),
                     label: Text(t.signOut),
                   ),

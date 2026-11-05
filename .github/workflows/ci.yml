@@ -8,17 +8,12 @@ on:
 permissions:
   contents: read
 
-env:
-  RUSTUP_TOOLCHAIN: 1.97.1
-
 jobs:
   check:
     name: Analyze
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: 3.47.7
@@ -26,19 +21,3 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter analyze
-
-  rust:
-    name: Rust native and WASM
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
-          targets: wasm32-unknown-unknown
-          components: clippy
-      - run: cargo clippy --locked --manifest-path native/team_engine/Cargo.toml --lib -- -D warnings
-      - run: cargo build --release --locked --manifest-path native/team_engine/Cargo.toml
-      - run: cargo build --release --locked --manifest-path native/team_engine/Cargo.toml --target wasm32-unknown-unknown

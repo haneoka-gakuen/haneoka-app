@@ -19,8 +19,9 @@ bool isAccountResource(Uri uri) {
     return true;
   }
   if (uri.path.startsWith('/api/v1/admin/attachments/')) return true;
-  final match = RegExp(r'^/(?:(?:assets|runtime|objects)/|api/v1/servers/)([^/]+)/')
-      .firstMatch(uri.path);
+  final match = RegExp(
+    r'^/(?:(?:assets|runtime|objects)/|api/v1/servers/)([^/]+)/',
+  ).firstMatch(uri.path);
   return match != null && !const {'jp', 'intl'}.contains(match[1]);
 }
 

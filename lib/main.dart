@@ -1,133 +1,109 @@
-import 'core/analytics.dart';
-import 'core/site_date.dart';
-
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:media_kit/media_kit.dart';
+import 'package:flutter/services.dart';
 
+import 'account/haneoka_account.dart';
 import 'core/app_state.dart';
-import 'core/app_media_lifetime.dart';
-import 'core/music_background.dart';
-import 'core/playback_focus.dart';
+import 'core/i18n.dart';
 import 'l10n/app_localizations.dart';
-import 'shell/shell.dart';
-import 'gacha_history/history_page.dart';
+import 'shell/history_action.dart';
+import 'shell/page_theme.dart';
 import 'ui/save_screen.dart';
-import 'ui/fonts.dart';
-import 'ui/season_layer.dart';
-import 'ui/theme.dart';
-import 'team_builder/engine_client.dart'
-    show runTeamEngineHost, runTeamEngineProcess;
+import 'shell/strings.dart';
+import 'shell/launch.dart';
+import 'shell/web_shell.dart';
 
-Future<void> main(List<String> arguments) async {
-  if (arguments.isNotEmpty &&
-      arguments.first.startsWith('--haneoka-team-engine-process=')) {
-    await runTeamEngineProcess(
-      arguments.first.substring('--haneoka-team-engine-process='.length),
-    );
-    return;
-  }
-  if (arguments.isNotEmpty &&
-      arguments.first.startsWith('--haneoka-team-engine=')) {
-    await runTeamEngineHost(
-      arguments.first.substring('--haneoka-team-engine='.length),
-    );
-    return;
-  }
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  registerAppFontLicenses();
-  MediaKit.ensureInitialized();
-  await SiteDatePreferences.load();
-  final state = await AppState.load(
-    WidgetsBinding.instance.platformDispatcher.locale,
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  runApp(const HaneokaApp());
+  unawaited(
+    HaneokaAccount.instance.load().catchError((Object error) {
+      debugPrint('Account startup: $error');
+    }),
   );
-  AppAnalytics.startLater(enabled: state.analytics);
-  PlaybackFocus.prepare = MusicBackground.prepareSession;
-  Uri? initialAddress;
-  for (final argument in arguments) {
-    if (argument.startsWith('-')) continue;
-    final uri = Uri.tryParse(argument);
-    if (uri != null &&
-        const {'https', 'http', 'file', 'haneoka'}.contains(uri.scheme)) {
-      initialAddress = uri;
-      break;
-    }
-    if (FileSystemEntity.typeSync(argument) != FileSystemEntityType.notFound) {
-      initialAddress = Uri.file(argument, windows: Platform.isWindows);
-      break;
-    }
-  }
-  runApp(
-    AppMediaLifetime(
-      child: AppScope(
-        state: state,
-        child: HaneokaApp(initialAddress: initialAddress),
-      ),
-    ),
-  );
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    unawaited(
-      MusicBackground.initialize(state.audio).catchError((
-        Object error,
-        StackTrace stack,
-      ) {
-        FlutterError.reportError(
-          FlutterErrorDetails(
-            exception: error,
-            stack: stack,
-            context: ErrorDescription('initializing background audio controls'),
-          ),
-        );
-      }),
-    );
-  });
 }
 
-class HaneokaApp extends StatelessWidget {
-  const HaneokaApp({super.key, this.initialAddress});
-  final Uri? initialAddress;
+class HaneokaApp extends StatefulWidget {
+  const HaneokaApp({super.key});
+  @override
+  State<HaneokaApp> createState() => _HaneokaAppState();
+}
+
+class _HaneokaAppState extends State<HaneokaApp> {
+  late Future<AppState> _state = _load();
+
+  Future<AppState> _load() async {
+    final locale = Strings.tag(
+      WidgetsBinding.instance.platformDispatcher.locale,
+    );
+    final text = await SiteText.load(locale)
+        .timeout(const Duration(seconds: 10));
+    return AppState(locale == 'ja' ? 'jp' : 'intl', text);
+  }
+
+  late final _theme = ValueNotifier(
+    PageTheme.fallback(
+      WidgetsBinding.instance.platformDispatcher.platformBrightness,
+    ),
+  );
 
   @override
-  Widget build(BuildContext context) {
-    final state = AppScope.of(context);
-    return MaterialApp(
-      title: 'Haneoka',
-      builder: (context, child) => SaveHistoryActionScope(
-        onReadHistory: openGameHistory,
-        child: SeasonLayer(
-          motif: state.seasonEffects ? state.shownDecoration?.$1 : null,
-          child: child!,
-        ),
-      ),
-      locale: state.locale,
-      theme: haneokaTheme(
-        Brightness.light,
-        seed: state.shownSeed,
-        schemes: state.schemesFor(state.shownSeed),
-        backdrop: state.seasonBackdrop,
-        compact: state.compact,
-        locale: state.locale,
-      ),
-      darkTheme: haneokaTheme(
-        Brightness.dark,
-        seed: state.shownSeed,
-        schemes: state.schemesFor(state.shownSeed),
-        backdrop: state.seasonBackdrop,
-        compact: state.compact,
-        locale: state.locale,
-      ),
-      themeMode: state.themeMode,
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: AppLocalizations.supportedLocales,
-      home: AppShell(initialAddress: initialAddress),
-    );
+  void dispose() {
+    _theme.dispose();
+    super.dispose();
   }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<AppState>(
+    future: _state,
+    builder: (context, snapshot) => ValueListenableBuilder(
+      valueListenable: _theme,
+      builder: (context, theme, _) {
+        final strings = Strings.of(
+          WidgetsBinding.instance.platformDispatcher.locale,
+        );
+        final app = MaterialApp(
+          title: 'Haneoka',
+          debugShowCheckedModeBanner: false,
+          theme: theme.data,
+          locale: switch (theme.locale) {
+            'zh-CN' => const Locale.fromSubtags(
+              languageCode: 'zh',
+              scriptCode: 'Hans',
+            ),
+            'zh-TW' => const Locale.fromSubtags(
+              languageCode: 'zh',
+              scriptCode: 'Hant',
+            ),
+            final tag? => Locale(tag.split('-').first),
+            null => null,
+          },
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          builder: (context, child) => SaveHistoryActionScope(
+            onReadHistory: (context, save) => readHistoryToSite(context, save),
+            child: child!,
+          ),
+          home: snapshot.hasData
+              ? WebShell(theme: _theme)
+              : Scaffold(
+                  body: LaunchScreen(
+                    t: strings,
+                    progress: 0,
+                    slow: false,
+                    error: snapshot.hasError ? strings['startupFailed'] : null,
+                    errorTitle: strings['startupFailed'],
+                    onRetry: () => setState(() => _state = _load()),
+                  ),
+                ),
+        );
+        if (snapshot.data case final state?) {
+          return AppScope(state: state, child: app);
+        }
+        return app;
+      },
+    ),
+  );
 }

@@ -168,7 +168,6 @@
 				33CC10EB2044A3C60003C045 /* Resources */,
 				33CC110E2044A8840003C045 /* Bundle Framework */,
 				3399D490228B24CF009A79C7 /* ShellScript */,
-				A11E0A1A0A1A0A1A0A1A0001 /* Rust Team Engine */,
 			);
 			buildRules = (
 			);
@@ -287,18 +286,6 @@
 			shellPath = /bin/sh;
 			shellScript = "\"$FLUTTER_ROOT\"/packages/flutter_tools/bin/macos_assemble.sh && touch Flutter/ephemeral/tripwire";
 		};
-		A11E0A1A0A1A0A1A0A1A0001 /* Rust Team Engine */ = {
-            isa = PBXShellScriptBuildPhase;
-            alwaysOutOfDate = 1;
-            buildActionMask = 2147483647;
-            files = ();
-            inputPaths = ();
-            name = "Rust Team Engine";
-            outputPaths = ();
-            runOnlyForDeploymentPostprocessing = 0;
-            shellPath = /bin/sh;
-            shellScript = "/bin/sh \"$PROJECT_DIR/../scripts/build_team_engine_apple.sh\"";
-        };
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */

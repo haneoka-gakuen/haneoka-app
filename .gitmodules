@@ -1,4 +1,0 @@
-[submodule "native/team_engine"]
-	path = native/team_engine
-	url = https://github.com/haneoka-gakuen/ournotes-team-builder.git
-	branch = main

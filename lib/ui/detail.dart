@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+
 import '../core/account_resource.dart';
+
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 
 import 'account_image.dart';
-
 
 import 'package:material_new_shapes/material_new_shapes.dart';
 
@@ -617,7 +618,10 @@ class _ZoomView extends StatefulWidget {
 class _ZoomViewState extends State<_ZoomView> {
   late final _pages = PageController(initialPage: widget.initial);
   @override
-  void dispose() { _pages.dispose(); super.dispose(); }
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -626,8 +630,10 @@ class _ZoomViewState extends State<_ZoomView> {
       body: Stack(
         children: [
           StreamBuilder<void>(
-            stream: widget.images.any((url) => isAccountResource(Uri.parse(url)))
-                ? AccountResources.instance.changes : null,
+            stream:
+                widget.images.any((url) => isAccountResource(Uri.parse(url)))
+                ? AccountResources.instance.changes
+                : null,
             builder: (context, _) => PhotoViewGallery.builder(
               key: ValueKey(AccountResources.instance.epoch),
               itemCount: widget.images.length,

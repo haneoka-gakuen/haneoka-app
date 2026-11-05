@@ -2,6 +2,10 @@
 cmake_minimum_required(VERSION 3.14)
 project(haneoka LANGUAGES CXX)
 
+# webview_all_windows still includes <experimental/coroutine>, which current
+# MSVC rejects unless this is defined.
+add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
 set(BINARY_NAME "haneoka")
@@ -106,23 +110,3 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
 install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
-
-find_program(CARGO_EXECUTABLE cargo REQUIRED)
-set(TEAM_ENGINE_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/../native/team_engine")
-set(TEAM_ENGINE_TARGET "${CMAKE_BINARY_DIR}/rust-team-engine")
-if(FLUTTER_TARGET_PLATFORM STREQUAL "windows-arm64")
-  set(TEAM_ENGINE_TRIPLE "aarch64-pc-windows-msvc")
-else()
-  set(TEAM_ENGINE_TRIPLE "x86_64-pc-windows-msvc")
-endif()
-set(TEAM_ENGINE_LIBRARY "${TEAM_ENGINE_TARGET}/${TEAM_ENGINE_TRIPLE}/release/haneoka_team_engine.dll")
-file(GLOB_RECURSE TEAM_ENGINE_FILES CONFIGURE_DEPENDS "${TEAM_ENGINE_SOURCE}/src/*.rs")
-add_custom_command(OUTPUT "${TEAM_ENGINE_LIBRARY}"
-  COMMAND "${CARGO_EXECUTABLE}" build --release --locked
-    --target "${TEAM_ENGINE_TRIPLE}"
-    --manifest-path "${TEAM_ENGINE_SOURCE}/Cargo.toml" --target-dir "${TEAM_ENGINE_TARGET}"
-  DEPENDS ${TEAM_ENGINE_FILES} "${TEAM_ENGINE_SOURCE}/Cargo.toml" "${TEAM_ENGINE_SOURCE}/Cargo.lock"
-  VERBATIM)
-add_custom_target(team_engine_kernel DEPENDS "${TEAM_ENGINE_LIBRARY}")
-add_dependencies(${BINARY_NAME} team_engine_kernel)
-install(FILES "${TEAM_ENGINE_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
