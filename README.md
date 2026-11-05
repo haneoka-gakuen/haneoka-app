@@ -30,6 +30,8 @@ flutter analyze
 flutter run --dart-define=HANEOKA_ORIGIN=http://127.0.0.1:4319
 ```
 
+For Android, add `--dart-define=cronetHttpNoPlay=true` to bundle Cronet independently of Google Play services, as the release workflow does. If Cronet cannot initialize, native requests use Dart HTTP with the existing system proxy routing.
+
 `HANEOKA_ORIGIN` points the app at a local preview; it defaults to `https://haneoka.org`. Packaging for each platform is in [`.github/workflows/release.yml`](.github/workflows/release.yml) and [`scripts/`](scripts).
 
 | Path | Contents |

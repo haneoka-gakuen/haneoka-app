@@ -68,11 +68,11 @@ jobs:
             echo "keyAlias=$KEY_ALIAS"
             echo "keyPassword=$KEY_PASSWORD"
           } > android/key.properties
-      - run: flutter build apk --release --target-platform=${{ env.ANDROID_TARGETS }} --build-name="${{ env.APP_VERSION }}" --build-number="${{ env.ANDROID_BUILD_NUMBER }}" --android-project-arg=force-version-code-ignoring-abi=true --split-per-abi
+      - run: flutter build apk --release --dart-define=cronetHttpNoPlay=true --target-platform=${{ env.ANDROID_TARGETS }} --build-name="${{ env.APP_VERSION }}" --build-number="${{ env.ANDROID_BUILD_NUMBER }}" --android-project-arg=force-version-code-ignoring-abi=true --split-per-abi
       - if: github.event_name != 'workflow_dispatch' || !inputs.only_arm64
-        run: flutter build apk --release --target-platform=${{ env.ANDROID_TARGETS }} --build-name="${{ env.APP_VERSION }}" --build-number="${{ env.ANDROID_BUILD_NUMBER }}" --android-project-arg=force-version-code-ignoring-abi=true
+        run: flutter build apk --release --dart-define=cronetHttpNoPlay=true --target-platform=${{ env.ANDROID_TARGETS }} --build-name="${{ env.APP_VERSION }}" --build-number="${{ env.ANDROID_BUILD_NUMBER }}" --android-project-arg=force-version-code-ignoring-abi=true
       - if: github.event_name != 'workflow_dispatch' || !inputs.only_arm64
-        run: flutter build appbundle --release --target-platform=${{ env.ANDROID_TARGETS }} --build-name="${{ env.APP_VERSION }}" --build-number="${{ env.ANDROID_BUILD_NUMBER }}" --android-project-arg=force-version-code-ignoring-abi=true
+        run: flutter build appbundle --release --dart-define=cronetHttpNoPlay=true --target-platform=${{ env.ANDROID_TARGETS }} --build-name="${{ env.APP_VERSION }}" --build-number="${{ env.ANDROID_BUILD_NUMBER }}" --android-project-arg=force-version-code-ignoring-abi=true
       - name: Collect
         run: |
           mkdir dist
