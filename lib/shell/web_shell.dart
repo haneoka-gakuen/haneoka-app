@@ -195,7 +195,7 @@ class _WebShellState extends State<WebShell> {
               ..add(page.origin);
           }
           _document++;
-          _requestedPage = page;
+          if (!Platform.isWindows) _requestedPage = page;
           _loaded = false;
           _httpFailed = false;
           _startLoading();
@@ -541,6 +541,17 @@ class _WebShellState extends State<WebShell> {
         unawaited(_loadPage(page));
         return NavigationDecision.prevent;
       }
+      if (_loaded) {
+        _lastFailure = null;
+        _triedOrigins
+          ..clear()
+          ..add(page.origin);
+      }
+      _requestedPage = page;
+      _document++;
+      _loaded = false;
+      _httpFailed = false;
+      _startLoading();
       return NavigationDecision.navigate;
     }
     if (const {'about', 'blob', 'data', 'javascript'}.contains(uri.scheme)) {
