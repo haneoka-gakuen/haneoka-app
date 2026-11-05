@@ -256,6 +256,7 @@ jobs:
     if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'apple' || github.event.inputs.platform == 'macos' || github.event.inputs.platform == 'ios'
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix: ${{ fromJSON(github.event.inputs.platform == 'ios' && '{"include":[{"kind":"ios","arch":"arm64","runner":"macos-26"}]}' || github.event.inputs.platform == 'macos' && '{"include":[{"kind":"macos","arch":"x64","runner":"macos-26-intel"},{"kind":"macos","arch":"arm64","runner":"macos-26"}]}' || '{"include":[{"kind":"macos","arch":"x64","runner":"macos-26-intel"},{"kind":"macos","arch":"arm64","runner":"macos-26"},{"kind":"ios","arch":"arm64","runner":"macos-26"}]}') }}
     runs-on: ${{ matrix.runner }}
     steps:
@@ -339,11 +340,34 @@ jobs:
             [[ "$prepared" == "$version" ]] || { echo "::error::Tag and pubspec version differ"; exit 1; }
           fi
           echo "APP_VERSION=$version" >> "$GITHUB_ENV"
+      - name: Verify complete release packages
+        if: startsWith(github.ref, 'refs/tags/') && (github.event_name != 'workflow_dispatch' || inputs.platform == 'all')
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          required = {
+              'haneoka-android-arm64-v8a.apk', 'haneoka-android-x86_64.apk',
+              'haneoka-android.apk', 'haneoka-android.aab',
+              'haneoka-ios-unsigned.ipa', 'haneoka-ios-trollstore.tipa',
+              'haneoka-windows-x64.zip', 'haneoka-windows-x64.msi',
+              'haneoka-windows-x64-setup.exe', 'haneoka-windows-x64.msix',
+          }
+          for arch in ('x64', 'arm64'):
+              required.update(f'haneoka-linux-{arch}.{extension}'
+                              for extension in ('tar.gz', 'deb', 'rpm', 'pkg.tar.zst', 'flatpak'))
+              required.update(f'haneoka-macos-{arch}.{extension}'
+                              for extension in ('zip', 'dmg', 'pkg'))
+          missing = sorted(name for name in required
+                           if not (Path('dist') / name).is_file() or not (Path('dist') / name).stat().st_size)
+          if missing:
+              raise SystemExit('Missing release packages: ' + ', '.join(missing))
+          PYTHON
       - name: Distribution manifests
         run: python3 scripts/release_metadata.py --dist dist --version "$APP_VERSION" --build-number "${{ github.run_number }}" --repository "$GITHUB_REPOSITORY"
       - uses: actions/upload-artifact@v4
         with:
           name: distribution-manifests
+          overwrite: true
           path: |
             dist/SHA256SUMS
             dist/release-version.json
