@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'account/haneoka_account.dart';
 import 'core/app_state.dart';
 import 'core/i18n.dart';
+import 'core/site_origin.dart';
 import 'l10n/app_localizations.dart';
 import 'shell/history_action.dart';
 import 'shell/page_theme.dart';
@@ -35,6 +36,7 @@ class _HaneokaAppState extends State<HaneokaApp> {
   late Future<AppState> _state = _load();
 
   Future<AppState> _load() async {
+    await SiteOrigin.instance.load();
     final locale = Strings.tag(
       WidgetsBinding.instance.platformDispatcher.locale,
     );

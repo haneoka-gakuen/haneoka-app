@@ -6,10 +6,9 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../core/net.dart';
+import '../core/site_origin.dart';
 import '../save/game_save.dart';
 import '../save/save_view.dart';
-
-const _origin = 'https://haneoka.org';
 
 /// A player linked to the Haneoka account (`community_game_account`).
 class LinkedPlayer {
@@ -55,7 +54,15 @@ class AccountError implements Exception {
 /// from the web view's cookies so native screens are always signed in exactly
 /// when the site is, plus the Our Notes players linked to it.
 class HaneokaAccount extends ChangeNotifier {
-  HaneokaAccount._();
+  HaneokaAccount._() {
+    SiteOrigin.instance.addListener(() {
+      _token = null;
+      _user = null;
+      profile = null;
+      _players = const [];
+      notifyListeners();
+    });
+  }
   static final HaneokaAccount instance = HaneokaAccount._();
 
   /// The web view's cookies for the site, provided by the web shell.
@@ -93,7 +100,10 @@ class HaneokaAccount extends ChangeNotifier {
 
   /// Reads the session and the linked players again.
   Future<void> refresh() async {
-    _token = await siteCookies?.call();
+    final origin = SiteOrigin.instance.value;
+    final token = await siteCookies?.call();
+    if (origin != SiteOrigin.instance.value) return;
+    _token = token;
     if (_token == null || _token!.isEmpty) {
       if (_user != null) {
         await _forget();
@@ -103,6 +113,7 @@ class HaneokaAccount extends ChangeNotifier {
     }
     try {
       final session = await request('GET', '/api/auth/get-session');
+      if (origin != SiteOrigin.instance.value) return;
       final user = (session as Map?)?['user'];
       if (user is! Map) {
         await _forget();
@@ -114,6 +125,7 @@ class HaneokaAccount extends ChangeNotifier {
           'GET',
           '/api/v1/account/profile',
         ) as Map?)?['profile'];
+        if (origin != SiteOrigin.instance.value) return;
         if (profile is Map) {
           this.profile = profile.cast<String, Object?>();
           _user = {
@@ -128,8 +140,10 @@ class HaneokaAccount extends ChangeNotifier {
       } on AccountError {
         // A profile not set up yet still signs in.
       }
+      if (origin != SiteOrigin.instance.value) return;
       await _readPlayers();
     } on AccountError catch (error) {
+      if (origin != SiteOrigin.instance.value) return;
       if (error.code == 'unauthenticated') await _forget();
     } catch (_) {
       // Offline: keep the stored session for next time.
@@ -250,10 +264,11 @@ class HaneokaAccount extends ChangeNotifier {
     Map<String, String> headers = const {},
   }) async {
     final owner = _user?['id'], token = _token;
-    final request = http.Request(method, Uri.parse('$_origin$path'))
+    final origin = SiteOrigin.instance.value.origin;
+    final request = http.Request(method, Uri.parse('$origin$path'))
       ..headers.addAll({
         'Accept': 'application/json',
-        'Origin': _origin,
+        'Origin': origin,
         if (authorized && _token != null) 'Cookie': _token!,
         if (body != null) 'Content-Type': 'application/json',
         ...headers,
@@ -263,7 +278,8 @@ class HaneokaAccount extends ChangeNotifier {
     final response = await http.Response.fromStream(
       await netClient.send(request),
     );
-    if (authorized && (owner != _user?['id'] || token != _token)) {
+    if (origin != SiteOrigin.instance.value.origin ||
+        (authorized && (owner != _user?['id'] || token != _token))) {
       throw const AccountError('session_changed');
     }
     final text = utf8.decode(response.bodyBytes);

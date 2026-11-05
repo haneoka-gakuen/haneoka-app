@@ -15,6 +15,10 @@ class LaunchScreen extends StatelessWidget {
     this.onRetry,
     this.onSaves,
     this.onOpenBrowser,
+    this.siteHost = 'haneoka.org',
+    this.alternativeHost,
+    this.onSwitchSite,
+    this.onCopyDiagnostics,
   });
   final Strings t;
   final int progress;
@@ -24,6 +28,10 @@ class LaunchScreen extends StatelessWidget {
   final VoidCallback? onRetry;
   final VoidCallback? onSaves;
   final VoidCallback? onOpenBrowser;
+  final String siteHost;
+  final String? alternativeHost;
+  final VoidCallback? onSwitchSite;
+  final VoidCallback? onCopyDiagnostics;
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +87,7 @@ class LaunchScreen extends StatelessWidget {
                   Text(
                     progress > 0
                         ? t.format('loading', {'percent': progress})
-                        : t['connecting'],
+                        : t.format('connecting', {'host': siteHost}),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),
@@ -123,6 +131,17 @@ class LaunchScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
+          if (alternativeHost != null && onSwitchSite != null) ...[
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onSwitchSite,
+                icon: const Icon(Symbols.swap_horiz_rounded),
+                label: Text(t.format('switchSite', {'host': alternativeHost!})),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           if (onOpenBrowser != null) ...[
             SizedBox(
               width: double.infinity,
@@ -143,6 +162,12 @@ class LaunchScreen extends StatelessWidget {
               icon: const Icon(Symbols.sports_esports_rounded),
               label: Text(t['readSave']),
             ),
+          ),
+        if (failed && onCopyDiagnostics != null)
+          TextButton.icon(
+            onPressed: onCopyDiagnostics,
+            icon: const Icon(Symbols.content_copy_rounded),
+            label: Text(t['copyDiagnostics']),
           ),
       ],
     );

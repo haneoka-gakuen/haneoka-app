@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:app_links/app_links.dart';
 import 'package:file_picker/file_picker.dart';
@@ -11,11 +12,13 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_all/webview_all.dart';
 import 'package:webview_all_android/webview_all_android.dart';
+import 'package:webview_all_windows/webview_all_windows.dart';
 
 import '../ui/game_account_sheet.dart';
 import '../ui/import_screen.dart';
 import '../account/haneoka_account.dart';
 import '../core/app_state.dart';
+import '../core/site_origin.dart';
 import '../save/game_save.dart';
 import '../save/save_view.dart';
 import '../save/song_marks.dart';
@@ -33,13 +36,7 @@ import 'site.dart';
 import 'sign_in.dart';
 import 'strings.dart';
 
-/// The website, overridable for testing a local preview.
-final origin = Uri.parse(
-  const String.fromEnvironment(
-    'HANEOKA_ORIGIN',
-    defaultValue: 'https://haneoka.org',
-  ),
-);
+Uri get origin => SiteOrigin.instance.value;
 
 /// The whole app: the live website, with native bars in its colours and the
 /// app-only work (game accounts, game-server reads, provider sign-in, file
@@ -55,13 +52,25 @@ class _WebShellState extends State<WebShell> {
   WebViewController? _web;
   WebViewController get _controller => _web!;
   bool _initialized = false;
+  Future<void>? _starting;
   int _attempt = 0;
   int _document = 0;
+  int _loadSerial = 0;
   Uri? _requestedPage;
+  bool _isRequestedPage(Uri page) =>
+      page.origin == _requestedPage?.origin &&
+      page.path == _requestedPage?.path &&
+      page.query == _requestedPage?.query;
   Timer? _deadline;
+  Timer? _readiness;
+  bool _checkingLoaded = false;
+  final Set<String> _triedOrigins = {};
+  String? _lastFailure;
+  String _version = '';
   final _links = AppLinks();
   StreamSubscription<Uri>? _linkSubscription;
   bool _loaded = false;
+  bool _httpFailed = false;
   bool _launchVisible = true;
 
   /// The main frame's load error, shown on the launch page with Retry.
@@ -98,12 +107,17 @@ class _WebShellState extends State<WebShell> {
     HaneokaAccount.siteCookies = null;
     _slowTimer?.cancel();
     _deadline?.cancel();
+    _readiness?.cancel();
     _attempt++;
     _linkSubscription?.cancel();
     super.dispose();
   }
 
-  Future<void> _start() async {
+  Future<void> _start() => _starting ??= _startAttempt().whenComplete(() {
+    _starting = null;
+  });
+
+  Future<void> _startAttempt() async {
     final attempt = ++_attempt;
     _initialized = false;
     _startLoading();
@@ -111,9 +125,12 @@ class _WebShellState extends State<WebShell> {
       await _configure(attempt).timeout(const Duration(seconds: 20));
     } catch (error, stack) {
       debugPrint('WebView startup: $error\n$stack');
+      _lastFailure =
+          'initialization: ${error is PlatformException ? error.code : error.runtimeType}';
       if (mounted && attempt == _attempt) {
         _attempt++;
-        _fail(_t['webviewFailed']);
+        _initialized = false;
+        _fail(_t['webviewFailed'], tryAlternative: false);
       }
     }
   }
@@ -124,21 +141,28 @@ class _WebShellState extends State<WebShell> {
     if (!active()) return;
     setState(() => _web = controller);
     final info = await PackageInfo.fromPlatform();
+    _version = info.version;
     await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
     await controller.setBackgroundColor(_theme.background);
     final agent = await controller.getUserAgent();
-    await controller.setUserAgent(
-      '${agent ?? ''} HaneokaApp/${info.version}'.trim(),
+    if (agent != null && agent.trim().isNotEmpty) {
+      await controller.setUserAgent('$agent HaneokaApp/${info.version}');
+    }
+    final random = Random.secure();
+    final token = base64UrlEncode(
+      List.generate(32, (_) => random.nextInt(256)),
     );
     await controller.addJavaScriptChannel(
       bridgeChannel,
       onMessageReceived: (message) {
-        if (active()) unawaited(_message(message.message));
+        if (active()) unawaited(_message(message, token));
       },
     );
     final script = bridgeScript(
       version: info.version,
       platform: Platform.operatingSystem,
+      token: token,
+      origins: SiteOrigin.instance.origins.map((site) => site.origin).toList(),
     );
     final userScript = await controller.isUserScriptInjectionSupported(
       WebViewUserScriptInjectionTime.documentStart,
@@ -159,15 +183,39 @@ class _WebShellState extends State<WebShell> {
             active() ? _navigate(request) : NavigationDecision.prevent,
         onPageStarted: (url) {
           if (!active()) return;
+          final page = Uri.tryParse(url);
+          if (!SiteOrigin.instance.contains(page) ||
+              page!.origin != origin.origin) {
+            return;
+          }
+          if (_loaded) {
+            _lastFailure = null;
+            _triedOrigins
+              ..clear()
+              ..add(page.origin);
+          }
           _document++;
-          _requestedPage = Uri.tryParse(url);
-          if (!_loaded) _startLoading();
+          _requestedPage = page;
+          _loaded = false;
+          _httpFailed = false;
+          _startLoading();
           if (!userScript) _inject(script);
+        },
+        onUrlChange: (change) {
+          if (!active()) return;
+          final page = Uri.tryParse(change.url ?? '');
+          if (SiteOrigin.instance.contains(page) &&
+              page!.origin == origin.origin) {
+            _requestedPage = page;
+          }
         },
         onProgress: (progress) {
           if (!active() || _loaded || _error != null) return;
           setState(() => _progress = progress);
-          if (progress == 100) unawaited(_checkLoaded());
+          if (progress == 100) {
+            _inject(script);
+            unawaited(_checkLoaded());
+          }
         },
         onPageFinished: (url) {
           if (!active()) return;
@@ -176,16 +224,19 @@ class _WebShellState extends State<WebShell> {
           if (server == 'jp' || server == 'intl') {
             AppScope.of(context).setServer(server!);
           }
-          if (!userScript) _inject(script);
+          _inject(script);
           unawaited(_checkLoaded());
         },
         onWebResourceError: (error) {
           if (!active() || error.isForMainFrame == false) return;
-          if (error.url?.isNotEmpty == true &&
-              Uri.tryParse(error.url!) != _requestedPage) {
+          final failedPage = Uri.tryParse(error.url ?? '');
+          if (SiteOrigin.instance.contains(failedPage) &&
+              failedPage!.origin != origin.origin) {
             return;
           }
           if (error.isForMainFrame == true) {
+            _lastFailure =
+                'web ${error.errorCode}: ${error.errorType?.name ?? 'unknown'}';
             _fail(
               error.description.isEmpty
                   ? 'Error ${error.errorCode}'
@@ -197,7 +248,13 @@ class _WebShellState extends State<WebShell> {
         },
         onHttpError: (error) {
           if (!active() || error.request?.uri != _requestedPage) return;
-          _fail('HTTP ${error.response?.statusCode ?? ''}'.trim());
+          final status = error.response?.statusCode;
+          _httpFailed = true;
+          _lastFailure = 'HTTP $status';
+          _fail(
+            'HTTP ${status ?? ''}'.trim(),
+            tryAlternative: status == 408 || (status != null && status >= 500),
+          );
         },
       ),
     );
@@ -208,10 +265,8 @@ class _WebShellState extends State<WebShell> {
     if (!active()) return;
     _initialized = true;
     _requestedPage ??= _page(initial) ?? _home;
-    await controller.loadRequest(_requestedPage!);
-    if (!active()) return;
-    if (initial?.scheme == 'haneoka' && initial?.host == 'saves') _openSaves();
     await _linkSubscription?.cancel();
+    if (!active()) return;
     _linkSubscription = _links.uriLinkStream.listen((uri) {
       if (uri.scheme == 'haneoka' && uri.host == 'saves') {
         _openSaves();
@@ -219,6 +274,8 @@ class _WebShellState extends State<WebShell> {
         unawaited(_loadPage(page));
       }
     });
+    unawaited(_loadPage(_requestedPage!, resetOrigins: false));
+    if (initial?.scheme == 'haneoka' && initial?.host == 'saves') _openSaves();
   }
 
   void _inject(String script) {
@@ -230,20 +287,23 @@ class _WebShellState extends State<WebShell> {
   }
 
   Future<void> _checkLoaded() async {
+    if (_checkingLoaded || !_initialized || _loaded || _web == null) return;
+    _checkingLoaded = true;
     final attempt = _attempt, document = _document;
-    await Future<void>.delayed(const Duration(milliseconds: 250));
-    if (!mounted ||
-        _loaded ||
-        _web == null ||
-        attempt != _attempt ||
-        document != _document) {
-      return;
-    }
     try {
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      if (!mounted ||
+          _loaded ||
+          _web == null ||
+          attempt != _attempt ||
+          document != _document) {
+        return;
+      }
       Object? answer = await _controller
           .runJavaScriptReturningResult(
-            'JSON.stringify({locale:document.documentElement.dataset.locale || "",'
+            'JSON.stringify({url:location.href,locale:document.documentElement.dataset.locale || "",'
             'main:!!document.querySelector("main"),ready:document.readyState,'
+            'status:performance.getEntriesByType("navigation")[0]?.responseStatus || 0,'
             'error:(document.body?.innerText.match(/net::ERR_[A-Z_]+/) || [""])[0]})',
           )
           .timeout(const Duration(seconds: 3));
@@ -257,6 +317,19 @@ class _WebShellState extends State<WebShell> {
           answer is! Map) {
         return;
       }
+      final page = Uri.tryParse('${answer['url'] ?? ''}');
+      if (!SiteOrigin.instance.contains(page) ||
+          page!.origin != origin.origin ||
+          !_isRequestedPage(page)) {
+        return;
+      }
+      final status = answer['status'];
+      if (status is num && status >= 400) {
+        _httpFailed = true;
+        _lastFailure = 'HTTP $status';
+        _fail('HTTP $status', tryAlternative: status == 408 || status >= 500);
+        return;
+      }
       if (answer['locale'] != '' && answer['main'] == true) {
         _showPage();
       } else if ('${answer['error'] ?? ''}'.isNotEmpty) {
@@ -264,20 +337,42 @@ class _WebShellState extends State<WebShell> {
       }
     } catch (error) {
       debugPrint('Page readiness: $error');
+    } finally {
+      _checkingLoaded = false;
     }
   }
 
   void _showPage() {
-    if (_error != null || _loaded || !mounted) return;
+    if (_loaded || _httpFailed || !mounted) return;
     _slowTimer?.cancel();
     _deadline?.cancel();
-    setState(() => _loaded = true);
+    _readiness?.cancel();
+    setState(() {
+      _loaded = true;
+      _error = null;
+    });
+    unawaited(
+      SiteOrigin.instance.remember().catchError((Object error) {
+        debugPrint('Site preference: $error');
+      }),
+    );
   }
 
-  void _fail(String error) {
+  void _fail(String error, {bool tryAlternative = true}) {
     if (!mounted) return;
+    final page = _requestedPage;
+    final next = SiteOrigin.instance.untried(_triedOrigins);
+    if (tryAlternative && _initialized && page != null && next != null) {
+      _lastFailure ??= error;
+      setState(() => _launchVisible = true);
+      unawaited(
+        _loadPage(SiteOrigin.instance.at(next, page), resetOrigins: false),
+      );
+      return;
+    }
     _slowTimer?.cancel();
     _deadline?.cancel();
+    _readiness?.cancel();
     setState(() {
       _error = error;
       _loaded = false;
@@ -288,6 +383,10 @@ class _WebShellState extends State<WebShell> {
   void _startLoading() {
     _slowTimer?.cancel();
     _deadline?.cancel();
+    _readiness?.cancel();
+    _readiness = Timer.periodic(const Duration(milliseconds: 750), (_) {
+      unawaited(_checkLoaded());
+    });
     _slow = false;
     _slowTimer = Timer(const Duration(seconds: 8), () {
       if (mounted && !_loaded) setState(() => _slow = true);
@@ -296,12 +395,20 @@ class _WebShellState extends State<WebShell> {
     _deadline = Timer(const Duration(seconds: 30), () async {
       await _checkLoaded();
       if (mounted && !_loaded && attempt == _attempt && document == _document) {
+        _lastFailure ??= 'document readiness timeout';
         _fail(_t['loadTimeout']);
       }
     });
   }
 
-  Future<void> _loadPage(Uri page) async {
+  Future<void> _loadPage(Uri page, {bool resetOrigins = true}) async {
+    final serial = ++_loadSerial;
+    if (resetOrigins) {
+      _triedOrigins.clear();
+      _lastFailure = null;
+    }
+    _triedOrigins.add(page.origin);
+    SiteOrigin.instance.select(page);
     _requestedPage = page;
     if (!_initialized) {
       await _start();
@@ -311,6 +418,8 @@ class _WebShellState extends State<WebShell> {
     setState(() {
       _error = null;
       _progress = 0;
+      _loaded = false;
+      _httpFailed = false;
     });
     _document++;
     _startLoading();
@@ -318,11 +427,16 @@ class _WebShellState extends State<WebShell> {
       await _controller.loadRequest(page).timeout(const Duration(seconds: 15));
     } catch (error) {
       debugPrint('Page navigation: $error');
-      if (mounted && attempt == _attempt) _fail(_t['offline']);
+      if (mounted && attempt == _attempt && serial == _loadSerial) {
+        _lastFailure = 'navigation: ${error.runtimeType}';
+        _fail(_t.format('offline', {'host': origin.host}));
+      }
     }
   }
 
   Future<void> _retry() async {
+    _lastFailure = null;
+    _triedOrigins.clear();
     setState(() {
       _error = null;
       _progress = 0;
@@ -332,6 +446,46 @@ class _WebShellState extends State<WebShell> {
     } else {
       await _loadPage(_requestedPage ?? _home);
     }
+  }
+
+  Future<void> _switchSite() async {
+    final next = SiteOrigin.instance.alternative;
+    if (next == null) return;
+    _lastFailure = null;
+    _triedOrigins
+      ..clear()
+      ..addAll(SiteOrigin.instance.origins.map((site) => site.origin));
+    await _loadPage(
+      SiteOrigin.instance.at(next, _requestedPage ?? _home),
+      resetOrigins: false,
+    );
+  }
+
+  Future<void> _copyDiagnostics() async {
+    String? runtime;
+    if (Platform.isWindows) {
+      try {
+        runtime = await WindowsWebViewController.getWebViewVersion().timeout(
+          const Duration(seconds: 3),
+        );
+      } catch (_) {}
+    }
+    final page = _requestedPage ?? _home;
+    final address = page.toString().split(RegExp(r'[?#]')).first;
+    await Clipboard.setData(
+      ClipboardData(
+        text: [
+          'Haneoka $_version',
+          'Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}',
+          if (runtime != null) 'WebView2: $runtime',
+          'Page: $address',
+          'Attempted: ${_triedOrigins.join(', ')}',
+          'Progress: $_progress',
+          'Failure: ${_lastFailure ?? _error ?? 'none'}',
+        ].join('\n'),
+      ),
+    );
+    if (mounted) _say(_t['copied']);
   }
 
   /// The site's cookies in the web view, for native requests that act as the
@@ -369,7 +523,9 @@ class _WebShellState extends State<WebShell> {
   /// app's `haneoka://gacha-history` as the page.
   Uri? _page(Uri? link) {
     if (link == null) return null;
-    if (link.host == origin.host) return link;
+    if (SiteOrigin.instance.contains(link)) {
+      return SiteOrigin.instance.local(link);
+    }
     if (link.scheme == 'haneoka' && link.host == 'gacha-history') {
       return _home.resolve('gacha-history/');
     }
@@ -379,8 +535,15 @@ class _WebShellState extends State<WebShell> {
   FutureOr<NavigationDecision> _navigate(NavigationRequest request) {
     final uri = Uri.tryParse(request.url);
     if (uri == null || !request.isMainFrame) return NavigationDecision.navigate;
-    if (uri.host == origin.host ||
-        const {'about', 'blob', 'data', 'javascript'}.contains(uri.scheme)) {
+    if (SiteOrigin.instance.contains(uri)) {
+      final page = SiteOrigin.instance.local(uri);
+      if (page != uri) {
+        unawaited(_loadPage(page));
+        return NavigationDecision.prevent;
+      }
+      return NavigationDecision.navigate;
+    }
+    if (const {'about', 'blob', 'data', 'javascript'}.contains(uri.scheme)) {
       return NavigationDecision.navigate;
     }
     if (uri.scheme != 'haneoka') {
@@ -463,20 +626,48 @@ class _WebShellState extends State<WebShell> {
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(message)));
 
-  Future<void> _message(String text) async {
+  Future<void> _message(JavaScriptMessage incoming, String token) async {
+    if (incoming.isMainFrame == false || incoming.sourceOrigin == 'null') {
+      return;
+    }
+    final document = _document;
     final Map<String, Object?> message;
     try {
-      message = (jsonDecode(text) as Map).cast<String, Object?>();
+      final decoded = jsonDecode(incoming.message);
+      if (decoded is! Map) return;
+      message = decoded.cast<String, Object?>();
     } on FormatException {
+      return;
+    }
+    if (message['bridge'] != token) return;
+    final page = Uri.tryParse('${message['page'] ?? ''}');
+    if (!SiteOrigin.instance.contains(page) || page!.origin != origin.origin) {
+      return;
+    }
+    if (incoming.sourceUrl case final source?) {
+      final uri = Uri.tryParse(source);
+      if (!SiteOrigin.instance.contains(uri) || uri!.origin != page.origin) {
+        return;
+      }
+    }
+    if (incoming.sourceOrigin != null && incoming.sourceOrigin != page.origin) {
+      return;
+    }
+    final status = message['status'];
+    if (status is num && status >= 400) {
+      _httpFailed = true;
+      _lastFailure = 'HTTP $status';
+      _fail('HTTP $status', tryAlternative: status == 408 || status >= 500);
       return;
     }
     final args = (message['args'] as Map?)?.cast<String, Object?>() ?? {};
     switch (message['method']) {
       case 'painted':
-        return _showPage();
+        if (_isRequestedPage(page)) _showPage();
+        return;
       case 'theme':
-        if (_error != null) return;
         if (PageTheme.read(args, _theme) case final theme?) {
+          if (_isRequestedPage(page)) _showPage();
           final state = AppScope.of(context);
           if (theme.locale case final locale?) {
             unawaited(state.setLocale(locale));
@@ -539,6 +730,9 @@ class _WebShellState extends State<WebShell> {
       };
     } catch (failure) {
       error = '$failure';
+    }
+    if (!mounted || document != _document || page.origin != origin.origin) {
+      return;
     }
     await _controller.runJavaScript(
       'window.__haneokaAppResolve($id, ${jsonEncode(error)}, ${jsonEncode(value)})',
@@ -686,9 +880,12 @@ class _WebShellState extends State<WebShell> {
                     fit: StackFit.expand,
                     children: [
                       if (_web case final controller?)
-                        WebViewWidget(
-                          key: ValueKey(controller),
-                          controller: controller,
+                        Offstage(
+                          offstage: _launchVisible && !_loaded,
+                          child: WebViewWidget(
+                            key: ValueKey(controller),
+                            controller: controller,
+                          ),
                         ),
                       if (_launchVisible)
                         IgnorePointer(
@@ -709,10 +906,17 @@ class _WebShellState extends State<WebShell> {
                                 slow: _slow,
                                 error: _error,
                                 errorTitle: _initialized
-                                    ? _t['offline']
+                                    ? _t.format('offline', {
+                                        'host': origin.host,
+                                      })
                                     : _t['startupFailed'],
                                 onRetry: _retry,
                                 onSaves: _openSaves,
+                                siteHost: origin.host,
+                                alternativeHost:
+                                    SiteOrigin.instance.alternative?.host,
+                                onSwitchSite: _switchSite,
+                                onCopyDiagnostics: _copyDiagnostics,
                                 onOpenBrowser: () => launchUrl(
                                   _requestedPage ?? _home,
                                   mode: LaunchMode.externalApplication,

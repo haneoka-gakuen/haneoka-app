@@ -6,17 +6,82 @@ const bridgeChannel = 'HaneokaAppChannel';
 /// Injected at document start of every page: `window.haneokaApp` for the
 /// website's app hooks (`src/lib/app-bridge.ts`), the page's colours for the
 /// native bars and sheets, and file downloads, which a web view drops.
-String bridgeScript({required String version, required String platform}) =>
-    _script
-        .replaceFirst('__VERSION__', jsonEncode(version))
-        .replaceFirst('__PLATFORM__', jsonEncode(platform))
-        .replaceFirst('__CHANNEL__', bridgeChannel);
+String bridgeScript({
+  required String version,
+  required String platform,
+  required String token,
+  required List<String> origins,
+}) => _script
+    .replaceFirst('__VERSION__', jsonEncode(version))
+    .replaceFirst('__PLATFORM__', jsonEncode(platform))
+    .replaceFirst('__TOKEN__', jsonEncode(token))
+    .replaceAll('__ORIGINS__', jsonEncode(origins))
+    .replaceFirst('__CHANNEL__', bridgeChannel);
 
 const _script = r'''
-(() => {
+(function installAppBridge(attempt = 0) {
+  if (window.top !== window || !__ORIGINS__.includes(location.origin)) return;
   if (window.haneokaApp) return;
   const channel = window.__CHANNEL__;
-  const post = (message) => channel.postMessage(JSON.stringify(message));
+  if (!channel || typeof channel.postMessage !== "function") {
+    if (attempt < 200) setTimeout(() => installAppBridge(attempt + 1), 25);
+    return;
+  }
+  const post = (message) => channel.postMessage(JSON.stringify({
+    ...message, bridge: __TOKEN__, page: location.href,
+    status: performance.getEntriesByType("navigation")[0]?.responseStatus || 0,
+  }));
+  const origins = __ORIGINS__;
+  const localResource = (value) => {
+    if (!/^https?:\/\//i.test(value)) return value;
+    try {
+      const url = new URL(value);
+      if (origins.includes(url.origin) && url.origin !== location.origin) {
+        url.protocol = location.protocol;
+        url.host = location.host;
+        return url.href;
+      }
+    } catch (_) {}
+    return value;
+  };
+  const nativeFetch = window.fetch;
+  window.fetch = function (input, init) {
+    const request = input instanceof Request ? input : null;
+    const method = String(init?.method ?? request?.method ?? "GET").toUpperCase();
+    const headers = new Headers(init?.headers ?? request?.headers);
+    if ((method === "GET" || method === "HEAD") && !headers.has("Authorization")) {
+      const address = request ? request.url : String(input);
+      const local = localResource(address);
+      if (local !== address) input = request ? new Request(local, request) : local;
+    }
+    return nativeFetch.call(window, input, init);
+  };
+  const resourceSelector = 'img[src],img[srcset],source[src],source[srcset],video[src],video[poster],audio[src],script[src],link[rel="stylesheet"][href]';
+  const remapResource = (element) => {
+    for (const attribute of ["src", "poster", "href", "srcset"]) {
+      const address = element.getAttribute(attribute);
+      if (!address) continue;
+      let local = address;
+      if (attribute === "srcset") {
+        for (const site of origins) {
+          if (site !== location.origin) local = local.split(site + "/").join(location.origin + "/");
+        }
+      } else local = localResource(address);
+      if (local !== address) element.setAttribute(attribute, local);
+    }
+  };
+  const remapTree = (node) => {
+    if (!(node instanceof Element)) return;
+    if (node.matches(resourceSelector)) remapResource(node);
+    node.querySelectorAll(resourceSelector).forEach(remapResource);
+  };
+  new MutationObserver((records) => {
+    for (const record of records) {
+      if (record.type === "attributes" && record.target.matches(resourceSelector)) remapResource(record.target);
+      else record.addedNodes.forEach(remapTree);
+    }
+  }).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ["src", "srcset", "poster", "href"] });
+  remapTree(document.documentElement);
   const pending = new Map();
   let next = 0;
   window.haneokaApp = Object.freeze({
@@ -230,7 +295,7 @@ const _script = r'''
     const text = JSON.stringify({ ...message, args: { ...message.args, duration: 0 } });
     if (text === reported) return;
     reported = text;
-    channel.postMessage(JSON.stringify(message));
+    post(message);
   };
   const spatial = new Set(["transform", "translate", "scale", "width", "height", "left", "right", "top", "bottom", "clip-path"]);
   const moving = (animation) => {
@@ -291,7 +356,7 @@ const _script = r'''
     (event) => {
       const link = event.target instanceof Element ? event.target.closest("a[download]") : null;
       if (!link || !link.href) return;
-      const url = new URL(link.href, location.href);
+      const url = new URL(localResource(link.href), location.href);
       if (url.protocol !== "blob:" && url.protocol !== "data:" && url.origin !== location.origin) return;
       event.preventDefault();
       const name = link.getAttribute("download") || url.pathname.split("/").pop() || "download";

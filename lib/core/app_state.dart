@@ -2,11 +2,14 @@ import 'package:flutter/widgets.dart';
 
 import 'api.dart';
 import 'i18n.dart';
+import 'site_origin.dart';
 
 /// What the native account screens need from the app: the release server,
 /// the website's text in the page's language and the API client.
 class AppState extends ChangeNotifier {
-  AppState(this.server, this.text);
+  AppState(this.server, this.text) {
+    SiteOrigin.instance.addListener(_siteChanged);
+  }
 
   String server;
   SiteText text;
@@ -20,14 +23,37 @@ class AppState extends ChangeNotifier {
   final bool difficultyEstimates = false;
 
   /// Changes when the cached public data should be read again.
-  Object get publicDataKey => (server, text.locale);
+  Object get publicDataKey =>
+      (server, text.locale, SiteOrigin.instance.value.origin);
 
   /// Both formal releases, for the cross-server catalogue.
   Map<String, HaneokaApi> get catalogApis => {
     for (final value in const ['jp', 'intl']) value: apiFor(value),
   };
 
-  HaneokaApi apiFor(String value) => _apis[value] ??= HaneokaApi(server: value);
+  HaneokaApi apiFor(String value) => _apis[value] ??= HaneokaApi(
+    server: value,
+    origin: const String.fromEnvironment('HANEOKA_API_ORIGIN').isNotEmpty
+        ? const String.fromEnvironment('HANEOKA_API_ORIGIN')
+        : SiteOrigin.instance.value.origin,
+  );
+
+  void _siteChanged() {
+    for (final api in _apis.values) {
+      api.dispose();
+    }
+    _apis.clear();
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    SiteOrigin.instance.removeListener(_siteChanged);
+    for (final api in _apis.values) {
+      api.dispose();
+    }
+    super.dispose();
+  }
 
   String songTitle(Object? value) => text.text(value);
 

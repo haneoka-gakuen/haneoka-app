@@ -51,6 +51,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="haneoka.org" />
+                <data android:scheme="https" android:host="haneoka.com" />
                 <data android:pathPrefix="/jp/" />
                 <data android:pathPrefix="/intl/" />
                 <data android:pathPrefix="/ja/catalog" />
