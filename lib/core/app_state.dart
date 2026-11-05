@@ -31,18 +31,15 @@ class AppState extends ChangeNotifier {
     for (final value in const ['jp', 'intl']) value: apiFor(value),
   };
 
-  HaneokaApi apiFor(String value) => _apis[value] ??= HaneokaApi(
-    server: value,
-    origin: const String.fromEnvironment('HANEOKA_API_ORIGIN').isNotEmpty
-        ? const String.fromEnvironment('HANEOKA_API_ORIGIN')
-        : SiteOrigin.instance.value.origin,
-  );
+  HaneokaApi apiFor(String value) =>
+      _apis['${SiteOrigin.instance.value.origin}:$value'] ??= HaneokaApi(
+        server: value,
+        origin: const String.fromEnvironment('HANEOKA_API_ORIGIN').isNotEmpty
+            ? const String.fromEnvironment('HANEOKA_API_ORIGIN')
+            : SiteOrigin.instance.value.origin,
+      );
 
   void _siteChanged() {
-    for (final api in _apis.values) {
-      api.dispose();
-    }
-    _apis.clear();
     notifyListeners();
   }
 
