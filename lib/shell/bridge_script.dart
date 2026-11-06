@@ -31,6 +31,27 @@ const _script = r'''
     ...message, bridge: __TOKEN__, page: location.href,
     status: performance.getEntriesByType("navigation")[0]?.responseStatus || 0,
   }));
+  // Readiness must not depend on requestAnimationFrame, visibility or the
+  // completion of subresources. Hidden WebView2 documents can pause frames.
+  let readyPage = "";
+  const reportReady = () => {
+    const locale = document.documentElement?.dataset.locale || "";
+    if (!locale || !document.querySelector("main") || readyPage === location.href) return;
+    readyPage = location.href;
+    post({ method: "ready", args: { locale, main: true } });
+    readyObserver.disconnect();
+  };
+  const readyObserver = new MutationObserver(reportReady);
+  readyObserver.observe(document, {
+    childList: true, subtree: true, attributes: true, attributeFilter: ["data-locale"],
+  });
+  document.addEventListener("DOMContentLoaded", reportReady, { once: true });
+  document.addEventListener("astro:after-swap", reportReady);
+  addEventListener("pageshow", () => {
+    readyPage = "";
+    reportReady();
+  });
+  reportReady();
   const origins = __ORIGINS__;
   const localResource = (value) => {
     if (!/^https?:\/\//i.test(value)) return value;

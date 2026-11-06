@@ -66,6 +66,8 @@ class _WebShellState extends State<WebShell> {
   bool _checkingLoaded = false;
   final Set<String> _triedOrigins = {};
   String? _lastFailure;
+  String? _pageReadiness;
+  String? _readinessFailure;
   String _version = '';
   final _links = AppLinks();
   StreamSubscription<Uri>? _linkSubscription;
@@ -303,6 +305,7 @@ class _WebShellState extends State<WebShell> {
           .runJavaScriptReturningResult(
             'JSON.stringify({url:location.href,locale:document.documentElement.dataset.locale || "",'
             'main:!!document.querySelector("main"),ready:document.readyState,'
+            'visibility:document.visibilityState,bridge:!!window.haneokaApp,'
             'status:performance.getEntriesByType("navigation")[0]?.responseStatus || 0,'
             'error:(document.body?.innerText.match(/net::ERR_[A-Z_]+/) || [""])[0]})',
           )
@@ -318,6 +321,12 @@ class _WebShellState extends State<WebShell> {
         return;
       }
       final page = Uri.tryParse('${answer['url'] ?? ''}');
+      _pageReadiness = [
+        if (page != null) 'page=${_diagnosticAddress(page)}',
+        for (final key in ['ready', 'visibility', 'main', 'locale', 'bridge'])
+          '$key=${answer[key]}',
+      ].join(', ');
+      _readinessFailure = null;
       if (!SiteOrigin.instance.contains(page) ||
           page!.origin != origin.origin ||
           !_isRequestedPage(page)) {
@@ -336,6 +345,11 @@ class _WebShellState extends State<WebShell> {
         _fail('${answer['error']}');
       }
     } catch (error) {
+      if (mounted && attempt == _attempt && document == _document) {
+        _readinessFailure = error is PlatformException
+            ? error.code
+            : '${error.runtimeType}';
+      }
       debugPrint('Page readiness: $error');
     } finally {
       _checkingLoaded = false;
@@ -410,6 +424,8 @@ class _WebShellState extends State<WebShell> {
     _triedOrigins.add(page.origin);
     SiteOrigin.instance.select(page);
     _requestedPage = page;
+    _pageReadiness = null;
+    _readinessFailure = null;
     if (!_initialized) {
       await _start();
       return;
@@ -471,7 +487,7 @@ class _WebShellState extends State<WebShell> {
       } catch (_) {}
     }
     final page = _requestedPage ?? _home;
-    final address = page.toString().split(RegExp(r'[?#]')).first;
+    final address = _diagnosticAddress(page);
     await Clipboard.setData(
       ClipboardData(
         text: [
@@ -481,12 +497,17 @@ class _WebShellState extends State<WebShell> {
           'Page: $address',
           'Attempted: ${_triedOrigins.join(', ')}',
           'Progress: $_progress',
+          if (_pageReadiness != null) 'Document: $_pageReadiness',
+          if (_readinessFailure != null) 'Readiness check: $_readinessFailure',
           'Failure: ${_lastFailure ?? _error ?? 'none'}',
         ].join('\n'),
       ),
     );
     if (mounted) _say(_t['copied']);
   }
+
+  static String _diagnosticAddress(Uri page) =>
+      page.replace(userInfo: '').toString().split(RegExp(r'[?#]')).first;
 
   /// The site's cookies in the web view, for native requests that act as the
   /// signed-in reader.
@@ -515,9 +536,10 @@ class _WebShellState extends State<WebShell> {
     unawaited(HaneokaAccount.instance.refresh());
   }
 
-  Uri get _home => origin.replace(
-    path: '/${Strings.tag(PlatformDispatcher.instance.locale)}/',
-  );
+  Uri get _home {
+    final state = AppScope.of(context);
+    return origin.replace(path: '/${state.server}/${state.text.locale}/');
+  }
 
   /// The website page a link opens: haneoka.org links as they are, the old
   /// app's `haneoka://gacha-history` as the page.
@@ -673,6 +695,14 @@ class _WebShellState extends State<WebShell> {
     }
     final args = (message['args'] as Map?)?.cast<String, Object?>() ?? {};
     switch (message['method']) {
+      case 'ready':
+        if (_isRequestedPage(page) &&
+            args['main'] == true &&
+            args['locale'] is String &&
+            (args['locale'] as String).isNotEmpty) {
+          _showPage();
+        }
+        return;
       case 'painted':
         if (_isRequestedPage(page)) _showPage();
         return;
@@ -892,7 +922,11 @@ class _WebShellState extends State<WebShell> {
                     children: [
                       if (_web case final controller?)
                         Offstage(
-                          offstage: _launchVisible && !_loaded,
+                          // Linux embeds a native window above Flutter's launch
+                          // screen. Windows uses a texture: keep it painted so
+                          // WebView2 stays visible and can finish startup.
+                          offstage:
+                              Platform.isLinux && _launchVisible && !_loaded,
                           child: WebViewWidget(
                             key: ValueKey(controller),
                             controller: controller,

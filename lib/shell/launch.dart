@@ -163,7 +163,7 @@ class LaunchScreen extends StatelessWidget {
               label: Text(t['readSave']),
             ),
           ),
-        if (failed && onCopyDiagnostics != null)
+        if ((failed || slow) && onCopyDiagnostics != null)
           TextButton.icon(
             onPressed: onCopyDiagnostics,
             icon: const Icon(Symbols.content_copy_rounded),
