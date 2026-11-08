@@ -61,8 +61,10 @@ http.Client _client() {
   }
   return IOClient(
     HttpClient()
+      ..connectionTimeout = const Duration(seconds: 15)
       ..maxConnectionsPerHost = 12
       ..idleTimeout = const Duration(seconds: 30)
+      ..findProxy = HttpClient.findProxyFromEnvironment
       ..userAgent = 'haneoka-app',
   );
 }

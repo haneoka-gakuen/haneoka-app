@@ -76,12 +76,23 @@ class FileSaveSource {
 
   Future<void> _walk(Directory directory, int depth) async {
     if (depth > _maxDepth) return;
-    await for (final entity in directory.list(followLinks: false)) {
+    final List<FileSystemEntity> entities;
+    try {
+      entities = await directory.list(followLinks: false).toList();
+    } on FileSystemException {
+      // A folder the app may not read holds no save it could import.
+      return;
+    }
+    for (final entity in entities) {
       final name = p.basename(entity.path);
       if (entity is Directory) {
         if (!skippedDirectories.contains(name)) await _walk(entity, depth + 1);
       } else if (entity is File) {
-        await _file(entity);
+        try {
+          await _file(entity);
+        } on FileSystemException {
+          continue;
+        }
       }
     }
   }
@@ -222,7 +233,13 @@ Future<void> _readArchive(
       }
       final resume = ReceivePort();
       try {
-        final content = _archiveBytes(entry);
+        final Uint8List content;
+        try {
+          content = _archiveBytes(entry);
+        } on Object {
+          // A damaged or oversized entry; the other entries still import.
+          continue;
+        }
         final data = SaveCodec.decode(content);
         if (data == null) continue;
         final dos = entry.lastModDateTime;

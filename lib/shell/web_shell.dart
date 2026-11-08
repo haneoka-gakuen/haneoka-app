@@ -512,9 +512,15 @@ class _WebShellState extends State<WebShell> {
   /// The site's cookies in the web view, for native requests that act as the
   /// signed-in reader.
   Future<String?> _siteCookies() async {
+    final web = _web;
+    if (web == null) return null;
     try {
-      final platform = WebViewCookieManager().platform as dynamic;
-      final cookies = await platform.getCookies(origin) as List<WebViewCookie>;
+      // The page's own store: a fresh cookie manager on Windows starts a
+      // second WebView2 for every read.
+      final cookies = await web.platform
+          .createSessionCookieManager()
+          .getCookies(origin)
+          .timeout(const Duration(seconds: 5));
       return cookies
           .map((cookie) => '${cookie.name}=${cookie.value}')
           .join('; ');
