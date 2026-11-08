@@ -199,6 +199,15 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
         }
         "pendingGachaHistory" => Ok(state(app).pending.lock().unwrap().gacha_history.take().unwrap_or(Value::Null)),
         "pendingSongProgress" => Ok(state(app).pending.lock().unwrap().song_progress.take().unwrap_or(Value::Null)),
+        "siteRoute" => {
+            let state = state(app);
+            if let Some(direct) = args.get("direct").and_then(Value::as_bool) {
+                if state.route_port.is_some() {
+                    state.set_direct(app, direct).await;
+                }
+            }
+            Ok(json!({ "direct": state.route.is_direct(), "available": state.route_port.is_some() }))
+        }
         "pendingPage" => Ok(state(app).pending.lock().unwrap().page.take().map(Value::from).unwrap_or(Value::Null)),
         "pendingBoxImport" => Ok(state(app).pending.lock().unwrap().box_import.take().unwrap_or(Value::Null)),
         "appInfo" => {

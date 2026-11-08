@@ -1,8 +1,9 @@
-//! A loopback HTTP proxy for the app's web view. Requests for the site go to
-//! the Cloudflare address that answers fastest from this network, found over
-//! DNS over HTTPS and measured, so a poisoned or slow route does not block
-//! the site; TLS stays end to end in the web view. Other hosts connect as
-//! they would without the proxy, or through the system proxy when one is set.
+//! A loopback HTTP proxy for the app's web view. Normally every host connects
+//! by name, as the web view would itself, or through the system proxy. When
+//! the site does not open that way, the direct route sends the site's
+//! requests to the Cloudflare address that answers fastest from this
+//! network, found over DNS over HTTPS and verified, so a poisoned or
+//! throttled route does not block it; TLS stays end to end in the web view.
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
@@ -42,6 +43,8 @@ struct Ranking {
 /// The measured order of site addresses, shared by every connection.
 #[derive(Clone)]
 pub struct Router {
+    /// Off: every host connects by name, as the web view would itself.
+    direct: Arc<std::sync::atomic::AtomicBool>,
     ranking: Arc<Mutex<Ranking>>,
     measuring: Arc<tokio::sync::Mutex<()>>,
     upstream: Option<Proxy>,
@@ -54,10 +57,23 @@ fn is_site(host: &str) -> bool {
 impl Router {
     pub fn new(upstream: Option<Proxy>) -> Self {
         Router {
+            direct: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             ranking: Arc::new(Mutex::new(Ranking { addresses: Vec::new(), measured: None })),
             measuring: Arc::new(tokio::sync::Mutex::new(())),
             upstream,
         }
+    }
+
+    pub fn set_direct(&self, direct: bool) {
+        self.direct.store(direct, std::sync::atomic::Ordering::Relaxed);
+        if direct {
+            let router = self.clone();
+            tokio::spawn(async move { router.measure().await });
+        }
+    }
+
+    pub fn is_direct(&self) -> bool {
+        self.direct.load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// The site's addresses from DNS over HTTPS and the anycast sample,
@@ -116,7 +132,7 @@ impl Router {
         if let Some(upstream) = &self.upstream {
             return crate::game::connect_through(upstream, host, port).await;
         }
-        if is_site(host) && port == 443 {
+        if self.is_direct() && is_site(host) && port == 443 {
             return self.connect_site(host, port).await;
         }
         TcpStream::connect((host, port)).await
@@ -180,10 +196,6 @@ where
 
 /// Serves the proxy on `listener` until the app exits.
 pub async fn serve(listener: TcpListener, router: Router) {
-    {
-        let router = router.clone();
-        tokio::spawn(async move { router.measure().await });
-    }
     loop {
         let Ok((client, _)) = listener.accept().await else { continue };
         let router = router.clone();

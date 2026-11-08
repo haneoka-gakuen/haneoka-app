@@ -93,7 +93,23 @@
           message.hidden = false;
         }
         render();
-        for (const origin of info.origins) probe(origin).then((ms) => (latency.set(origin, ms), render()));
+        probeAll();
+      };
+
+      // The web view's own route first; when no site answers, the direct route, and back.
+      let route = { available: false, direct: false };
+      let switched = false;
+      const switchRoute = async () => {
+        if (!route.available || switched) return false;
+        switched = true;
+        route = await call("siteRoute", { direct: !route.direct }).catch(() => route);
+        return true;
+      };
+      const probeAll = async () => {
+        latency.clear();
+        render();
+        const results = await Promise.all(info.origins.map((origin) => probe(origin).then((ms) => (latency.set(origin, ms), render(), ms))));
+        if (results.every((ms) => ms == null) && (await switchRoute())) await probeAll();
       };
 
       document.getElementById("sites").addEventListener("click", (event) => {
@@ -102,10 +118,12 @@
       });
 
       await setup();
+      route = await call("siteRoute").catch(() => route);
       const page = await call("pendingPage").catch(() => null);
       if (page) location.replace(page);
       else if (failed || query.has("choose") || !info.chosen) choose();
       else if ((await probe(info.chosen, 1)) != null) go(info.chosen);
+      else if ((await switchRoute()) && (await probe(info.chosen, 1)) != null) go(info.chosen);
       else {
         const message = document.getElementById("failed");
         message.textContent = t("siteFailed", { host: new URL(info.chosen).host });

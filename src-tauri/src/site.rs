@@ -76,8 +76,14 @@ fn fall_back(app: &AppHandle, generation: u64, delay: Duration) {
 
 pub fn page_load(window: &WebviewWindow, event: PageLoadEvent, url: &tauri::Url) {
     if site_origin(url).is_none() {
+        let state = window.app_handle().state::<AppState>();
         if url.path().ends_with("/saves.html") {
-            window.app_handle().state::<AppState>().pending.lock().unwrap().page = None;
+            state.pending.lock().unwrap().page = None;
+        } else if url.path().ends_with("/index.html") && matches!(event, PageLoadEvent::Finished) {
+            // A link that launched the app arrived before the launch page could ask for it.
+            if let Some(page) = state.pending.lock().unwrap().page.take() {
+                let _ = window.navigate(crate::site::local_url(&page));
+            }
         }
         return;
     }

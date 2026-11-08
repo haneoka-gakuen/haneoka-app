@@ -27,8 +27,29 @@ pub struct AppState {
     pub watch: site::Watch,
     /// What the app's own pages hand to a website page, taken once there.
     pub pending: Mutex<Pending>,
+    /// The web view's loopback route and its port; `None` when it could not start.
+    pub route: haneoka_core::direct::Router,
+    pub route_port: Option<u16>,
     #[cfg(desktop)]
     pub resources: Option<PathBuf>,
+}
+
+impl AppState {
+    /// Switches the site between the web view's own route and the direct one.
+    pub async fn set_direct(&self, app: &AppHandle, direct: bool) {
+        self.route.set_direct(direct);
+        self.set_preference("route", serde_json::json!(if direct { "direct" } else { "native" }));
+        // Android applies the loopback proxy only while the direct route is on; desktop web views
+        // always use it, and it connects by name until the direct route is on.
+        #[cfg(target_os = "android")]
+        {
+            use tauri_plugin_haneoka_device::DeviceExt;
+            let port = if direct { self.route_port.unwrap_or(0) } else { 0 };
+            let _: Result<serde_json::Value, String> = app.device().call("webViewProxy", serde_json::json!({ "port": port })).await;
+        }
+        #[cfg(not(target_os = "android"))]
+        let _ = app;
+    }
 }
 
 #[derive(Default)]
@@ -200,15 +221,15 @@ fn localized(window: &WebviewWindow, path: &str) -> String {
     path.replacen("/en/", &format!("/{locale}/"), 1)
 }
 
-/// The web view's own route to the site (`haneoka_core::direct`), on a
-/// loopback port; `None` when the port cannot be opened.
-fn start_direct() -> Option<u16> {
+/// The web view's loopback route (`haneoka_core::direct`); `None` when the
+/// port cannot be opened.
+fn start_direct(router: haneoka_core::direct::Router) -> Option<u16> {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").ok()?;
     listener.set_nonblocking(true).ok()?;
     let port = listener.local_addr().ok()?.port();
     tauri::async_runtime::spawn(async move {
         if let Ok(listener) = tokio::net::TcpListener::from_std(listener) {
-            haneoka_core::direct::serve(listener, haneoka_core::direct::Router::new(platform::game_proxy())).await;
+            haneoka_core::direct::serve(listener, router).await;
         }
     });
     Some(port)
@@ -300,7 +321,11 @@ pub fn run() {
             for legacy in platform::legacy_account_folders(&data) {
                 let _ = accounts.adopt(&legacy);
             }
+            let route = haneoka_core::direct::Router::new(platform::game_proxy());
+            let route_port = start_direct(route.clone());
             app.manage(AppState {
+                route,
+                route_port,
                 accounts,
                 config: paths.app_config_dir()?,
                 pending_path: Mutex::new(None),
@@ -325,15 +350,10 @@ pub fn run() {
                     open_link(&handle, &url);
                 }
             }
-            let direct = start_direct();
-            build_window(&handle, direct)?;
-            #[cfg(target_os = "android")]
-            if let Some(port) = direct {
-                let device = handle.clone();
-                tauri::async_runtime::spawn(async move {
-                    use tauri_plugin_haneoka_device::DeviceExt;
-                    let _: Result<serde_json::Value, String> = device.device().call("webViewProxy", serde_json::json!({ "port": port })).await;
-                });
+            build_window(&handle, handle.state::<AppState>().route_port)?;
+            if handle.state::<AppState>().preference("route") == "direct" {
+                let route = handle.clone();
+                tauri::async_runtime::spawn(async move { route.state::<AppState>().set_direct(&route, true).await });
             }
             Ok(())
         })

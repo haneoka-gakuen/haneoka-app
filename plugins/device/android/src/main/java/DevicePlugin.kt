@@ -277,12 +277,18 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
         }
     }
 
-    /** Sends the web view's requests through the app's loopback route; local pages stay direct. */
+    /** Sends the web view's requests through the app's loopback route, or back to its own with port 0; local pages stay direct. */
     @Command
     fun webViewProxy(invoke: Invoke) {
         val args = invoke.parseArgs(ProxyArgs::class.java)
-        if (args.port <= 0 || !WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
             invoke.resolve(JSObject().put("applied", false))
+            return
+        }
+        if (args.port <= 0) {
+            ProxyController.getInstance().clearProxyOverride({ it.run() }) {
+                invoke.resolve(JSObject().put("applied", false))
+            }
             return
         }
         val config = ProxyConfig.Builder()
