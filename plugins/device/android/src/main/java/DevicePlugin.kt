@@ -12,6 +12,7 @@ import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.CookieManager
 import android.webkit.WebView
 import androidx.activity.result.ActivityResult
 import androidx.core.view.ViewCompat
@@ -65,6 +66,11 @@ class BarsArgs {
 @InvokeArg
 class ActiveArgs {
     var active: Boolean = false
+}
+
+@InvokeArg
+class UrlArgs {
+    lateinit var url: String
 }
 
 @InvokeArg
@@ -275,6 +281,13 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
             }
             invoke.resolve()
         }
+    }
+
+    /** The web view's cookies for a site page, as a Cookie header value. */
+    @Command
+    fun siteCookies(invoke: Invoke) {
+        val args = invoke.parseArgs(UrlArgs::class.java)
+        invoke.resolve(JSObject().put("cookie", CookieManager.getInstance().getCookie(args.url) ?: ""))
     }
 
     /** Sends the web view's requests through the app's loopback route, or back to its own with port 0; local pages stay direct. */

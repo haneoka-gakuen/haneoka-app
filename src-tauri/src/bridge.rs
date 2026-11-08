@@ -127,17 +127,27 @@ async fn refreshed(app: &AppHandle, save: GameSave) -> GameSave {
 }
 
 /// The reader's site session, as the web view holds it.
-fn site_session(app: &AppHandle, origin: &str) -> Option<String> {
-    let window = app.get_webview_window("main")?;
-    let cookies = window.cookies_for_url(url::Url::parse(origin).ok()?).ok()?;
-    let header = cookies.iter().map(|cookie| format!("{}={}", cookie.name(), cookie.value())).collect::<Vec<_>>().join("; ");
+async fn site_session(app: &AppHandle, origin: &str) -> Option<String> {
+    // Android reads the web view's cookie store through the device plugin.
+    #[cfg(target_os = "android")]
+    let header = {
+        let value: Value = app.device().call("siteCookies", json!({ "url": origin })).await.ok()?;
+        value["cookie"].as_str().unwrap_or_default().to_owned()
+    };
+    #[cfg(not(target_os = "android"))]
+    let header = {
+        let window = app.get_webview_window("main")?;
+        let url = url::Url::parse(origin).ok()?;
+        let cookies = tauri::async_runtime::spawn_blocking(move || window.cookies_for_url(url)).await.ok()?.ok()?;
+        cookies.iter().map(|cookie| format!("{}={}", cookie.name(), cookie.value())).collect::<Vec<_>>().join("; ")
+    };
     (!header.is_empty()).then_some(header)
 }
 
 /// The linked-player list of the reader's Haneoka account; `None` when signed out.
 async fn linked_players(app: &AppHandle, method: &str, path: &str, body: Option<Value>) -> Result<Option<Vec<Value>>> {
     let origin = crate::current_origin(app);
-    let Some(cookie) = site_session(app, &origin) else { return Ok(None) };
+    let Some(cookie) = site_session(app, &origin).await else { return Ok(None) };
     let payload = body.map(|value| value.to_string());
     let mut headers = vec![("Cookie", cookie.as_str()), ("Origin", origin.as_str())];
     if payload.is_some() {

@@ -299,6 +299,9 @@ button {
 .row:hover:not(:disabled) {
   background: var(--md-sys-color-surface-container-high);
 }
+.row:active:not(:disabled) {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, var(--md-sys-color-surface-container-high));
+}
 .row:disabled {
   opacity: 0.5;
   cursor: default;
