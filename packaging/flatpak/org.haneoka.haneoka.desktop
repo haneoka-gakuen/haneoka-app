@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Haneoka
-Exec=haneoka %u
-Icon=org.haneoka.haneoka
-Categories=Game;Utility;
-Terminal=false
-MimeType=application/x-haneoka-save;x-scheme-handler/haneoka;

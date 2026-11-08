@@ -1,0 +1,16 @@
+[workspace]
+resolver = "2"
+members = ["core"]
+
+[workspace.package]
+version = "0.3.0"
+edition = "2021"
+license = "MPL-2.0"
+repository = "https://github.com/haneoka-gakuen/haneoka-app"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+opt-level = "s"
+panic = "unwind"

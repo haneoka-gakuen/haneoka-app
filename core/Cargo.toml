@@ -1,0 +1,40 @@
+[package]
+name = "haneoka-core"
+description = "Save reading, account storage and game-server reads for the Haneoka app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["arbitrary_precision", "preserve_order"] }
+base64 = "0.22"
+flate2 = "1"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+sha2 = "0.10"
+hex = "0.4"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+thiserror = "2"
+tokio = { version = "1", features = ["net", "time", "io-util", "rt", "macros", "process", "fs"] }
+h2 = "0.4"
+http = "1"
+bytes = "1"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+webpki-roots = "0.26"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+plist = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+aes = "0.8"
+cbc = "0.1"
+
+pbkdf2 = "0.12"
+hmac = "0.12"
+sha1 = "0.10"
+tempfile = "3"
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
