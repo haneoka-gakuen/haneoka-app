@@ -39,6 +39,17 @@ Object? _withoutIdentity(Object? value) => switch (value) {
   _ => value,
 };
 
+/// The progress snapshot the site's save workspace stores: the player
+/// document only, compact.
+String exportSaveSnapshot(GameSave save) => jsonEncode({
+  'schema': 'haneoka-game-save-v1',
+  'server': save.server,
+  'savedAt': save.modifiedAt?.toUtc().toIso8601String(),
+  'player': _withoutIdentity(
+    save.documents[SaveDocumentKind.cache]?.data['_player'],
+  ),
+});
+
 /// The whole save, minus identity: every progress, collection, result and
 /// setting the game keeps. Readable by Haneoka and by anything that reads JSON.
 Uint8List exportSave(GameSave save) {
