@@ -11,11 +11,16 @@
     <div id="bar"></div>
     <main class="page" id="page"></main>
     <script type="module">
-      import { call, setup, t, icon, escape, bar, snackbar, failure, RELEASES, date } from "./app.js";
+      import { call, setup, t, icon, escape, bar, snackbar, failure, RELEASES, date, info } from "./app.js";
 
       await setup();
       const query = new URLSearchParams(location.search);
       const updating = query.get("update");
+      const updatingName = updating
+        ? await call("saveDetail", { key: updating })
+            .then(({ account }) => `${account.name || account.profileId} / ${account.profileId}`)
+            .catch(() => "")
+        : "";
       document.title = t("importTitle");
       document.getElementById("bar").innerHTML = bar({ title: t("importTitle"), back: updating ? `save.html?key=${encodeURIComponent(updating)}` : "saves.html" });
 
@@ -27,13 +32,32 @@
       let backups = null;
       let locked = null;
 
-      const method = (id, title, summary, body, recommended = false) => `<section class="surface" style="display:grid;gap:12px" data-method="${id}">
-        <h2 class="section-title"><span class="section-badge">${icon(
-          { shizuku: "smartphone", gameFolder: "folder_open", files: "description", folder: "folder_open", adb: "usb", iosBackup: "phone_iphone" }[id],
-        )}</span><span class="grow">${escape(title)}</span>${recommended ? `<span class="badge">${escape(t("recommended"))}</span>` : ""}</h2>
-        <p class="muted">${escape(summary)}</p>
-        ${body}
-      </section>`;
+      let showDevices = false;
+      const open = new Set();
+      const platform = info.platform ?? "";
+
+      /** One way to reach the save: what it is, what it needs, its steps and its buttons. */
+      const method = (id, { glyph, title, summary, steps, recommended = false, status = null, note = null, body = "", actions = [] }) => `
+        <section class="method ${recommended ? "method--recommended" : ""}">
+          <div class="method__head">
+            <span class="method__icon">${icon(glyph)}</span>
+            <div class="grow">
+              <div class="method__title"><h3>${escape(title)}</h3>${recommended ? `<span class="method__badge">${escape(t("recommended"))}</span>` : ""}</div>
+              <p>${escape(summary)}</p>
+              ${status ? `<p class="method__status">${icon("error", "icon--small")}${escape(status)}</p>` : ""}
+            </div>
+          </div>
+          <details class="method__steps" data-steps="${id}" ${open.has(id) ? "open" : ""}>
+            <summary>${escape(t("stepsShow"))}${icon("expand_more")}</summary>
+            <ol>${steps.split("\n").map((line, index) => `<li><span>${index + 1}</span>${escape(line)}</li>`).join("")}</ol>
+            ${note ? `<p class="muted">${escape(note)}</p>` : ""}
+          </details>
+          ${body}
+          <div class="method__actions">${actions.join("")}</div>
+        </section>`;
+      const link = (href, label, external = true) => `<a class="button button--text" href="${escape(href)}">${external ? icon("open_in_new") : ""}${escape(label)}</a>`;
+      const action = (name, label, style = "text", glyph = "") =>
+        `<button class="button button--${style}" type="button" data-action="${name}" ${busy ? "disabled" : ""}>${glyph ? icon(glyph) : ""}${escape(label)}</button>`;
 
       const releaseChips = () => `<div class="cluster" role="group" aria-label="${escape(t("release"))}">${RELEASES.map(
         (r) => `<button class="chip" type="button" data-release="${r.id}" aria-pressed="${r.id === release}">${r.id === release ? icon("check", "icon--small") : ""}${escape(t(r.name))}</button>`,
@@ -103,37 +127,81 @@
         const parts = [];
         if (sources.includes("shizuku"))
           parts.push(
-            method(
-              "shizuku",
-              t("methodShizukuTitle"),
-              status?.status === "unsupported" ? t("shizukuUnsupported") : t("methodShizukuSummary"),
-              `<div class="cluster"><button class="button button--filled" type="button" data-action="shizuku" ${busy ? "disabled" : ""}>${escape(
-                status?.status === "notRunning" ? t("openShizuku") : t("readSave"),
-              )}</button></div>`,
-              true,
-            ),
+            method("shizuku", {
+              glyph: "bolt",
+              title: t("methodShizukuTitle"),
+              summary: t("methodShizukuSummary"),
+              steps: t("methodShizukuSteps"),
+              recommended: true,
+              status: status?.status === "notRunning" ? t("shizukuNotRunning") : status?.status === "unsupported" ? t("shizukuUnsupported") : null,
+              actions: [
+                link("https://shizuku.rikka.app/download/", t("downloadShizuku")),
+                link("https://shizuku.rikka.app/guide/setup/", t("setupGuide"), false),
+                status?.status === "notRunning" ? action("open-shizuku", t("openShizuku")) : "",
+                action("shizuku", t("readSave"), "filled", "download"),
+              ],
+            }),
           );
         if (sources.includes("gameFolder") && status?.canGrantFolder)
           parts.push(
-            method(
-              "gameFolder",
-              t("methodFolderTitle"),
-              t("methodFolderSummary"),
-              `${releaseChips()}<div class="cluster"><button class="button button--tonal" type="button" data-action="grant" ${busy ? "disabled" : ""}>${escape(t("chooseFolder"))}</button></div>`,
-            ),
+            method("gameFolder", {
+              glyph: "folder_special",
+              title: t("methodFolderTitle"),
+              summary: t("methodFolderSummary"),
+              steps: t("methodFolderSteps"),
+              body: releaseChips(),
+              actions: [action("granted", t("readAgain")), action("grant", t("chooseFolder"), "tonal", "folder_open")],
+            }),
           );
-        if (sources.includes("adb")) parts.push(method("adb", t("methodAdbTitle"), t("methodAdbSummary"), adbBody(), true));
-        if (sources.includes("iosBackup")) parts.push(method("iosBackup", t("methodBackupTitle"), t("methodBackupSummary"), backupBody()));
+        if (sources.includes("adb"))
+          parts.push(
+            method("adb", {
+              glyph: "phone_android",
+              title: t("methodAdbTitle"),
+              summary: t("methodAdbSummary"),
+              steps: t("methodAdbSteps"),
+              recommended: true,
+              body: showDevices ? adbBody() : "",
+              actions: [action("read-connected", t("readConnected"), "filled", "cable"), action("choose-device", t("chooseDevice"), "text", "devices")],
+            }),
+          );
+        if (sources.includes("iosBackup"))
+          parts.push(
+            method("iosBackup", {
+              glyph: "phone_iphone",
+              title: t("methodBackupTitle"),
+              summary: t("methodBackupSummary"),
+              steps: t("methodBackupSteps"),
+              body: backups === null && !locked ? "" : backupBody(),
+              actions: [
+                ...(platform === "macos" || platform === "windows"
+                  ? [link("https://imazing.com/download", t("downloadIMazing")), link("https://imazing.com/guides/how-to-export-backup-and-transfer-ios-apps-data-and-settings", t("exportGuide"), false)]
+                  : []),
+                platform === "linux" ? link("https://github.com/libimobiledevice/libimobiledevice", "libimobiledevice") : "",
+                action("backups", t("openBackups"), "tonal", "backup"),
+              ],
+            }),
+          );
         parts.push(
-          method(
-            "files",
-            t("methodFilesTitle"),
-            t("methodFilesSummary"),
-            `<div class="cluster"><button class="button button--tonal" type="button" data-action="files" ${busy ? "disabled" : ""}>${escape(t("chooseFiles"))}</button>
-            ${sources.includes("folder") ? `<button class="button button--tonal" type="button" data-action="folder" ${busy ? "disabled" : ""}>${escape(t("chooseFolder"))}</button>` : ""}</div>`,
-          ),
+          method("files", {
+            glyph: "file_open",
+            title: t("methodFilesTitle"),
+            summary: t("methodFilesSummary"),
+            steps: t("methodFilesSteps"),
+            recommended: platform === "ios",
+            actions: [sources.includes("folder") ? action("folder", t("chooseFolder")) : "", action("files", t("chooseFiles"), "tonal", "upload_file")],
+          }),
         );
-        document.getElementById("page").innerHTML = `<h2 class="section-title">${escape(t("importHeadline"))}</h2>${parts.join("")}`;
+        const headline = updating ? t("updateSave") : t("importHeadline");
+        const intro = updating ? `${updatingName}\n${t("updateSaveHint")}` : t("importIntro");
+        document.getElementById("page").innerHTML = `
+          <div class="import-head">
+            <span class="method__icon method__icon--large">${icon("sd_card")}</span>
+            <div class="grow"><h2>${escape(headline)}</h2><p class="muted">${escape(intro)}</p></div>
+          </div>
+          <h3 class="methods-title">${escape(t("methodsTitle"))}</h3>
+          ${parts.join("")}`;
+        document.getElementById("bar").querySelector(".bar-progress")?.toggleAttribute("hidden", !busy);
       };
 
       const run = async (work) => {
@@ -193,6 +261,26 @@
             });
           case "grant":
             return run(async () => done(await call("gameFolder", { release })));
+          case "granted":
+            return run(async () => done(await call("gameFolder", {})));
+          case "open-shizuku":
+            return call("openShizuku").catch(() => {});
+          case "choose-device":
+            showDevices = !showDevices;
+            render();
+            if (showDevices) run(async () => (devices = await call("adbDevices")));
+            return;
+          case "read-connected":
+            return run(async () => {
+              devices = await call("adbDevices");
+              const ready = devices.find((device) => device.state === "device" && device.releases.length);
+              if (!ready) {
+                showDevices = true;
+                snackbar(devices.length ? t("gameNotInstalled") : t("noDevices"));
+                return;
+              }
+              done(await call("adbRead", { serial: ready.serial }));
+            });
           case "files":
             return run(async () => done(await call("readFiles", {})));
           case "folder":
@@ -233,8 +321,15 @@
           });
       });
 
+      document.getElementById("page").addEventListener(
+        "toggle",
+        (event) => {
+          const steps = event.target.closest?.("[data-steps]");
+          if (steps) steps.open ? open.add(steps.dataset.steps) : open.delete(steps.dataset.steps);
+        },
+        true,
+      );
       render();
-      if (sources.includes("adb")) run(async () => (devices = await call("adbDevices")));
       if (sources.includes("iosBackup")) call("iosBackups", {}).then((found) => ((backups = found), render())).catch(() => {});
     </script>
   </body>

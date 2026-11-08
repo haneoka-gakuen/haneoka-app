@@ -11,15 +11,15 @@
     <div id="bar"></div>
     <main class="page" id="page"></main>
     <script type="module">
-      import { call, setup, t, icon, escape, bar, number, date, emblem, openSite } from "./app.js";
+      import { call, setup, t, icon, escape, bar, date, emblem, openSite, sunny } from "./app.js";
 
       await setup();
-      document.title = t("importedAccounts");
+      document.title = t("accountTitle");
       document.getElementById("bar").innerHTML = bar({
-        title: t("importedAccounts"),
+        title: t("accountTitle"),
         back: "#back",
         actions: `<a class="icon-button" href="index.html?choose" aria-label="${escape(t("chooseSite"))}">${icon("public")}</a>
-          <a class="icon-button icon-button--tonal" href="import.html" aria-label="${escape(t("readSave"))}">${icon("add")}</a>`,
+          <a class="icon-button" href="import.html" aria-label="${escape(t("importMore"))}">${icon("add")}</a>`,
       });
       document.querySelector('[href="#back"]').addEventListener("click", (event) => {
         event.preventDefault();
@@ -30,29 +30,29 @@
       const render = async () => {
         const saves = await call("gameAccounts").catch(() => []);
         const page = document.getElementById("page");
+        const heading = `<h2 class="methods-title">${escape(t("importedAccounts"))}</h2>`;
         if (!saves.length) {
-          page.innerHTML = `<section class="surface" style="display:grid;gap:16px;justify-items:start">
-            <p class="muted">${escape(t("noAccountsYet"))}</p>
-            <a class="button button--filled" href="import.html">${icon("add")}${escape(t("readSave"))}</a>
+          page.innerHTML = `${heading}<section class="empty">
+            <span class="method__icon method__icon--empty">${icon("sd_card")}</span>
+            <h3>${escape(t("noAccountsYet"))}</h3>
+            <p class="muted">${escape(t("importIntro"))}</p>
+            <a class="button button--filled" href="import.html">${icon("add")}${escape(t("importMore"))}</a>
           </section>`;
           return;
         }
-        page.innerHTML = `<ul class="list">${saves
+        page.innerHTML = `${heading}${saves
           .map(
-            (save) => `<li><a class="row" href="save.html?key=${encodeURIComponent(save.key)}">
-              <span class="row__lead" style="background:none"><img src="${emblem(save.release, save.server)}" alt="" width="32" height="32" /></span>
-              <span class="row__text">
-                <span class="row__title">${escape(save.name || save.profileId)}</span>
-                <span class="row__supporting">${[save.region, `${t("playerId")} ${save.profileId}`, save.rank == null ? "" : `RANK ${number(save.rank)}`, save.savedAt == null ? "" : t("savedOn", { time: date(save.savedAt, true) })]
-                  .filter(Boolean)
-                  .map(escape)
-                  .join(" / ")}</span>
+            (save) => `<a class="account-card" href="save.html?key=${encodeURIComponent(save.key)}">
+              <span class="account-card__rank">${sunny}<strong>${escape(save.rank ?? "—")}</strong></span>
+              <span class="grow">
+                <span class="account-card__name"><span>${escape(save.name || save.profileId)}</span><img src="${emblem(save.release, save.server)}" alt="" width="18" height="18" /></span>
+                <span class="account-card__meta">${escape([save.region, `ID ${save.profileId}`].filter(Boolean).join(" / "))}</span>
+                ${save.savedAt == null ? "" : `<span class="account-card__meta">${escape(t("savedOn", { time: date(save.savedAt, true) }))}</span>`}
               </span>
-              <span class="row__trail">${icon("chevron_right")}</span>
-            </a></li>`,
+              ${icon("chevron_right")}
+            </a>`,
           )
-          .join("")}</ul>
-          <a class="button button--tonal" href="import.html" style="justify-self:start">${icon("add")}${escape(t("importMore"))}</a>`;
+          .join("")}`;
       };
       await render();
     </script>

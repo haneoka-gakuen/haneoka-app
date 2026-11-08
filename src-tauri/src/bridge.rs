@@ -126,6 +126,44 @@ async fn refreshed(app: &AppHandle, save: GameSave) -> GameSave {
     }
 }
 
+/// The reader's site session, as the web view holds it.
+fn site_session(app: &AppHandle, origin: &str) -> Option<String> {
+    let window = app.get_webview_window("main")?;
+    let cookies = window.cookies_for_url(url::Url::parse(origin).ok()?).ok()?;
+    let header = cookies.iter().map(|cookie| format!("{}={}", cookie.name(), cookie.value())).collect::<Vec<_>>().join("; ");
+    (!header.is_empty()).then_some(header)
+}
+
+/// The linked-player list of the reader's Haneoka account; `None` when signed out.
+async fn linked_players(app: &AppHandle, method: &str, path: &str, body: Option<Value>) -> Result<Option<Vec<Value>>> {
+    let origin = crate::current_origin(app);
+    let Some(cookie) = site_session(app, &origin) else { return Ok(None) };
+    let payload = body.map(|value| value.to_string());
+    let mut headers = vec![("Cookie", cookie.as_str()), ("Origin", origin.as_str())];
+    if payload.is_some() {
+        headers.push(("Content-Type", "application/json"));
+    }
+    let (status, response) = haneoka_core::http::request(method, &format!("{origin}{path}"), &headers, payload.as_deref().map(str::as_bytes), 1 << 20)
+        .await
+        .map_err(|e| e.0.to_owned())?;
+    if status == 401 {
+        return Ok(None);
+    }
+    let value: Value = serde_json::from_slice(&response).unwrap_or(Value::Null);
+    if !(200..300).contains(&status) {
+        return Err(value["error"].as_str().unwrap_or("link_failed").to_owned());
+    }
+    Ok(Some(value["accounts"].as_array().cloned().unwrap_or_default()))
+}
+
+fn player_link(players: Option<Vec<Value>>, save: &GameSave) -> Value {
+    let Some(players) = players else { return json!({ "signedIn": false }) };
+    let link = players.into_iter().find(|row| {
+        row["region"].as_str() == save.server() && row["playerUid"].as_str() == Some(save.profile_id.as_str())
+    });
+    json!({ "signedIn": true, "link": link })
+}
+
 async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &Value) -> Result<Value> {
     let window = window.clone();
     match method {
@@ -178,6 +216,27 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
         "theme" => {
             state(app).set_preference("theme", args.clone());
             Ok(Value::Null)
+        }
+        "playerLink" => {
+            let save = state(app).accounts.find(text(args, "key").ok_or("key")?).ok_or("save_not_found")?;
+            Ok(player_link(linked_players(app, "GET", "/api/v1/account/game-accounts", None).await?, &save))
+        }
+        "linkPlayer" => {
+            let save = state(app).accounts.find(text(args, "key").ok_or("key")?).ok_or("save_not_found")?;
+            let body = json!({
+                "server": save.server(),
+                "profileId": save.profile_id,
+                "name": save.name,
+                "visibility": if args["public"].as_bool().unwrap_or(true) { "public" } else { "private" },
+                "savedAt": save.modified_at().map(|t| t.timestamp_millis()),
+                "summary": args["summary"],
+            });
+            Ok(player_link(linked_players(app, "PUT", "/api/v1/account/game-accounts", Some(body)).await?, &save))
+        }
+        "unlinkPlayer" => {
+            let save = state(app).accounts.find(text(args, "key").ok_or("key")?).ok_or("save_not_found")?;
+            let path = format!("/api/v1/account/game-accounts/{}/{}", save.server().unwrap_or("intl"), save.profile_id);
+            Ok(player_link(linked_players(app, "DELETE", &path, None).await?, &save))
         }
         "saveDetail" => {
             let save = state(app).accounts.find(text(args, "key").ok_or("key")?).ok_or("save_not_found")?;

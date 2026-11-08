@@ -93,6 +93,7 @@ export function bar({ title, back, actions = "" }) {
     ${back ? `<a class="icon-button" href="${escape(back)}" aria-label="${escape(t("back"))}">${icon("arrow_back")}</a>` : ""}
     <h1>${escape(title)}</h1>
     ${actions}
+    <div class="progress bar-progress" hidden></div>
   </header>`;
 }
 
@@ -114,3 +115,14 @@ export const RELEASES = [
 ];
 export const emblem = (release, server) =>
   RELEASES.find((r) => r.id === release)?.emblem ?? (server === "jp" ? "release-bushimo.svg" : "release-bilibili.svg");
+
+/** Material 3's eight-lobed "sunny" shape, for rank badges. */
+export const sunny = (() => {
+  const points = [];
+  for (let i = 0; i < 96; i++) {
+    const angle = (i / 96) * Math.PI * 2;
+    const radius = 46 * (1 + 0.085 * Math.cos(angle * 8));
+    points.push(`${(50 + radius * Math.cos(angle)).toFixed(2)},${(50 + radius * Math.sin(angle)).toFixed(2)}`);
+  }
+  return `<svg viewBox="0 0 100 100" aria-hidden="true"><polygon points="${points.join(" ")}" /></svg>`;
+})();

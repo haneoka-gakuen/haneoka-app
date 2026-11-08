@@ -173,6 +173,8 @@ jobs:
           npx tauri android init --ci
           # The generated project carries the template icon.
           cp -R src-tauri/icons/android/. src-tauri/gen/android/app/src/main/res/
+          # A retried build after a failed download cannot reuse the configuration cache.
+          echo "org.gradle.configuration-cache=false" >> src-tauri/gen/android/gradle.properties
           # services.gradle.org often times out; fetch the distribution with retries.
           props=src-tauri/gen/android/gradle/wrapper/gradle-wrapper.properties
           url=$(sed -n 's/^distributionUrl=//p' "$props" | sed 's/\\:/:/g')
@@ -181,7 +183,12 @@ jobs:
       - name: Build
         run: |
           config='{"version":"${{ needs.version.outputs.version }}","bundle":{"android":{"versionCode":${{ needs.version.outputs.android }}}}}'
-          npx tauri android build --ci --apk --target aarch64 --config "$config" || npx tauri android build --ci --apk --target aarch64 --config "$config"
+          # Gradle fetches the Kotlin compiler from GitHub releases, which time out at times.
+          for attempt in 1 2 3; do
+            npx tauri android build --ci --apk --target aarch64 --config "$config" && break
+            [ "$attempt" = 3 ] && exit 1
+            sleep 30
+          done
           mkdir -p "$RUNNER_TEMP/arm64"
           cp "$(find src-tauri/gen/android/app/build/outputs/apk -name '*release*.apk' | head -1)" "$RUNNER_TEMP/arm64/haneoka.apk"
           npx tauri android build --ci --apk --aab --target aarch64 x86_64 --config "$config"

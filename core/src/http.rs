@@ -1,4 +1,5 @@
-//! A small HTTPS GET for release metadata on platforms without the updater.
+//! A small HTTPS client: release metadata, DNS over HTTPS and the site's
+//! account API.
 
 use std::time::Duration;
 
@@ -12,17 +13,27 @@ pub struct HttpError(pub &'static str);
 pub async fn get(url: &str, limit: usize) -> Result<Vec<u8>, HttpError> {
     let mut target = url.to_owned();
     for _ in 0..6 {
-        let request = tokio::time::timeout(Duration::from_secs(20), once(&target, limit));
+        let request = tokio::time::timeout(Duration::from_secs(20), once("GET", &target, &[], None, limit));
         match request.await.map_err(|_| HttpError("timeout"))?? {
-            Response::Body(body) => return Ok(body),
+            Response::Body(200, body) => return Ok(body),
+            Response::Body(..) => return Err(HttpError("status")),
             Response::Redirect(location) => target = location,
         }
     }
     Err(HttpError("redirects"))
 }
 
+/// One request without following redirects: the status and the body.
+pub async fn request(method: &str, url: &str, headers: &[(&str, &str)], body: Option<&[u8]>, limit: usize) -> Result<(u16, Vec<u8>), HttpError> {
+    let request = tokio::time::timeout(Duration::from_secs(20), once(method, url, headers, body, limit));
+    match request.await.map_err(|_| HttpError("timeout"))?? {
+        Response::Body(status, body) => Ok((status, body)),
+        Response::Redirect(_) => Err(HttpError("redirect")),
+    }
+}
+
 enum Response {
-    Body(Vec<u8>),
+    Body(u16, Vec<u8>),
     Redirect(String),
 }
 
@@ -33,7 +44,7 @@ fn split(url: &str) -> Option<(&str, &str)> {
     Some((&rest[..slash], path))
 }
 
-async fn once(url: &str, limit: usize) -> Result<Response, HttpError> {
+async fn once(method: &str, url: &str, headers: &[(&str, &str)], payload: Option<&[u8]>, limit: usize) -> Result<Response, HttpError> {
     let (host, path) = split(url).ok_or(HttpError("url"))?;
     let tcp = tokio::net::TcpStream::connect((host, 443)).await.map_err(|_| HttpError("connect"))?;
     let name = rustls::pki_types::ServerName::try_from(host.to_owned()).map_err(|_| HttpError("host"))?;
@@ -43,10 +54,18 @@ async fn once(url: &str, limit: usize) -> Result<Response, HttpError> {
         .connect(name, tcp)
         .await
         .map_err(|_| HttpError("tls"))?;
-    let request = format!(
-        "GET {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: haneoka-app\r\nAccept: application/json\r\nConnection: close\r\n\r\n"
-    );
+    let mut request = format!("{method} {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: haneoka-app\r\nAccept: application/json\r\nConnection: close\r\n");
+    for (name, value) in headers {
+        request.push_str(&format!("{name}: {value}\r\n"));
+    }
+    if let Some(payload) = payload {
+        request.push_str(&format!("Content-Length: {}\r\n", payload.len()));
+    }
+    request.push_str("\r\n");
     stream.write_all(request.as_bytes()).await.map_err(|_| HttpError("write"))?;
+    if let Some(payload) = payload {
+        stream.write_all(payload).await.map_err(|_| HttpError("write"))?;
+    }
     let mut raw = Vec::new();
     (&mut stream).take((limit + 16 * 1024) as u64).read_to_end(&mut raw).await.map_err(|_| HttpError("read"))?;
     let end = raw.windows(4).position(|w| w == b"\r\n\r\n").ok_or(HttpError("response"))?;
@@ -64,16 +83,13 @@ async fn once(url: &str, limit: usize) -> Result<Response, HttpError> {
         let absolute = if location.starts_with("https://") { location } else { format!("https://{host}{location}") };
         return Ok(Response::Redirect(absolute));
     }
-    if status != 200 {
-        return Err(HttpError("status"));
-    }
     if header("transfer-encoding").is_some_and(|v| v.eq_ignore_ascii_case("chunked")) {
         body = dechunk(&body).ok_or(HttpError("chunked"))?;
     }
     if body.len() > limit {
         return Err(HttpError("size"));
     }
-    Ok(Response::Body(body))
+    Ok(Response::Body(status, body))
 }
 
 fn dechunk(mut data: &[u8]) -> Option<Vec<u8>> {
