@@ -58,17 +58,41 @@
         return times.length ? Math.round(times.sort((a, b) => a - b)[Math.floor(times.length / 2)]) : null;
       };
 
-      const go = async (origin) => {
+      const fastestSite = (except) =>
+        [...latency.entries()].filter(([origin, ms]) => ms != null && origin !== except).sort((a, b) => a[1] - b[1])[0]?.[0];
+
+      // A navigation whose connection stalls never starts loading, so the window's own
+      // fallback never sees it: after a while the direct route, then the other site.
+      const OPEN_WAIT = 20_000;
+      const go = async (origin, retry = 0) => {
         // A link that launched the app can arrive while the sites are tested.
         const page = await call("pendingPage").catch(() => null);
         if (page) return location.replace(page);
         await call("chooseOrigin", { origin });
         const target = await window.__TAURI_INTERNALS__.invoke("launch_info", { locale: document.documentElement.lang, path });
         location.replace(origin + target.path);
+        setTimeout(async () => {
+          window.stop();
+          if (retry === 0 && (await switchRoute())) return go(origin, 1);
+          latency.set(origin, null);
+          const other = retry < 2 && fastestSite(origin);
+          if (other) {
+            opening = other;
+            render();
+            return go(other, 2);
+          }
+          opening = null;
+          document.getElementById("opening").hidden = true;
+          const message = document.getElementById("failed");
+          message.textContent = t("siteFailed", { host: new URL(origin).host });
+          message.hidden = false;
+          if (document.getElementById("choose").hidden) choose();
+          else render();
+        }, OPEN_WAIT);
       };
 
       const render = () => {
-        const fastest = [...latency.entries()].filter(([, ms]) => ms != null).sort((a, b) => a[1] - b[1])[0]?.[0];
+        const fastest = fastestSite();
         document.getElementById("sites").innerHTML = info.origins
           .map((origin) => {
             const ms = latency.get(origin);
@@ -113,7 +137,7 @@
         const results = await Promise.all(info.origins.map((origin) => probe(origin).then((ms) => (latency.set(origin, ms), render(), ms))));
         if (results.every((ms) => ms == null) && (await switchRoute())) return probeAll();
         if (failed && !opening && retryAllowed()) {
-          const fastest = [...latency.entries()].filter(([, ms]) => ms != null).sort((a, b) => a[1] - b[1])[0]?.[0];
+          const fastest = fastestSite();
           if (fastest) {
             opening = fastest;
             document.getElementById("opening").hidden = false;
