@@ -5,6 +5,7 @@
 pub mod codec;
 pub mod export;
 pub mod files;
+pub mod direct;
 pub mod game;
 pub mod http;
 pub mod proto;

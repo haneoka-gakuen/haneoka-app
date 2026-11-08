@@ -18,6 +18,9 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.webkit.ProxyConfig
+import androidx.webkit.ProxyController
+import androidx.webkit.WebViewFeature
 import app.tauri.annotation.ActivityCallback
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
@@ -62,6 +65,11 @@ class BarsArgs {
 @InvokeArg
 class ActiveArgs {
     var active: Boolean = false
+}
+
+@InvokeArg
+class ProxyArgs {
+    var port: Int = 0
 }
 
 @InvokeArg
@@ -266,6 +274,25 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
                 activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
             invoke.resolve()
+        }
+    }
+
+    /** Sends the web view's requests through the app's loopback route; local pages stay direct. */
+    @Command
+    fun webViewProxy(invoke: Invoke) {
+        val args = invoke.parseArgs(ProxyArgs::class.java)
+        if (args.port <= 0 || !WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
+            invoke.resolve(JSObject().put("applied", false))
+            return
+        }
+        val config = ProxyConfig.Builder()
+            .addProxyRule("127.0.0.1:${args.port}")
+            .addBypassRule("tauri.localhost")
+            .addBypassRule("*.localhost")
+            .addBypassRule("127.0.0.1")
+            .build()
+        ProxyController.getInstance().setProxyOverride(config, { it.run() }) {
+            invoke.resolve(JSObject().put("applied", true))
         }
     }
 

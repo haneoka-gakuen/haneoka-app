@@ -200,7 +200,21 @@ fn localized(window: &WebviewWindow, path: &str) -> String {
     path.replacen("/en/", &format!("/{locale}/"), 1)
 }
 
-fn build_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+/// The web view's own route to the site (`haneoka_core::direct`), on a
+/// loopback port; `None` when the port cannot be opened.
+fn start_direct() -> Option<u16> {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").ok()?;
+    listener.set_nonblocking(true).ok()?;
+    let port = listener.local_addr().ok()?.port();
+    tauri::async_runtime::spawn(async move {
+        if let Ok(listener) = tokio::net::TcpListener::from_std(listener) {
+            haneoka_core::direct::serve(listener, haneoka_core::direct::Router::new(platform::game_proxy())).await;
+        }
+    });
+    Some(port)
+}
+
+fn build_window(app: &AppHandle, direct: Option<u16>) -> tauri::Result<WebviewWindow> {
     let script = include_str!("bridge.js")
         .replace("__ORIGINS__", &serde_json::to_string(&ORIGINS).unwrap())
         .replace("__VERSION__", env!("CARGO_PKG_VERSION"))
@@ -241,6 +255,14 @@ fn build_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
                 }
             }
         });
+    // macOS takes a web view proxy only from macOS 14, so it keeps the system route.
+    #[cfg(any(windows, target_os = "linux"))]
+    let builder = match direct.and_then(|port| tauri::Url::parse(&format!("http://127.0.0.1:{port}")).ok()) {
+        Some(proxy) => builder.proxy_url(proxy),
+        None => builder,
+    };
+    #[cfg(not(any(windows, target_os = "linux")))]
+    let _ = direct;
     #[cfg(desktop)]
     let builder = builder
         .title("haneoka")
@@ -303,7 +325,16 @@ pub fn run() {
                     open_link(&handle, &url);
                 }
             }
-            build_window(&handle)?;
+            let direct = start_direct();
+            build_window(&handle, direct)?;
+            #[cfg(target_os = "android")]
+            if let Some(port) = direct {
+                let device = handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    use tauri_plugin_haneoka_device::DeviceExt;
+                    let _: Result<serde_json::Value, String> = device.device().call("webViewProxy", serde_json::json!({ "port": port })).await;
+                });
+            }
             Ok(())
         })
         .run(tauri::generate_context!())

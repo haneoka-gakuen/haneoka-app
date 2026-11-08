@@ -32,5 +32,7 @@ dependencies {
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation("dev.rikka.shizuku:aidl:13.1.5")
+    // The web view's proxy override: the site goes through the app's own route.
+    implementation("androidx.webkit:webkit:1.12.1")
     implementation(project(":tauri-android"))
 }

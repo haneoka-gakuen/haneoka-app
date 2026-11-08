@@ -177,7 +177,7 @@ async fn first_answering(host: &str, addresses: &[std::net::SocketAddr], last: &
     None
 }
 
-async fn resolve_over_https(host: &str) -> Vec<std::net::SocketAddr> {
+pub(crate) async fn resolve_over_https(host: &str) -> Vec<std::net::SocketAddr> {
     for server in ["223.5.5.5", "8.8.8.8"] {
         let url = format!("https://{server}/resolve?name={host}&type=A");
         let Ok(Ok(body)) = tokio::time::timeout(Duration::from_secs(5), crate::http::get(&url, 64 * 1024)).await else { continue };
@@ -195,6 +195,24 @@ async fn resolve_over_https(host: &str) -> Vec<std::net::SocketAddr> {
         }
     }
     Vec::new()
+}
+
+/// A tunnel to `host:port` through an HTTP proxy.
+pub(crate) async fn connect_through(proxy: &Proxy, host: &str, port: u16) -> std::io::Result<TcpStream> {
+    let mut stream = TcpStream::connect((proxy.host.as_str(), proxy.port)).await?;
+    stream.write_all(format!("CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n").as_bytes()).await?;
+    let mut head = Vec::new();
+    while !head.ends_with(b"\r\n\r\n") {
+        if head.len() > 8192 {
+            return Err(std::io::Error::other("proxy"));
+        }
+        head.push(stream.read_u8().await?);
+    }
+    let line = String::from_utf8_lossy(&head);
+    if !line.split_whitespace().nth(1).is_some_and(|code| code.starts_with('2')) {
+        return Err(std::io::Error::other("proxy"));
+    }
+    Ok(stream)
 }
 
 async fn connect(host: &str, proxy: Option<&Proxy>) -> std::io::Result<TcpStream> {
