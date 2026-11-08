@@ -97,6 +97,32 @@
       true,
     );
   };
+  // Android draws the status and navigation bars: they take the app bar's colour.
+  if ("__PLATFORM__" === "android") {
+    let reported = "";
+    const bars = () => {
+      const bar = document.querySelector(".top-app-bar") || document.body;
+      if (!bar) return;
+      const color = getComputedStyle(bar).backgroundColor;
+      const match = /rgba?\(([^)]+)\)/.exec(color);
+      if (!match) return;
+      const [r, g, b] = match[1].split(/[\s,/]+/).map(Number);
+      const hex = "#" + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+      const dark = document.documentElement.dataset.theme === "dark" || (0.299 * r + 0.587 * g + 0.114 * b) < 128;
+      const key = hex + dark;
+      if (key === reported) return;
+      reported = key;
+      invoke("systemBars", { color: hex, dark }).catch(() => {});
+    };
+    const watch = () => {
+      bars();
+      new MutationObserver(bars).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class"] });
+      document.addEventListener("astro:after-swap", bars);
+      matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => setTimeout(bars, 50));
+    };
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watch, { once: true });
+    else watch();
+  }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install, { once: true });
   else install();
 })();

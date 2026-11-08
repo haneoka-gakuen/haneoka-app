@@ -193,6 +193,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_haneoka_device::init())
         .invoke_handler(tauri::generate_handler![launch_info, remember_origin, bridge::bridge])
         .setup(|app| {
             let paths = app.path();

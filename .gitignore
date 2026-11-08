@@ -12,3 +12,4 @@ src-tauri/gen/
 *.p12
 *.key
 *.jks
+src-tauri/tools/

@@ -1529,6 +1529,7 @@ dependencies = [
  "tauri-plugin-deep-link",
  "tauri-plugin-dialog",
  "tauri-plugin-fs",
+ "tauri-plugin-haneoka-device",
  "tauri-plugin-opener",
  "tauri-plugin-single-instance",
  "tokio",
@@ -3935,6 +3936,16 @@ dependencies = [
  "thiserror 2.0.21",
  "toml 1.2.1+spec-1.1.0",
  "url",
+]
+
+[[package]]
+name = "tauri-plugin-haneoka-device"
+version = "0.3.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
 ]
 
 [[package]]

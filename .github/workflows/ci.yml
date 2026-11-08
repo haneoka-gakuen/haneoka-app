@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, tauri]
   pull_request:
 
 permissions:
@@ -10,14 +10,17 @@ permissions:
 
 jobs:
   check:
-    name: Analyze
-    runs-on: ubuntu-latest
+    name: Test
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          flutter-version: 3.47.7
-          channel: stable
-          cache: true
-      - run: flutter pub get
-      - run: flutter analyze
+          components: clippy
+      - uses: swatinem/rust-cache@v2
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - run: cargo test --workspace --locked
+      - run: cargo clippy --workspace --locked -- -D clippy::correctness -D clippy::suspicious

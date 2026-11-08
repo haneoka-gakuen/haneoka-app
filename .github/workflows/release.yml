@@ -3,418 +3,240 @@ name: Release
 on:
   push:
     tags: ["v*"]
+    branches: [tauri]
   workflow_dispatch:
     inputs:
       platform:
         description: Platform to build
         type: choice
         default: all
-        options: [all, android, linux, windows, apple, macos, ios]
-      only_arm64:
-        description: Build only the ARM64 installation-test APK
-        type: boolean
-        default: false
+        options: [all, android, linux, windows, macos, ios]
 
 permissions:
   contents: write
-  actions: read
 
 env:
-  FLUTTER_VERSION: 3.47.7
+  CARGO_TERM_COLOR: always
 
 jobs:
-  android:
-    if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'android'
+  version:
     runs-on: ubuntu-latest
-    env:
-      ANDROID_TARGETS: ${{ github.event_name == 'workflow_dispatch' && inputs.only_arm64 && 'android-arm64' || 'android-arm64,android-x64' }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      android: ${{ steps.version.outputs.android }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        run: |
+          version=$(jq -r .version src-tauri/tauri.conf.json)
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="${GITHUB_REF_NAME#v}"; fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # Above every code the Flutter releases used (10000 + run number),
+          # the same for every APK so any of them updates any other.
+          echo "android=$((20000 + ${{ github.run_number }}))" >> "$GITHUB_OUTPUT"
+
+  desktop:
+    needs: version
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'linux' || inputs.platform == 'windows' || inputs.platform == 'macos'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64
+            runner: ubuntu-22.04
+            platform: linux
+            adb: linux
+            arch: x64
+          - name: linux-arm64
+            runner: ubuntu-22.04-arm
+            platform: linux
+            adb: linux
+            arch: arm64
+          - name: windows-x64
+            runner: windows-latest
+            platform: windows
+            adb: windows
+            arch: x64
+          - name: macos-universal
+            runner: macos-latest
+            platform: macos
+            adb: darwin
+            arch: universal
+            target: universal-apple-darwin
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf rpm xdg-utils
+      - name: Bundle ADB
+        shell: bash
+        run: |
+          if [[ "${{ matrix.platform }}" == linux && "${{ matrix.arch }}" == arm64 ]]; then sudo apt-get install -y adb; fi
+          python3 scripts/bundle_adb.py --platform ${{ matrix.adb }} --arch ${{ matrix.arch }} --dest src-tauri/tools/adb
+          python3 - <<'PYTHON'
+          import json, pathlib
+          path = pathlib.Path('src-tauri/tauri.conf.json')
+          config = json.loads(path.read_text())
+          config['bundle']['resources'] = {'tools/adb/': 'tools/adb/'}
+          path.write_text(json.dumps(config, indent=2))
+          PYTHON
+      - run: npm ci
+      - name: Build
+        shell: bash
+        run: |
+          args=(--config "{\"version\":\"${{ needs.version.outputs.version }}\"}")
+          if [[ -n "${{ matrix.target }}" ]]; then args+=(--target "${{ matrix.target }}"); fi
+          npx tauri build "${args[@]}"
+      - name: Collect
+        shell: bash
+        run: |
+          mkdir dist
+          version=${{ needs.version.outputs.version }}
+          bundle=target/${{ matrix.target || 'release' }}
+          [[ -n "${{ matrix.target }}" ]] && bundle=target/${{ matrix.target }}/release
+          [[ -z "${{ matrix.target }}" ]] && bundle=target/release
+          shopt -s nullglob
+          for file in $bundle/bundle/deb/*.deb; do cp "$file" "dist/haneoka-${{ matrix.name }}.deb"; done
+          for file in $bundle/bundle/rpm/*.rpm; do cp "$file" "dist/haneoka-${{ matrix.name }}.rpm"; done
+          for file in $bundle/bundle/appimage/*.AppImage; do cp "$file" "dist/haneoka-${{ matrix.name }}.AppImage"; done
+          for file in $bundle/bundle/msi/*.msi; do cp "$file" "dist/haneoka-${{ matrix.name }}.msi"; done
+          for file in $bundle/bundle/nsis/*.exe; do cp "$file" "dist/haneoka-${{ matrix.name }}-setup.exe"; done
+          for file in $bundle/bundle/dmg/*.dmg; do cp "$file" "dist/haneoka-${{ matrix.name }}.dmg"; done
+          if [[ -d $bundle/bundle/macos/haneoka.app ]]; then
+            (cd $bundle/bundle/macos && ditto -c -k --keepParent haneoka.app "$GITHUB_WORKSPACE/dist/haneoka-${{ matrix.name }}.zip")
+          fi
+          ls -la dist
+          [[ -n "$(ls dist)" ]]
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: dist/*
+
+  android:
+    needs: version
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'android'
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
-      - name: Version
-        shell: bash
+      - uses: android-actions/setup-android@v3
+      - name: NDK
         run: |
-          version=$(sed -n 's/^version: \([^+]*\).*/\1/p' pubspec.yaml)
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="${GITHUB_REF_NAME#v}"; fi
-          echo "APP_VERSION=$version" >> "$GITHUB_ENV"
-          # Start above the legacy split-APK ABI offsets. Every APK variant
-          # uses the same monotonically increasing code so either can update it.
-          echo "ANDROID_BUILD_NUMBER=$((10000 + ${{ github.run_number }}))" >> "$GITHUB_ENV"
-      - run: flutter pub get
-      - name: Release key
+          sdkmanager "ndk;27.2.12479018" "build-tools;35.0.0" "platforms;android-36"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,x86_64-linux-android
+      - uses: swatinem/rust-cache@v2
+        with:
+          key: android
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx tauri android init --ci
+      - name: Build
+        run: |
+          npx tauri android build --ci --apk --aab --target aarch64 x86_64 \
+            --config '{"version":"${{ needs.version.outputs.version }}","bundle":{"android":{"versionCode":${{ needs.version.outputs.android }}}}}'
+      - name: Sign
         env:
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          tools=$ANDROID_HOME/build-tools/35.0.0
+          mkdir dist
+          apk=$(find src-tauri/gen/android/app/build/outputs/apk -name '*release*.apk' | head -1)
+          aab=$(find src-tauri/gen/android/app/build/outputs/bundle -name '*.aab' | head -1)
           if [[ -z "$KEYSTORE" ]]; then
             if [[ "$GITHUB_REF" == refs/tags/* ]]; then echo "::error::A release signing key is required for update-compatible Android releases."; exit 1; fi
-            echo "No release key configured; workflow_dispatch uses a development signature."
-            exit 0
+            keytool -genkeypair -keystore "$RUNNER_TEMP/debug.jks" -storepass android -keypass android -alias debug -keyalg RSA -dname CN=debug -validity 30
+            KEYSTORE_FILE=$RUNNER_TEMP/debug.jks; STORE_PASSWORD=android; KEY_ALIAS=debug; KEY_PASSWORD=android
+          else
+            KEYSTORE_FILE=$RUNNER_TEMP/release.jks
+            echo "$KEYSTORE" | base64 -d > "$KEYSTORE_FILE"
           fi
-          echo "$KEYSTORE" | base64 -d > android/upload.jks
-          {
-            echo "storeFile=$GITHUB_WORKSPACE/android/upload.jks"
-            echo "storePassword=$STORE_PASSWORD"
-            echo "keyAlias=$KEY_ALIAS"
-            echo "keyPassword=$KEY_PASSWORD"
-          } > android/key.properties
-      - run: flutter build apk --release --dart-define=cronetHttpNoPlay=true --target-platform=${{ env.ANDROID_TARGETS }} --build-name="${{ env.APP_VERSION }}" --build-number="${{ env.ANDROID_BUILD_NUMBER }}" --android-project-arg=force-version-code-ignoring-abi=true --split-per-abi
-      - if: github.event_name != 'workflow_dispatch' || !inputs.only_arm64
-        run: flutter build apk --release --dart-define=cronetHttpNoPlay=true --target-platform=${{ env.ANDROID_TARGETS }} --build-name="${{ env.APP_VERSION }}" --build-number="${{ env.ANDROID_BUILD_NUMBER }}" --android-project-arg=force-version-code-ignoring-abi=true
-      - if: github.event_name != 'workflow_dispatch' || !inputs.only_arm64
-        run: flutter build appbundle --release --dart-define=cronetHttpNoPlay=true --target-platform=${{ env.ANDROID_TARGETS }} --build-name="${{ env.APP_VERSION }}" --build-number="${{ env.ANDROID_BUILD_NUMBER }}" --android-project-arg=force-version-code-ignoring-abi=true
-      - name: Collect
-        run: |
-          mkdir dist
-          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk dist/haneoka-android-arm64-v8a.apk
-          if [[ "$ANDROID_TARGETS" == android-arm64,android-x64 ]]; then
-            cp build/app/outputs/flutter-apk/app-release.apk dist/haneoka-android.apk
-            cp build/app/outputs/flutter-apk/app-x86_64-release.apk dist/haneoka-android-x86_64.apk
-            cp build/app/outputs/bundle/release/app-release.aab dist/haneoka-android.aab
-          fi
+          "$tools/zipalign" -f -p 4 "$apk" "$RUNNER_TEMP/aligned.apk"
+          "$tools/apksigner" sign --ks "$KEYSTORE_FILE" --ks-pass "pass:$STORE_PASSWORD" --ks-key-alias "$KEY_ALIAS" --key-pass "pass:$KEY_PASSWORD" \
+            --out dist/haneoka-android.apk "$RUNNER_TEMP/aligned.apk"
+          cp "$aab" dist/haneoka-android.aab
+          jarsigner -keystore "$KEYSTORE_FILE" -storepass "$STORE_PASSWORD" -keypass "$KEY_PASSWORD" dist/haneoka-android.aab "$KEY_ALIAS"
+          "$tools/apksigner" verify --print-certs dist/haneoka-android.apk | head -3
       - uses: actions/upload-artifact@v4
         with:
           name: android
           path: dist/*
 
-  linux:
-    if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'linux'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: x64
-            runner: ubuntu-22.04
-            tool_arch: x86_64
-          - arch: arm64
-            runner: ubuntu-24.04-arm
-            tool_arch: aarch64
-    runs-on: ${{ matrix.runner }}
+  ios:
+    needs: version
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'ios'
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - run: |
-          sudo apt-get update
-          if [[ "${{ matrix.arch }}" == "x64" ]]; then sudo apt-get remove -y libunwind-14-dev; fi
-          sudo apt-get install -y ninja-build clang cmake pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev rpm zstd patchelf file adb squashfs-tools flatpak flatpak-builder xvfb xauth
-      - uses: subosito/flutter-action@v2
-        if: matrix.arch == 'x64'
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          architecture: ${{ matrix.arch }}
-          cache: true
-      - name: Native ARM64 Flutter SDK
-        if: matrix.arch == 'arm64'
+          targets: aarch64-apple-ios
+      - uses: swatinem/rust-cache@v2
+        with:
+          key: ios
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: brew install xcodegen ldid
+      - run: npx tauri ios init --ci
+      - name: Build without signing
         run: |
-          git clone --depth 1 --branch "$FLUTTER_VERSION" https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter-native"
-          "$RUNNER_TEMP/flutter-native/bin/flutter" --version
-          "$RUNNER_TEMP/flutter-native/bin/cache/dart-sdk/bin/dart" --version 2>&1 | tee "$RUNNER_TEMP/dart-version.txt"
-          grep -q linux_arm64 "$RUNNER_TEMP/dart-version.txt"
-          echo "FLUTTER_ROOT=$RUNNER_TEMP/flutter-native" >> "$GITHUB_ENV"
-          echo "$RUNNER_TEMP/flutter-native/bin" >> "$GITHUB_PATH"
-      - name: Version
-        shell: bash
+          project=$(ls -d src-tauri/gen/apple/*.xcodeproj | head -1)
+          scheme=$(xcodebuild -list -project "$project" -json | jq -r '.project.schemes[] | select(endswith("_iOS"))' | head -1)
+          xcodebuild -project "$project" -scheme "$scheme" -configuration release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -archivePath build/haneoka.xcarchive archive \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            MARKETING_VERSION=${{ needs.version.outputs.version }} CURRENT_PROJECT_VERSION=${{ github.run_number }}
+      - name: Packages
         run: |
-          version=$(sed -n 's/^version: \([^+]*\).*/\1/p' pubspec.yaml)
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="${GITHUB_REF_NAME#v}"; fi
-          echo "APP_VERSION=$version" >> "$GITHUB_ENV"
-      - run: flutter pub get
-      - run: flutter build linux --release --target-platform=linux-${{ matrix.arch }} --build-name="${{ env.APP_VERSION }}" --build-number="${{ github.run_number }}"
-        env:
-          CMAKE_BUILD_PARALLEL_LEVEL: 2
-      - name: Bundle ADB
-        run: python3 scripts/bundle_adb.py --platform linux --arch ${{ matrix.arch }} --dest build/linux/${{ matrix.arch }}/release/bundle/tools/adb
-      - name: Installers
-        run: python3 scripts/package_linux.py --bundle build/linux/${{ matrix.arch }}/release/bundle --arch ${{ matrix.arch }} --version "$APP_VERSION" --formats tar,deb,rpm,arch
-      - name: Run extracted Linux package
-        run: |
-          mkdir -p build/package-runtime
-          tar -xzf dist/haneoka-linux-${{ matrix.arch }}.tar.gz -C build/package-runtime
-          LD_LIBRARY_PATH="$GITHUB_WORKSPACE/build/package-runtime/lib" ldd build/package-runtime/haneoka | tee "$RUNNER_TEMP/package-dependencies.txt"
-          ! grep -q 'not found' "$RUNNER_TEMP/package-dependencies.txt"
-          set +e
-          LIBGL_ALWAYS_SOFTWARE=1 timeout 10s xvfb-run -a build/package-runtime/haneoka > "$RUNNER_TEMP/package-runtime.log" 2>&1
-          status=$?
-          set -e
-          cat "$RUNNER_TEMP/package-runtime.log"
-          [[ "$status" == 124 ]] || exit 1
-      - name: Flatpak
-        run: |
-          mkdir -p build/flatpak
-          cp -a build/linux/${{ matrix.arch }}/release/bundle build/flatpak/bundle
-          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user -y flathub org.gnome.Platform//48 org.gnome.Sdk//48
-          flatpak-builder --user --force-clean --repo=build/flatpak/repo build/flatpak/build packaging/flatpak/org.haneoka.haneoka.yml
-          flatpak build-bundle build/flatpak/repo dist/haneoka-linux-${{ matrix.arch }}.flatpak org.haneoka.haneoka
+          mkdir -p dist build/ios/standard/Payload build/ios/trollstore/Payload
+          app=$(find build/haneoka.xcarchive/Products/Applications -maxdepth 1 -name '*.app' | head -1)
+          ditto "$app" "build/ios/standard/Payload/$(basename "$app")"
+          codesign --force --sign - --timestamp=none "build/ios/standard/Payload/$(basename "$app")"
+          ditto "build/ios/standard/Payload/$(basename "$app")" "build/ios/trollstore/Payload/$(basename "$app")"
+          (cd build/ios/standard && zip -qry "$GITHUB_WORKSPACE/dist/haneoka-ios-unsigned.ipa" Payload)
+          binary=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "build/ios/trollstore/Payload/$(basename "$app")/Info.plist")
+          ldid -Spackaging/ios-trollstore.entitlements "build/ios/trollstore/Payload/$(basename "$app")/$binary"
+          (cd build/ios/trollstore && zip -qry "$GITHUB_WORKSPACE/dist/haneoka-ios-trollstore.tipa" Payload)
       - uses: actions/upload-artifact@v4
         with:
-          name: linux-${{ matrix.arch }}
+          name: ios
           path: dist/*
 
-  windows:
-    if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'windows'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: x64
-            runner: windows-latest
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          architecture: x64
-          cache: true
-      - name: Version
-        shell: bash
-        run: |
-          version=$(sed -n 's/^version: \([^+]*\).*/\1/p' pubspec.yaml)
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="${GITHUB_REF_NAME#v}"; fi
-          echo "APP_VERSION=$version" >> "$GITHUB_ENV"
-      - run: flutter pub get
-      - run: flutter build windows --release --build-name="${{ env.APP_VERSION }}" --build-number="${{ github.run_number }}"
-      - name: Bundle Visual C++ runtime
-        shell: pwsh
-        run: |
-          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
-          $vs = & $vswhere -latest -products '*' -property installationPath
-          if (!$vs) { throw 'Visual Studio runtime source not found' }
-          $versions = Get-ChildItem (Join-Path $vs 'VC/Redist/MSVC') -Directory | Sort-Object LastWriteTime -Descending
-          $crt = $null
-          foreach ($version in $versions) {
-            $candidate = Get-ChildItem (Join-Path $version.FullName '${{ matrix.arch }}') -Directory -Filter 'Microsoft.VC*.CRT' -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($candidate) { $crt = $candidate; break }
-          }
-          if (!$crt) { throw 'Redistributable runtime for the package architecture not found' }
-          $bundle = 'build/windows/${{ matrix.arch }}/runner/Release'
-          Copy-Item (Join-Path $crt.FullName '*.dll') $bundle
-          foreach ($name in @('msvcp140.dll', 'vcruntime140.dll')) {
-            if (!(Test-Path (Join-Path $bundle $name))) { throw "Required C++ runtime missing: $name" }
-          }
-      - name: Bundle ADB
-        run: python scripts/bundle_adb.py --platform windows --arch ${{ matrix.arch }} --dest build/windows/${{ matrix.arch }}/runner/Release/tools/adb
-      - name: Installer tools
-        shell: pwsh
-        run: |
-          dotnet tool install --global wix --version 6.0.2
-          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
-          if (!(Test-Path $iscc)) {
-            winget install --id JRSoftware.InnoSetup --exact --silent --accept-package-agreements --accept-source-agreements
-          }
-          Add-Content $env:GITHUB_PATH 'C:\Program Files (x86)\Inno Setup 6'
-      - name: Signing certificate
-        shell: pwsh
-        env:
-          WINDOWS_SIGNING_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
-          WINDOWS_SIGNING_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PASSWORD }}
-          WINDOWS_MSIX_PUBLISHER: ${{ vars.WINDOWS_MSIX_PUBLISHER }}
-        run: |
-          $publisher = if ($env:WINDOWS_MSIX_PUBLISHER) { $env:WINDOWS_MSIX_PUBLISHER } else { 'CN=Haneoka' }
-          Add-Content $env:GITHUB_ENV "WINDOWS_MSIX_PUBLISHER=$publisher"
-          if (!$env:WINDOWS_SIGNING_PFX_BASE64) { exit 0 }
-          $pfx = Join-Path $env:RUNNER_TEMP 'haneoka-signing.pfx'
-          try {
-            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_SIGNING_PFX_BASE64))
-            $password = ConvertTo-SecureString $env:WINDOWS_SIGNING_PASSWORD -AsPlainText -Force
-            $cert = Import-PfxCertificate -FilePath $pfx -CertStoreLocation 'Cert:/CurrentUser/My' -Password $password
-            if ($cert.Subject -ne $publisher) { throw 'Certificate subject must match the MSIX publisher' }
-            Add-Content $env:GITHUB_ENV "WINDOWS_SIGNING_THUMBPRINT=$($cert.Thumbprint)"
-            if ($cert.Subject -eq $cert.Issuer) {
-              $publicCert = Join-Path $env:RUNNER_TEMP 'haneoka-signing.cer'
-              Export-Certificate -Cert $cert -FilePath $publicCert -Force | Out-Null
-              # Trust the signing leaf only on this disposable CI runner for signature verification.
-              Import-Certificate -FilePath $publicCert -CertStoreLocation 'Cert:/LocalMachine/Root' | Out-Null
-            }
-          } finally { Remove-Item $pfx -Force -ErrorAction SilentlyContinue }
-      - name: Installers
-        run: python scripts/package_windows.py --bundle build/windows/${{ matrix.arch }}/runner/Release --arch ${{ matrix.arch }} --version "${{ env.APP_VERSION }}"
-      - name: MSIX
-        shell: pwsh
-        run: ./scripts/package_msix.ps1 -Bundle build/windows/${{ matrix.arch }}/runner/Release -Arch ${{ matrix.arch }} -Version "$env:APP_VERSION" -BuildNumber ${{ github.run_number }} -Destination dist
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-${{ matrix.arch }}
-          path: dist/*
-
-  apple:
-    if: github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'apple' || github.event.inputs.platform == 'macos' || github.event.inputs.platform == 'ios'
-    strategy:
-      fail-fast: false
-      max-parallel: 1
-      matrix: ${{ fromJSON(github.event.inputs.platform == 'ios' && '{"include":[{"kind":"ios","arch":"arm64","runner":"macos-26"}]}' || github.event.inputs.platform == 'macos' && '{"include":[{"kind":"macos","arch":"x64","runner":"macos-26-intel"},{"kind":"macos","arch":"arm64","runner":"macos-26"}]}' || '{"include":[{"kind":"macos","arch":"x64","runner":"macos-26-intel"},{"kind":"macos","arch":"arm64","runner":"macos-26"},{"kind":"ios","arch":"arm64","runner":"macos-26"}]}') }}
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          architecture: ${{ matrix.arch }}
-          cache: true
-      - name: Version
-        shell: bash
-        run: |
-          version=$(sed -n 's/^version: \([^+]*\).*/\1/p' pubspec.yaml)
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="${GITHUB_REF_NAME#v}"; fi
-          echo "APP_VERSION=$version" >> "$GITHUB_ENV"
-      - run: flutter pub get
-      - name: Configure native macOS architecture
-        if: matrix.kind == 'macos'
-        run: |
-          if [[ "${{ matrix.arch }}" == "arm64" ]]; then
-            flutter config --enable-macos-arm64-only
-          else
-            printf '\nARCHS = x86_64\nEXCLUDED_ARCHS = arm64\n' >> macos/Runner/Configs/Release.xcconfig
-          fi
-      - if: matrix.kind == 'macos'
-        run: flutter build macos --release --build-name="${{ env.APP_VERSION }}" --build-number="${{ github.run_number }}"
-      - name: Bundle ADB
-        if: matrix.kind == 'macos'
-        run: |
-          python3 scripts/bundle_adb.py --platform darwin --arch ${{ matrix.arch }} --dest build/macos/Build/Products/Release/haneoka.app/Contents/Resources/tools/adb
-      - name: Installers
-        if: matrix.kind == 'macos'
-        run: bash scripts/package_macos.sh build/macos/Build/Products/Release/haneoka.app "$APP_VERSION" ${{ matrix.arch }} dist
-      - if: matrix.kind == 'ios'
-        run: flutter build ios --release --build-name="${{ env.APP_VERSION }}" --build-number="${{ github.run_number }}" --no-codesign
-      - name: iOS standard and privileged packages
-        if: matrix.kind == 'ios'
-        run: |
-          brew install ldid
-          mkdir -p dist build/ios-packages/standard/Payload build/ios-packages/trollstore/Payload
-          ditto build/ios/iphoneos/Runner.app build/ios-packages/standard/Payload/Runner.app
-          # AltSign/ldid requires a coherent signature layout in Flutter's
-          # embedded frameworks. Ad-hoc signatures are replaced by the user's
-          # sideloading tool; they require no distribution certificate.
-          app=build/ios-packages/standard/Payload/Runner.app
-          while IFS= read -r -d '' binary; do
-            codesign --force --sign - --timestamp=none "$binary"
-          done < <(find "$app" -type f -name '*.dylib' -print0)
-          while IFS= read -r -d '' bundle; do
-            codesign --force --sign - --timestamp=none "$bundle"
-          done < <(find "$app" -depth -type d \( -name '*.framework' -o -name '*.appex' \) -print0)
-          codesign --force --sign - --timestamp=none "$app"
-          codesign --verify --deep --strict "$app"
-          ditto "$app" build/ios-packages/trollstore/Payload/Runner.app
-          (cd build/ios-packages/standard && zip -qry "$GITHUB_WORKSPACE/dist/haneoka-ios-unsigned.ipa" Payload)
-          ldid -Spackaging/ios-trollstore.entitlements build/ios-packages/trollstore/Payload/Runner.app/Runner
-          (cd build/ios-packages/trollstore && zip -qry "$GITHUB_WORKSPACE/dist/haneoka-ios-trollstore.tipa" Payload)
-          python3 scripts/ios_archive.py --trollstore dist/haneoka-ios-trollstore.tipa
-      - uses: actions/upload-artifact@v4
-        with:
-          name: apple-${{ matrix.kind }}-${{ matrix.arch }}
-          path: dist/*
-
-  release:
-    needs: [android, linux, windows, apple]
-    if: always() && !(github.event_name == 'workflow_dispatch' && inputs.only_arm64) && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+  publish:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [version, desktop, android, ios]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
-      - name: Verify prepared version
-        run: |
-          prepared=$(sed -n 's/^version: \([^+]*\).*/\1/p' pubspec.yaml)
-          version="$prepared"
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            version="${GITHUB_REF_NAME#v}"
-            [[ "$prepared" == "$version" ]] || { echo "::error::Tag and pubspec version differ"; exit 1; }
-          fi
-          echo "APP_VERSION=$version" >> "$GITHUB_ENV"
-      - name: Verify complete release packages
-        if: startsWith(github.ref, 'refs/tags/') && (github.event_name != 'workflow_dispatch' || inputs.platform == 'all')
-        run: |
-          python3 - <<'PYTHON'
-          from pathlib import Path
-          required = {
-              'haneoka-android-arm64-v8a.apk', 'haneoka-android-x86_64.apk',
-              'haneoka-android.apk', 'haneoka-android.aab',
-              'haneoka-ios-unsigned.ipa', 'haneoka-ios-trollstore.tipa',
-              'haneoka-windows-x64.zip', 'haneoka-windows-x64.msi',
-              'haneoka-windows-x64-setup.exe', 'haneoka-windows-x64.msix',
-          }
-          for arch in ('x64', 'arm64'):
-              required.update(f'haneoka-linux-{arch}.{extension}'
-                              for extension in ('tar.gz', 'deb', 'rpm', 'pkg.tar.zst', 'flatpak'))
-              required.update(f'haneoka-macos-{arch}.{extension}'
-                              for extension in ('zip', 'dmg', 'pkg'))
-          missing = sorted(name for name in required
-                           if not (Path('dist') / name).is_file() or not (Path('dist') / name).stat().st_size)
-          if missing:
-              raise SystemExit('Missing release packages: ' + ', '.join(missing))
-          PYTHON
-      - name: Distribution manifests
-        run: python3 scripts/release_metadata.py --dist dist --version "$APP_VERSION" --build-number "${{ github.run_number }}" --repository "$GITHUB_REPOSITORY"
-      - uses: actions/upload-artifact@v4
+      - name: Checksums
+        run: (cd dist && sha256sum * > SHA256SUMS)
+      - uses: softprops/action-gh-release@v2
         with:
-          name: distribution-manifests
-          overwrite: true
-          path: |
-            dist/SHA256SUMS
-            dist/release-version.json
-            dist/altstore-source.json
-            dist/scoop-haneoka.json
-            dist/Haneoka.Haneoka*.yaml
-            dist/haneoka.rb
-            dist/*.appinstaller
-      - name: Publish
-        if: startsWith(github.ref, 'refs/tags/') && (github.event_name != 'workflow_dispatch' || inputs.platform == 'all')
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          current=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_REF_NAME" --jq .sha)
-          [[ "$current" == "$(git rev-parse HEAD)" ]] || { echo "::error::Release tag changed during this build"; exit 1; }
-          if draft=$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2>/dev/null); then
-            [[ "$draft" == true ]] || { echo "::error::Published releases are immutable; prepare a new version."; exit 1; }
-          else
-            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
-              --title "haneoka ${GITHUB_REF_NAME#v}" --generate-notes
-          fi
-          gh release upload "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --clobber
-          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' > /tmp/haneoka-release-assets
-          while IFS= read -r name; do
-            if [[ ! -f "dist/$name" ]]; then
-              gh release delete-asset "$GITHUB_REF_NAME" "$name" --repo "$GITHUB_REPOSITORY" --yes
-            fi
-          done < /tmp/haneoka-release-assets
-          release_api=$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json apiUrl --jq .apiUrl)
-          gh api "$release_api" > /tmp/haneoka-release-metadata.json
-          node <<'NODE'
-          const fs = require('node:fs');
-          const { createHash } = require('node:crypto');
-          const sums = fs.readFileSync('dist/SHA256SUMS');
-          const expected = new Map(sums.toString('utf8').trim().split('\n').map(line => {
-            const match = /^([a-f0-9]{64})  (.+)$/.exec(line);
-            if (!match) throw new Error('Invalid SHA256SUMS entry');
-            return [match[2], match[1]];
-          }));
-          expected.set('SHA256SUMS', createHash('sha256').update(sums).digest('hex'));
-          const release = JSON.parse(fs.readFileSync('/tmp/haneoka-release-metadata.json', 'utf8'));
-          if (release.assets.length !== expected.size) throw new Error('Release asset count differs');
-          for (const asset of release.assets) {
-            const digest = expected.get(asset.name);
-            if (!digest || asset.state !== 'uploaded' || asset.digest !== `sha256:${digest}`) {
-              throw new Error(`Release asset mismatch: ${asset.name}`);
-            }
-          }
-          NODE
-          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          files: dist/*
+          generate_release_notes: true

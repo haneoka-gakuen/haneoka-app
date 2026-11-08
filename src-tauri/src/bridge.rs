@@ -8,6 +8,7 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Manager, WebviewWindow};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 use tauri_plugin_fs::FsExt;
+use tauri_plugin_haneoka_device::DeviceExt;
 
 use crate::{platform, sign_in, AppState};
 
@@ -165,10 +166,16 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
             let result = sign_in::sign_in(app, &state(app).sign_in, &origin, provider).await?;
             Ok(result.map_or(Value::Null, |(code, verifier)| json!({ "code": code, "verifier": verifier })))
         }
-        "orientation" => Ok(Value::Null),
+        "orientation" | "systemBars" => {
+            #[cfg(target_os = "android")]
+            app.device().call::<Value, _>(method, args).await?;
+            Ok(Value::Null)
+        }
         "fullscreen" => {
             #[cfg(desktop)]
             window.set_fullscreen(args.get("active").and_then(Value::as_bool).unwrap_or(false)).map_err(|e| e.to_string())?;
+            #[cfg(target_os = "android")]
+            app.device().call::<Value, _>(method, args).await?;
             Ok(Value::Null)
         }
         "download" => {
@@ -179,6 +186,8 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
             let mut sources = vec!["files"];
             #[cfg(desktop)]
             sources.extend(["folder", "adb", "iosBackup"]);
+            #[cfg(target_os = "android")]
+            sources.extend(["shizuku", "gameFolder"]);
             Ok(json!({ "sources": sources, "releases": GameRelease::ALL.iter().map(|r| r.package_id()).collect::<Vec<_>>() }))
         }
         "readFiles" => {
@@ -288,6 +297,37 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
             .map_err(|e| e.to_string())?;
             imported(app, &window, collector)
         }
+        "deviceStatus" => app.device().status().await,
+        "shizukuRequest" | "openShizuku" => app.device().call(method, json!({})).await,
+        "shizukuRead" => {
+            let releases = match release_arg(args) {
+                Some(release) => vec![release],
+                None => GameRelease::ALL.to_vec(),
+            };
+            let mut batches = Vec::new();
+            for release in releases {
+                batches.push(app.device().shizuku_read(release.package_id()).await?);
+            }
+            read_batches(app, &window, batches).await
+        }
+        "gameFolder" => {
+            let mut uris: Vec<String> = Vec::new();
+            if let Some(release) = release_arg(args) {
+                let granted: Value = app.device().call("grantGameFolder", json!({ "packageId": release.package_id() })).await?;
+                match granted.get("uri").and_then(Value::as_str) {
+                    Some(uri) => uris.push(uri.to_owned()),
+                    None => return Ok(Value::Null),
+                }
+            } else {
+                let granted: Value = app.device().call("grantedFolders", json!({})).await?;
+                uris.extend(granted["folders"].as_array().into_iter().flatten().filter_map(Value::as_str).map(str::to_owned));
+            }
+            let mut batches = Vec::new();
+            for uri in uris {
+                batches.push(app.device().folder_read(&uri).await?);
+            }
+            read_batches(app, &window, batches).await
+        }
         "refreshGameAccount" => {
             let save = state(app).accounts.find(text(args, "key").ok_or("key")?).ok_or("save_not_found")?;
             let updated = game::refresh(&save, platform::game_proxy().as_ref()).await.map_err(|e| e.0.to_owned())?;
@@ -311,6 +351,27 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
         }
         _ => Err(format!("unsupported: {method}")),
     }
+}
+
+/// Files the phone staged; each batch is released once read.
+async fn read_batches(app: &AppHandle, window: &WebviewWindow, batches: Vec<tauri_plugin_haneoka_device::Batch>) -> Result<Value> {
+    let mut collector = SaveCollector::new();
+    for batch in batches {
+        for file in &batch.files {
+            let Ok(bytes) = tokio::fs::read(&file.path).await else { continue };
+            collector.offer(
+                &bytes,
+                &haneoka_core::save::SaveCandidate {
+                    source: file.source.clone(),
+                    group: Some(file.group.clone()),
+                    modified_at: (file.modified > 0).then(|| chrono::DateTime::from_timestamp_millis(file.modified)).flatten(),
+                    release: GameRelease::from_package(&file.package),
+                },
+            );
+        }
+        app.device().release(&batch.id).await;
+    }
+    imported(app, window, collector)
 }
 
 #[tauri::command]
