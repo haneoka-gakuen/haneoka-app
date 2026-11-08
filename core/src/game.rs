@@ -140,25 +140,61 @@ fn tls_config() -> Arc<rustls::ClientConfig> {
 }
 
 /// Every resolved address in turn, IPv4 first, each with its own time limit,
-/// so one unroutable address cannot use up the whole attempt.
+/// so one unroutable address cannot use up the whole attempt. When none
+/// answers, as when a VPN's fake-IP table has lost the name, the addresses
+/// from DNS over HTTPS are tried as well.
 async fn direct(host: &str) -> std::io::Result<TcpStream> {
-    let mut addresses: Vec<std::net::SocketAddr> = tokio::net::lookup_host((host, 443)).await?.collect();
+    let mut addresses: Vec<std::net::SocketAddr> = match tokio::net::lookup_host((host, 443)).await {
+        Ok(found) => found.collect(),
+        Err(error) => {
+            log::warn!("game resolve {host}: {error}");
+            Vec::new()
+        }
+    };
     addresses.sort_by_key(|address| address.is_ipv6());
     let mut last = std::io::Error::new(std::io::ErrorKind::NotFound, "no address");
-    for address in addresses {
+    if let Some(stream) = first_answering(host, &addresses, &mut last).await {
+        return Ok(stream);
+    }
+    let fallback: Vec<_> = resolve_over_https(host).await.into_iter().filter(|address| !addresses.contains(address)).collect();
+    first_answering(host, &fallback, &mut last).await.ok_or(last)
+}
+
+async fn first_answering(host: &str, addresses: &[std::net::SocketAddr], last: &mut std::io::Error) -> Option<TcpStream> {
+    for &address in addresses {
         match tokio::time::timeout(Duration::from_secs(6), TcpStream::connect(address)).await {
-            Ok(Ok(stream)) => return Ok(stream),
+            Ok(Ok(stream)) => return Some(stream),
             Ok(Err(error)) => {
                 log::warn!("game connect {host} {address}: {error}");
-                last = error;
+                *last = error;
             }
             Err(_) => {
                 log::warn!("game connect {host} {address}: timed out");
-                last = std::io::Error::from(std::io::ErrorKind::TimedOut);
+                *last = std::io::Error::from(std::io::ErrorKind::TimedOut);
             }
         }
     }
-    Err(last)
+    None
+}
+
+async fn resolve_over_https(host: &str) -> Vec<std::net::SocketAddr> {
+    for server in ["223.5.5.5", "8.8.8.8"] {
+        let url = format!("https://{server}/resolve?name={host}&type=A");
+        let Ok(Ok(body)) = tokio::time::timeout(Duration::from_secs(5), crate::http::get(&url, 64 * 1024)).await else { continue };
+        let Ok(value) = serde_json::from_slice::<serde_json::Value>(&body) else { continue };
+        let found: Vec<_> = value["Answer"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|answer| answer["type"] == 1)
+            .filter_map(|answer| answer["data"].as_str()?.parse::<std::net::Ipv4Addr>().ok())
+            .map(|ip| std::net::SocketAddr::from((ip, 443)))
+            .collect();
+        if !found.is_empty() {
+            return found;
+        }
+    }
+    Vec::new()
 }
 
 async fn connect(host: &str, proxy: Option<&Proxy>) -> std::io::Result<TcpStream> {

@@ -99,7 +99,9 @@
       });
 
       await setup();
-      if (failed || query.has("choose") || !info.chosen) choose();
+      const page = await call("pendingPage").catch(() => null);
+      if (page) location.replace(page);
+      else if (failed || query.has("choose") || !info.chosen) choose();
       else if ((await probe(info.chosen, 1)) != null) go(info.chosen);
       else {
         const message = document.getElementById("failed");

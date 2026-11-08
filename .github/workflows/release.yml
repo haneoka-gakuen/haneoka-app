@@ -171,6 +171,8 @@ jobs:
       - name: Android project
         run: |
           npx tauri android init --ci
+          # The generated project carries the template icon.
+          cp -R src-tauri/icons/android/. src-tauri/gen/android/app/src/main/res/
           # services.gradle.org often times out; fetch the distribution with retries.
           props=src-tauri/gen/android/gradle/wrapper/gradle-wrapper.properties
           url=$(sed -n 's/^distributionUrl=//p' "$props" | sed 's/\\:/:/g')
@@ -241,6 +243,7 @@ jobs:
           APPLE_DEVELOPMENT_TEAM: "0000000000"
         run: |
           npx tauri ios init --ci
+          cp src-tauri/icons/ios/*.png src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/
           python3 - <<'PYTHON'
           import pathlib, re
           path = pathlib.Path('src-tauri/gen/apple/project.yml')

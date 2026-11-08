@@ -161,6 +161,7 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
         }
         "pendingGachaHistory" => Ok(state(app).pending.lock().unwrap().gacha_history.take().unwrap_or(Value::Null)),
         "pendingSongProgress" => Ok(state(app).pending.lock().unwrap().song_progress.take().unwrap_or(Value::Null)),
+        "pendingPage" => Ok(state(app).pending.lock().unwrap().page.take().map(Value::from).unwrap_or(Value::Null)),
         "pendingBoxImport" => Ok(state(app).pending.lock().unwrap().box_import.take().unwrap_or(Value::Null)),
         "appInfo" => {
             let state = state(app);

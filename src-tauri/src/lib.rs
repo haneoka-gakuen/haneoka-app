@@ -36,6 +36,8 @@ pub struct Pending {
     pub box_import: Option<serde_json::Value>,
     pub song_progress: Option<serde_json::Value>,
     pub gacha_history: Option<serde_json::Value>,
+    /// A bundled page a link asked for before the launch page ran.
+    pub page: Option<String>,
 }
 
 impl AppState {
@@ -154,8 +156,13 @@ fn open_link(app: &AppHandle, url: &url::Url) {
                 return;
             }
             Some("saves") => {
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.navigate(site::local_url("saves.html"));
+                let window = app.get_webview_window("main");
+                let settled = window.as_ref().and_then(|w| w.url().ok()).is_some_and(|u| site_origin(&u).is_some() || !u.path().ends_with("/index.html"));
+                match window {
+                    Some(window) if settled => {
+                        let _ = window.navigate(site::local_url("saves.html"));
+                    }
+                    _ => app.state::<AppState>().pending.lock().unwrap().page = Some("saves.html".into()),
                 }
                 return;
             }
