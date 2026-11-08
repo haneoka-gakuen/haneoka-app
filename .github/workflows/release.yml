@@ -168,11 +168,15 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - run: npx tauri android init --ci
+      - name: Android project
+        run: |
+          npx tauri android init --ci
+          # The template gives the Gradle download ten seconds.
+          sed -i 's/^networkTimeout=.*/networkTimeout=120000/' src-tauri/gen/android/gradle/wrapper/gradle-wrapper.properties
       - name: Build
         run: |
           config='{"version":"${{ needs.version.outputs.version }}","bundle":{"android":{"versionCode":${{ needs.version.outputs.android }}}}}'
-          npx tauri android build --ci --apk --target aarch64 --config "$config"
+          npx tauri android build --ci --apk --target aarch64 --config "$config" || npx tauri android build --ci --apk --target aarch64 --config "$config"
           mkdir -p "$RUNNER_TEMP/arm64"
           cp "$(find src-tauri/gen/android/app/build/outputs/apk -name '*release*.apk' | head -1)" "$RUNNER_TEMP/arm64/haneoka.apk"
           npx tauri android build --ci --apk --aab --target aarch64 x86_64 --config "$config"
