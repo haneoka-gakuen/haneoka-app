@@ -11,6 +11,7 @@ use crate::ORIGINS;
 
 static CHECKED: AtomicBool = AtomicBool::new(false);
 
+#[cfg_attr(not(desktop), allow(dead_code))]
 struct Text {
     title: &'static str,
     ready: &'static str,
@@ -51,6 +52,7 @@ fn feeds(origin: &str, name: &str) -> Vec<tauri::Url> {
 }
 
 /// Mirror URLs follow the site this window reached.
+#[cfg(desktop)]
 fn on_site(url: &tauri::Url, origin: &str) -> tauri::Url {
     if crate::site_origin(url).is_none() {
         return url.clone();
