@@ -139,9 +139,31 @@ fn tls_config() -> Arc<rustls::ClientConfig> {
         .clone()
 }
 
+/// Every resolved address in turn, IPv4 first, each with its own time limit,
+/// so one unroutable address cannot use up the whole attempt.
+async fn direct(host: &str) -> std::io::Result<TcpStream> {
+    let mut addresses: Vec<std::net::SocketAddr> = tokio::net::lookup_host((host, 443)).await?.collect();
+    addresses.sort_by_key(|address| address.is_ipv6());
+    let mut last = std::io::Error::new(std::io::ErrorKind::NotFound, "no address");
+    for address in addresses {
+        match tokio::time::timeout(Duration::from_secs(6), TcpStream::connect(address)).await {
+            Ok(Ok(stream)) => return Ok(stream),
+            Ok(Err(error)) => {
+                log::warn!("game connect {host} {address}: {error}");
+                last = error;
+            }
+            Err(_) => {
+                log::warn!("game connect {host} {address}: timed out");
+                last = std::io::Error::from(std::io::ErrorKind::TimedOut);
+            }
+        }
+    }
+    Err(last)
+}
+
 async fn connect(host: &str, proxy: Option<&Proxy>) -> std::io::Result<TcpStream> {
     let Some(proxy) = proxy else {
-        return TcpStream::connect((host, 443)).await;
+        return direct(host).await;
     };
     let mut stream = TcpStream::connect((proxy.host.as_str(), proxy.port)).await?;
     stream
@@ -189,14 +211,18 @@ async fn unary(
 ) -> Result<Response, GameError> {
     let network = GameError("history_network_error");
     let host = region.host();
-    let tcp = tokio::time::timeout(Duration::from_secs(15), connect(host, proxy))
+    let failed = |stage: &str, error: &dyn std::fmt::Display| {
+        log::warn!("game {stage} {host}: {error}");
+        GameError("history_network_error")
+    };
+    let tcp = tokio::time::timeout(Duration::from_secs(20), connect(host, proxy))
         .await
-        .map_err(|_| GameError("history_network_error"))?
-        .map_err(|_| GameError("history_network_error"))?;
-    let name = rustls::pki_types::ServerName::try_from(host.to_owned()).map_err(|_| GameError("history_network_error"))?;
-    let tls = tokio_rustls::TlsConnector::from(tls_config()).connect(name, tcp).await.map_err(|_| GameError("history_network_error"))?;
+        .map_err(|error| failed("connect", &error))?
+        .map_err(|error| failed("connect", &error))?;
+    let name = rustls::pki_types::ServerName::try_from(host.to_owned()).map_err(|error| failed("name", &error))?;
+    let tls = tokio_rustls::TlsConnector::from(tls_config()).connect(name, tcp).await.map_err(|error| failed("tls", &error))?;
     let exchange = async {
-        let (client, connection) = h2::client::handshake(tls).await.map_err(|_| GameError("history_network_error"))?;
+        let (client, connection) = h2::client::handshake(tls).await.map_err(|error| failed("h2", &error))?;
         tokio::spawn(async move {
             let _ = connection.await;
         });
@@ -215,7 +241,7 @@ async fn unary(
         let request = request.body(()).map_err(|_| GameError("history_network_error"))?;
         let (response, mut send) = client.send_request(request, false).map_err(|_| GameError("history_network_error"))?;
         send.send_data(Bytes::from_static(&[0, 0, 0, 0, 0]), true).map_err(|_| GameError("history_network_error"))?;
-        let response = response.await.map_err(|_| GameError("history_network_error"))?;
+        let response = response.await.map_err(|error| failed("response", &error))?;
         let (parts, mut body) = response.into_parts();
         let mut collected = HashMap::new();
         for (key, value) in &parts.headers {

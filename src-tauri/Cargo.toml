@@ -29,6 +29,7 @@ sha2 = "0.10"
 rand = "0.8"
 url = "2"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+log = "0.4.35"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-single-instance = { version = "2.5", features = ["deep-link"] }
@@ -36,3 +37,6 @@ tauri-plugin-updater = "2.14"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.15.1"

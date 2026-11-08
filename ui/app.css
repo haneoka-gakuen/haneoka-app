@@ -125,8 +125,17 @@ button {
   background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
 }
 .icon-button--tonal {
-  background: var(--md-sys-color-secondary-container);
+  position: relative;
+  isolation: isolate;
   color: var(--md-sys-color-on-secondary-container);
+}
+.icon-button--tonal::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  z-index: -1;
+  border-radius: 20px;
+  background: var(--md-sys-color-secondary-container);
 }
 .icon-button:disabled {
   opacity: 0.38;

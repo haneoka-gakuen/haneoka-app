@@ -247,6 +247,8 @@ fn build_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "android")]
+    android_logger::init_once(android_logger::Config::default().with_max_level(log::LevelFilter::Info).with_tag("haneoka"));
     let builder = tauri::Builder::default();
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
@@ -284,11 +286,6 @@ pub fn run() {
             #[cfg(any(target_os = "linux", windows))]
             let _ = app.deep_link().register_all();
             let handle = app.handle().clone();
-            if let Ok(Some(urls)) = app.deep_link().get_current() {
-                for url in urls {
-                    open_link(&handle, &url);
-                }
-            }
             let links = handle.clone();
             app.deep_link().on_open_url(move |event| {
                 for url in event.urls() {
@@ -296,6 +293,12 @@ pub fn run() {
                 }
             });
             build_window(&handle)?;
+            // The link that launched the app needs the window to open in.
+            if let Ok(Some(urls)) = app.deep_link().get_current() {
+                for url in urls {
+                    open_link(&handle, &url);
+                }
+            }
             Ok(())
         })
         .run(tauri::generate_context!())
