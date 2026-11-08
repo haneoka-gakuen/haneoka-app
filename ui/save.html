@@ -55,7 +55,27 @@
       async function loadCatalog() {
         const server = detail.account.server ?? "intl";
         const base = `${site()}/api/v1/servers/${server}/`;
-        const identity = await fetch(`${base}release?projection=identity`).then((r) => r.json());
+        // Offline, the last release read still has its documents in the HTTP cache.
+        const remembered = `haneoka:catalog-release:${server}`;
+        const identity = await fetch(`${base}release?projection=identity`)
+          .then((r) => r.json())
+          .then((value) => {
+            try {
+              localStorage.setItem(remembered, value.releaseId);
+            } catch {}
+            return value;
+          })
+          .catch(() => {
+            const releaseId = (() => {
+              try {
+                return localStorage.getItem(remembered);
+              } catch {
+                return null;
+              }
+            })();
+            if (!releaseId) throw new Error("offline");
+            return { releaseId };
+          });
         // Release-pinned documents are immutable: the browser keeps them after the first read.
         const pinned = (resource, query = "") =>
           fetch(`${base}${resource}?${query}release=${encodeURIComponent(identity.releaseId)}`)
