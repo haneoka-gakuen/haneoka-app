@@ -7,7 +7,6 @@
   ],
   "permissions": [
     "core:default",
-    "allow-launch-info",
-    "allow-remember-origin"
+    "allow-launch-info"
   ]
 }

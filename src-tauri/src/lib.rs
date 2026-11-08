@@ -4,6 +4,8 @@
 mod bridge;
 mod platform;
 mod sign_in;
+mod site;
+mod update;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -22,6 +24,7 @@ pub struct AppState {
     /// A website page a link asked for before the window had a site loaded.
     pub pending_path: Mutex<Option<String>>,
     pub sign_in: sign_in::Waiter,
+    pub watch: site::Watch,
     #[cfg(desktop)]
     pub resources: Option<PathBuf>,
 }
@@ -69,26 +72,29 @@ fn default_path(locale: &str) -> String {
 }
 
 #[tauri::command]
-fn launch_info(state: tauri::State<'_, AppState>, locale: String) -> LaunchInfo {
+fn launch_info(state: tauri::State<'_, AppState>, locale: String, path: Option<String>) -> LaunchInfo {
     LaunchInfo {
         origins: ORIGINS.to_vec(),
         remembered: state.remembered_origin(),
-        path: state
-            .pending_path
-            .lock()
-            .unwrap()
-            .take()
+        path: path
+            .filter(|p| p.starts_with('/') && !p.starts_with("//"))
+            .or_else(|| state.pending_path.lock().unwrap().take())
             .or_else(|| if cfg!(debug_assertions) { std::env::var("HANEOKA_START_PATH").ok() } else { None })
             .unwrap_or_else(|| default_path(&locale)),
     }
 }
 
-#[tauri::command]
-fn remember_origin(state: tauri::State<'_, AppState>, origin: String) {
-    if ORIGINS.contains(&origin.as_str()) {
+/// A page of [origin] loaded the site: the origin works and is remembered.
+pub fn site_ready(app: &AppHandle, origin: &str, locale: &str) {
+    let state = app.state::<AppState>();
+    if !state.watch.ready() {
+        return;
+    }
+    if state.remembered_origin().as_deref() != Some(origin) {
         let _ = std::fs::create_dir_all(&state.config);
         let _ = std::fs::write(state.origin_file(), origin);
     }
+    update::check(app, origin.to_owned(), locale.to_owned());
 }
 
 /// Opens a link the system hands the app: a website page, the saves page,
@@ -165,6 +171,7 @@ fn build_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
             }
         })
         .on_page_load(|window, payload| {
+            site::page_load(&window, payload.event(), payload.url());
             if cfg!(debug_assertions) {
                 eprintln!("page {:?} {}", payload.event(), payload.url());
                 if std::env::var_os("HANEOKA_SELF_TEST").is_some()
@@ -188,6 +195,8 @@ fn build_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
 pub fn run() {
     let builder = tauri::Builder::default();
     #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
         if let Some(window) = app.get_webview_window("main") {
             let _ = window.unminimize();
@@ -200,7 +209,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_haneoka_device::init())
-        .invoke_handler(tauri::generate_handler![launch_info, remember_origin, bridge::bridge])
+        .invoke_handler(tauri::generate_handler![launch_info, bridge::bridge])
         .setup(|app| {
             let paths = app.path();
             let data = paths.app_data_dir()?;
@@ -213,6 +222,7 @@ pub fn run() {
                 config: paths.app_config_dir()?,
                 pending_path: Mutex::new(None),
                 sign_in: sign_in::Waiter::default(),
+                watch: site::Watch::default(),
                 #[cfg(desktop)]
                 resources: paths.resource_dir().ok(),
             });

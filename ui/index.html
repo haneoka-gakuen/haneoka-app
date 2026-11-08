@@ -109,25 +109,29 @@
       const t = text[locale];
       document.documentElement.lang = locale;
       const invoke = (command, args) => window.__TAURI_INTERNALS__.invoke(command, args);
+      const query = new URLSearchParams(location.search);
+      // A site whose page did not load comes last this time.
+      const skip = query.get("skip");
       const reachable = (origin) =>
         new Promise((resolve) => {
           const controller = new AbortController();
           const timer = setTimeout(() => controller.abort(), 8000);
-          fetch(`${origin}/site.webmanifest`, { mode: "no-cors", cache: "no-store", signal: controller.signal })
-            .then(() => resolve(true), () => resolve(false))
+          fetch(`${origin}/site.webmanifest`, { cache: "no-store", signal: controller.signal })
+            .then((response) => resolve(response.ok), () => resolve(false))
             .finally(() => clearTimeout(timer));
         });
       const start = async () => {
         document.getElementById("progress").hidden = false;
         document.getElementById("message").hidden = true;
         document.getElementById("retry").hidden = true;
-        const info = await invoke("launch_info", { locale });
-        const order = [info.remembered, ...info.origins].filter((o, i, all) => o && all.indexOf(o) === i);
-        // Both sites at once; the first reachable one in preference order wins.
+        const info = await invoke("launch_info", { locale, path: query.get("path") });
+        const order = [info.remembered, ...info.origins]
+          .filter((o, i, all) => o && all.indexOf(o) === i)
+          .sort((a, b) => (a === skip) - (b === skip));
+        // Every site at once; the first reachable one in preference order wins.
         const checks = order.map((origin) => reachable(origin));
         for (const [index, origin] of order.entries()) {
           if (await checks[index]) {
-            await invoke("remember_origin", { origin });
             location.replace(origin + info.path);
             return;
           }
@@ -140,8 +144,18 @@
         retry.textContent = t.retry;
         retry.hidden = false;
       };
+      const failed = () => {
+        document.getElementById("progress").hidden = true;
+        const message = document.getElementById("message");
+        message.textContent = t.offline.replace("{host}", new URL(skip || "https://haneoka.org").host);
+        message.hidden = false;
+        const retry = document.getElementById("retry");
+        retry.textContent = t.retry;
+        retry.hidden = false;
+      };
       document.getElementById("retry").addEventListener("click", start);
-      start();
+      if (query.get("failed")) failed();
+      else start();
     </script>
   </body>
 </html>

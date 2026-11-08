@@ -47,28 +47,39 @@ jobs:
             platform: linux
             adb: linux
             arch: x64
+            updater: linux-x86_64
           - name: linux-arm64
             runner: ubuntu-24.04-arm
             platform: linux
             adb: linux
             arch: arm64
+            updater: linux-aarch64
           - name: windows-x64
             runner: windows-latest
             platform: windows
             adb: windows
             arch: x64
-          - name: macos-universal
+            updater: windows-x86_64
+          - name: macos-arm64
             runner: macos-latest
             platform: macos
             adb: darwin
-            arch: universal
-            target: universal-apple-darwin
+            arch: arm64
+            target: aarch64-apple-darwin
+            updater: darwin-aarch64
+          - name: macos-x64
+            runner: macos-latest
+            platform: macos
+            adb: darwin
+            arch: x64
+            target: x86_64-apple-darwin
+            updater: darwin-x86_64
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.target || '' }}
       - uses: swatinem/rust-cache@v2
         with:
           key: ${{ matrix.name }}
@@ -94,6 +105,9 @@ jobs:
       - run: npm ci
       - name: Build
         shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           args=(--config "{\"version\":\"${{ needs.version.outputs.version }}\"}")
           if [[ -n "${{ matrix.target }}" ]]; then args+=(--target "${{ matrix.target }}"); fi
@@ -102,22 +116,29 @@ jobs:
         shell: bash
         run: |
           mkdir dist
-          version=${{ needs.version.outputs.version }}
-          bundle=target/${{ matrix.target || 'release' }}
-          [[ -n "${{ matrix.target }}" ]] && bundle=target/${{ matrix.target }}/release
-          [[ -z "${{ matrix.target }}" ]] && bundle=target/release
+          bundle=target/release/bundle
+          [[ -n "${{ matrix.target }}" ]] && bundle=target/${{ matrix.target }}/release/bundle
+          name=haneoka-${{ matrix.name }}
           shopt -s nullglob
-          for file in $bundle/bundle/deb/*.deb; do cp "$file" "dist/haneoka-${{ matrix.name }}.deb"; done
-          for file in $bundle/bundle/rpm/*.rpm; do cp "$file" "dist/haneoka-${{ matrix.name }}.rpm"; done
-          for file in $bundle/bundle/appimage/*.AppImage; do cp "$file" "dist/haneoka-${{ matrix.name }}.AppImage"; done
-          for file in $bundle/bundle/msi/*.msi; do cp "$file" "dist/haneoka-${{ matrix.name }}.msi"; done
-          for file in $bundle/bundle/nsis/*.exe; do cp "$file" "dist/haneoka-${{ matrix.name }}-setup.exe"; done
-          for file in $bundle/bundle/dmg/*.dmg; do cp "$file" "dist/haneoka-${{ matrix.name }}.dmg"; done
-          if [[ -d $bundle/bundle/macos/haneoka.app ]]; then
-            (cd $bundle/bundle/macos && ditto -c -k --keepParent haneoka.app "$GITHUB_WORKSPACE/dist/haneoka-${{ matrix.name }}.zip")
+          copy() { cp "$1" "dist/$2"; [[ -f "$1.sig" ]] && cp "$1.sig" "dist/$2.sig"; true; }
+          for file in $bundle/deb/*.deb; do copy "$file" "$name.deb"; done
+          for file in $bundle/rpm/*.rpm; do copy "$file" "$name.rpm"; done
+          for file in $bundle/appimage/*.AppImage; do copy "$file" "$name.AppImage"; done
+          for file in $bundle/msi/*.msi; do copy "$file" "$name.msi"; done
+          for file in $bundle/nsis/*.exe; do copy "$file" "$name-setup.exe"; done
+          for file in $bundle/dmg/*.dmg; do copy "$file" "$name.dmg"; done
+          for file in $bundle/macos/*.app.tar.gz; do copy "$file" "$name.app.tar.gz"; done
+          if [[ -d $bundle/macos/haneoka.app ]]; then
+            (cd $bundle/macos && ditto -c -k --keepParent haneoka.app "$GITHUB_WORKSPACE/dist/$name.zip")
           fi
+          # Which package the updater installs on this platform.
+          case "${{ matrix.platform }}" in
+            windows) echo '{"${{ matrix.updater }}": "'$name'-setup.exe", "${{ matrix.updater }}-nsis": "'$name'-setup.exe", "${{ matrix.updater }}-msi": "'$name'.msi"}' ;;
+            macos) echo '{"${{ matrix.updater }}": "'$name'.app.tar.gz"}' ;;
+            linux) echo '{"${{ matrix.updater }}": "'$name'.AppImage"}' ;;
+          esac > "dist/updater-${{ matrix.name }}.json"
           ls -la dist
-          [[ -n "$(ls dist)" ]]
+          ls dist/*.sig > /dev/null
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}
@@ -150,8 +171,11 @@ jobs:
       - run: npx tauri android init --ci
       - name: Build
         run: |
-          npx tauri android build --ci --apk --aab --target aarch64 x86_64 \
-            --config '{"version":"${{ needs.version.outputs.version }}","bundle":{"android":{"versionCode":${{ needs.version.outputs.android }}}}}'
+          config='{"version":"${{ needs.version.outputs.version }}","bundle":{"android":{"versionCode":${{ needs.version.outputs.android }}}}}'
+          npx tauri android build --ci --apk --target aarch64 --config "$config"
+          mkdir -p "$RUNNER_TEMP/arm64"
+          cp "$(find src-tauri/gen/android/app/build/outputs/apk -name '*release*.apk' | head -1)" "$RUNNER_TEMP/arm64/haneoka.apk"
+          npx tauri android build --ci --apk --aab --target aarch64 x86_64 --config "$config"
       - name: Sign
         env:
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -171,9 +195,13 @@ jobs:
             KEYSTORE_FILE=$RUNNER_TEMP/release.jks
             echo "$KEYSTORE" | base64 -d > "$KEYSTORE_FILE"
           fi
-          "$tools/zipalign" -f -p 4 "$apk" "$RUNNER_TEMP/aligned.apk"
-          "$tools/apksigner" sign --ks "$KEYSTORE_FILE" --ks-pass "pass:$STORE_PASSWORD" --ks-key-alias "$KEY_ALIAS" --key-pass "pass:$KEY_PASSWORD" \
-            --out dist/haneoka-android.apk "$RUNNER_TEMP/aligned.apk"
+          sign() {
+            "$tools/zipalign" -f -p 4 "$1" "$RUNNER_TEMP/aligned.apk"
+            "$tools/apksigner" sign --ks "$KEYSTORE_FILE" --ks-pass "pass:$STORE_PASSWORD" --ks-key-alias "$KEY_ALIAS" --key-pass "pass:$KEY_PASSWORD" \
+              --out "$2" "$RUNNER_TEMP/aligned.apk"
+          }
+          sign "$apk" dist/haneoka-android.apk
+          sign "$RUNNER_TEMP/arm64/haneoka.apk" dist/haneoka-android-arm64-v8a.apk
           cp "$aab" dist/haneoka-android.aab
           jarsigner -keystore "$KEYSTORE_FILE" -storepass "$STORE_PASSWORD" -keypass "$KEY_PASSWORD" dist/haneoka-android.aab "$KEY_ALIAS"
           "$tools/apksigner" verify --print-certs dist/haneoka-android.apk | head -3
@@ -248,8 +276,35 @@ jobs:
         with:
           path: dist
           merge-multiple: true
-      - name: Checksums
-        run: (cd dist && sha256sum * > SHA256SUMS)
+      - name: Release metadata
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          BUILD: ${{ needs.version.outputs.android }}
+          TAG: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 - <<'PYTHON'
+          import datetime, json, os, pathlib
+          dist = pathlib.Path('dist')
+          version, tag, repository = os.environ['VERSION'], os.environ['TAG'], os.environ['REPOSITORY']
+          (dist / 'release-version.json').write_text(json.dumps({'version': version, 'buildNumber': int(os.environ['BUILD'])}) + '\n')
+          platforms = {}
+          for part in sorted(dist.glob('updater-*.json')):
+              for platform, name in json.loads(part.read_text()).items():
+                  platforms[platform] = {
+                      'signature': (dist / f'{name}.sig').read_text().strip(),
+                      'url': f'https://github.com/{repository}/releases/download/{tag}/{name}',
+                  }
+              part.unlink()
+          for signature in dist.glob('*.sig'):
+              signature.unlink()
+          (dist / 'updater.json').write_text(json.dumps({
+              'version': version,
+              'pub_date': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+              'platforms': platforms,
+          }, indent=2) + '\n')
+          PYTHON
+          (cd dist && sha256sum * > SHA256SUMS)
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*

@@ -6,6 +6,7 @@ pub mod codec;
 pub mod export;
 pub mod files;
 pub mod game;
+pub mod http;
 pub mod proto;
 mod rijndael;
 pub mod save;

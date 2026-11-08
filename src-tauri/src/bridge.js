@@ -10,6 +10,14 @@
   const agent = `${navigator.userAgent} HaneokaApp/__VERSION__`;
   Object.defineProperty(Navigator.prototype, "userAgent", { configurable: true, get: () => agent });
 
+  // The page's own markup arrived: the site works.
+  const ready = () => {
+    const locale = document.documentElement.dataset.locale;
+    if (locale) invoke("ready", { locale }).catch(() => {});
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready, { once: true });
+  else ready();
+
   const locale = () => document.documentElement.dataset.locale || location.pathname.split("/")[2] || "en";
   const local = new Set(["openGameAccount", "addGameAccount"]);
   window.haneokaApp = Object.freeze({

@@ -49,29 +49,67 @@
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
       }
-    }
+    },
+    "createUpdaterArtifacts": true
   },
   "plugins": {
     "deep-link": {
       "mobile": [
-        { "scheme": ["haneoka"], "host": "auth" },
-        { "scheme": ["haneoka"], "host": "saves" },
-        { "scheme": ["haneoka"], "host": "gacha-history" },
         {
-          "scheme": ["https"],
-          "host": "haneoka.org",
-          "appLink": true,
-          "pathPrefix": ["/jp/", "/intl/"]
+          "scheme": [
+            "haneoka"
+          ],
+          "host": "auth"
         },
         {
-          "scheme": ["https"],
+          "scheme": [
+            "haneoka"
+          ],
+          "host": "saves"
+        },
+        {
+          "scheme": [
+            "haneoka"
+          ],
+          "host": "gacha-history"
+        },
+        {
+          "scheme": [
+            "https"
+          ],
+          "host": "haneoka.org",
+          "appLink": true,
+          "pathPrefix": [
+            "/jp/",
+            "/intl/"
+          ]
+        },
+        {
+          "scheme": [
+            "https"
+          ],
           "host": "haneoka.com",
           "appLink": true,
-          "pathPrefix": ["/jp/", "/intl/"]
+          "pathPrefix": [
+            "/jp/",
+            "/intl/"
+          ]
         }
       ],
       "desktop": {
-        "schemes": ["haneoka"]
+        "schemes": [
+          "haneoka"
+        ]
+      }
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ1NTdBRUM5RURBREVCRjkKUldUNTY2M3R5YTVYUldDelVqa0JzSXR2UzZ0WmJENkhHMlJCOXp0d0tRaC9JRndxbmlwOTR3bjAK",
+      "endpoints": [
+        "https://haneoka.org/downloads/app/latest/updater.json",
+        "https://github.com/haneoka-gakuen/haneoka-app/releases/latest/download/updater.json"
+      ],
+      "windows": {
+        "installMode": "passive"
       }
     }
   }

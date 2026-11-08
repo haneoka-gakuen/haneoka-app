@@ -160,6 +160,12 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
             Ok(json!({ "files": [{ "name": name, "text": text }] }))
         }
         "pendingGachaHistory" | "pendingSongProgress" | "pendingBoxImport" => Ok(Value::Null),
+        "ready" => {
+            if let Some(origin) = window.url().ok().as_ref().and_then(crate::site_origin) {
+                crate::site_ready(app, origin, text(args, "locale").unwrap_or("en"));
+            }
+            Ok(Value::Null)
+        }
         "signIn" => {
             let origin = crate::current_origin(app);
             let provider = text(args, "provider").ok_or("provider")?;
