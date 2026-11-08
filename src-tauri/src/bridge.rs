@@ -218,7 +218,26 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
             }
             Ok(json!({ "direct": state.route.is_direct(), "available": state.route_port.is_some() }))
         }
-        "pendingPage" => Ok(state(app).pending.lock().unwrap().page.take().map(Value::from).unwrap_or(Value::Null)),
+        "pendingPage" => {
+            // On Android the launching link is readable only once the activity has started.
+            let app_state = state(app);
+            let launch = {
+                let mut pending = app_state.pending.lock().unwrap();
+                let first = !pending.launch_link_seen;
+                pending.launch_link_seen = true;
+                first
+            };
+            if launch {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let saves = app.deep_link().get_current().ok().flatten().into_iter().flatten()
+                    .any(|url| url.scheme() == "haneoka" && url.host_str() == Some("saves"));
+                if saves {
+                    app_state.pending.lock().unwrap().page = Some("saves.html".into());
+                }
+            }
+            let page = app_state.pending.lock().unwrap().page.take();
+            Ok(page.map(Value::from).unwrap_or(Value::Null))
+        }
         "pendingBoxImport" => Ok(state(app).pending.lock().unwrap().box_import.take().unwrap_or(Value::Null)),
         "appInfo" => {
             let state = state(app);

@@ -3,6 +3,7 @@
 
 mod bridge;
 mod platform;
+mod session;
 mod sign_in;
 mod site;
 mod update;
@@ -59,6 +60,8 @@ pub struct Pending {
     pub gacha_history: Option<serde_json::Value>,
     /// A bundled page a link asked for before the launch page ran.
     pub page: Option<String>,
+    /// The link that launched the app has been looked at.
+    pub launch_link_seen: bool,
 }
 
 impl AppState {

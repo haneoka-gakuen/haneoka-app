@@ -94,6 +94,11 @@ pub fn page_load(window: &WebviewWindow, event: PageLoadEvent, url: &tauri::Url)
             let generation = watch.arm();
             fall_back(app, generation, OVERALL);
         }
-        PageLoadEvent::Finished => fall_back(app, watch.generation(), AFTER_FINISH),
+        PageLoadEvent::Finished => {
+            fall_back(app, watch.generation(), AFTER_FINISH);
+            if let Some(origin) = site_origin(url) {
+                tauri::async_runtime::spawn(crate::session::share(app.clone(), origin.to_owned()));
+            }
+        }
     }
 }

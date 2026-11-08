@@ -74,6 +74,12 @@ class UrlArgs {
 }
 
 @InvokeArg
+class CookieArgs {
+    lateinit var url: String
+    lateinit var cookie: String
+}
+
+@InvokeArg
 class ProxyArgs {
     var port: Int = 0
 }
@@ -288,6 +294,17 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
     fun siteCookies(invoke: Invoke) {
         val args = invoke.parseArgs(UrlArgs::class.java)
         invoke.resolve(JSObject().put("cookie", CookieManager.getInstance().getCookie(args.url) ?: ""))
+    }
+
+    /** Sets one cookie for a site page, as a Set-Cookie value. */
+    @Command
+    fun setSiteCookie(invoke: Invoke) {
+        val args = invoke.parseArgs(CookieArgs::class.java)
+        val cookies = CookieManager.getInstance()
+        cookies.setCookie(args.url, args.cookie) {
+            cookies.flush()
+            invoke.resolve(JSObject().put("set", it))
+        }
     }
 
     /** Sends the web view's requests through the app's loopback route, or back to its own with port 0; local pages stay direct. */
