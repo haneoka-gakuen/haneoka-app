@@ -84,9 +84,7 @@ class HaneokaAccount extends ChangeNotifier {
   List<LinkedPlayer> get players => _players;
 
   /// The session cookie for requests made outside [request] to the site.
-  Map<String, String> get authorization => {
-    if (_token != null) 'Cookie': _token!,
-  };
+  Map<String, String> get authorization => {'Cookie': ?_token};
 
   LinkedPlayer? linkOf(GameSave save) => _players
       .where((p) => p.server == save.server && p.profileId == save.profileId)
