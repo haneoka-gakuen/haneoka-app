@@ -73,7 +73,13 @@ fn launch_info(state: tauri::State<'_, AppState>, locale: String) -> LaunchInfo 
     LaunchInfo {
         origins: ORIGINS.to_vec(),
         remembered: state.remembered_origin(),
-        path: state.pending_path.lock().unwrap().take().unwrap_or_else(|| default_path(&locale)),
+        path: state
+            .pending_path
+            .lock()
+            .unwrap()
+            .take()
+            .or_else(|| if cfg!(debug_assertions) { std::env::var("HANEOKA_START_PATH").ok() } else { None })
+            .unwrap_or_else(|| default_path(&locale)),
     }
 }
 
