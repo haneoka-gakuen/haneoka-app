@@ -171,8 +171,11 @@ jobs:
       - name: Android project
         run: |
           npx tauri android init --ci
-          # The template gives the Gradle download ten seconds.
-          sed -i 's/^networkTimeout=.*/networkTimeout=120000/' src-tauri/gen/android/gradle/wrapper/gradle-wrapper.properties
+          # services.gradle.org often times out; fetch the distribution with retries.
+          props=src-tauri/gen/android/gradle/wrapper/gradle-wrapper.properties
+          url=$(sed -n 's/^distributionUrl=//p' "$props" | sed 's/\\:/:/g')
+          curl -fsSL --retry 6 --retry-all-errors --retry-delay 15 --max-time 300 -o "$RUNNER_TEMP/gradle.zip" "$url"
+          sed -i "s#^distributionUrl=.*#distributionUrl=file://$RUNNER_TEMP/gradle.zip#" "$props"
       - name: Build
         run: |
           config='{"version":"${{ needs.version.outputs.version }}","bundle":{"android":{"versionCode":${{ needs.version.outputs.android }}}}}'
