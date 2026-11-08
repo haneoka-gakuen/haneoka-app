@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../account/haneoka_account.dart';
 import 'net.dart';
+import 'site_origin.dart';
 import 'media_lifecycle.dart';
 
 bool isAccountResource(Uri uri) {
@@ -68,7 +69,7 @@ class AccountResources {
   bool _closed = false;
   String? get owner => _account.user?['id'] as String?;
   Object get _currentIdentity =>
-      (_account.user?['id'], _account.authorization['Authorization']);
+      (_account.user?['id'], _account.authorization['Cookie']);
   Stream<void> get changes => _changes.stream;
   int get epoch => _epoch;
   void _changed() {
@@ -212,7 +213,7 @@ class AccountResources {
               )
               ..followRedirects = false
               ..headers.addAll({
-                if (target.origin == 'https://haneoka.org')
+                if (target.origin == SiteOrigin.instance.value.origin)
                   ..._account.authorization,
               });
         final response = await sendFileRequest(request)

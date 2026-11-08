@@ -83,9 +83,9 @@ class HaneokaAccount extends ChangeNotifier {
 
   List<LinkedPlayer> get players => _players;
 
-  /// The bearer header for requests made outside [request] (uploads).
+  /// The session cookie for requests made outside [request] to the site.
   Map<String, String> get authorization => {
-    if (_token != null) 'Authorization': 'Bearer $_token',
+    if (_token != null) 'Cookie': _token!,
   };
 
   LinkedPlayer? linkOf(GameSave save) => _players
@@ -277,13 +277,23 @@ class HaneokaAccount extends ChangeNotifier {
     if (bytes != null) request.bodyBytes = bytes;
     final response = await http.Response.fromStream(
       await netClient.send(request),
-    );
+    ).timeout(const Duration(seconds: 30));
     if (origin != SiteOrigin.instance.value.origin ||
         (authorized && (owner != _user?['id'] || token != _token))) {
       throw const AccountError('session_changed');
     }
-    final text = utf8.decode(response.bodyBytes);
-    final json = text.isEmpty ? null : jsonDecode(text);
+    Object? json;
+    try {
+      final text = utf8.decode(response.bodyBytes);
+      json = text.isEmpty ? null : jsonDecode(text);
+    } on FormatException {
+      // Gateway and challenge pages answer in HTML.
+      throw AccountError(
+        response.statusCode >= 400
+            ? 'http_${response.statusCode}'
+            : 'invalid_response',
+      );
+    }
     if (response.statusCode >= 400) {
       // Haneoka's API nests `{error: {code}}`; the account service answers
       // `{code, message}`.
