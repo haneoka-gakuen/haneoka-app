@@ -57,6 +57,9 @@
       };
 
       const go = async (origin) => {
+        // A link that launched the app can arrive while the sites are tested.
+        const page = await call("pendingPage").catch(() => null);
+        if (page) return location.replace(page);
         await call("chooseOrigin", { origin });
         const target = await window.__TAURI_INTERNALS__.invoke("launch_info", { locale: document.documentElement.lang, path });
         location.replace(origin + target.path);
