@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>haneoka</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --background: #f6f8f9;
+        --on-background: #1b1b21;
+        --primary: #31356e;
+        --on-primary: #ffffff;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --background: #131318;
+          --on-background: #e4e1e9;
+          --primary: #bec2ff;
+          --on-primary: #262a5e;
+        }
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: var(--background);
+        color: var(--on-background);
+        font: 16px/1.5 Roboto, "Noto Sans", system-ui, sans-serif;
+      }
+      main {
+        min-height: 100%;
+        display: grid;
+        place-items: center;
+        align-content: center;
+        gap: 24px;
+        padding: 16px;
+        box-sizing: border-box;
+        text-align: center;
+      }
+      img {
+        width: 96px;
+        height: 96px;
+      }
+      .progress {
+        width: 160px;
+        height: 4px;
+        border-radius: 2px;
+        background: color-mix(in srgb, var(--primary) 20%, transparent);
+        overflow: hidden;
+      }
+      .progress::after {
+        content: "";
+        display: block;
+        width: 40%;
+        height: 100%;
+        border-radius: 2px;
+        background: var(--primary);
+        animation: slide 1.2s ease-in-out infinite;
+      }
+      @keyframes slide {
+        from {
+          transform: translateX(-100%);
+        }
+        to {
+          transform: translateX(250%);
+        }
+      }
+      button {
+        min-height: 48px;
+        padding: 0 24px;
+        border: 0;
+        border-radius: 24px;
+        background: var(--primary);
+        color: var(--on-primary);
+        font: 500 14px/1 inherit;
+        cursor: pointer;
+      }
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="logo.svg" alt="" />
+      <div class="progress" id="progress"></div>
+      <p id="message" hidden></p>
+      <button id="retry" type="button" hidden></button>
+    </main>
+    <script>
+      const text = {
+        en: { offline: "Cannot reach {host}", retry: "Retry" },
+        ja: { offline: "{host} に接続できません", retry: "再試行" },
+        ko: { offline: "{host}에 연결할 수 없습니다", retry: "다시 시도" },
+        "zh-CN": { offline: "无法连接 {host}", retry: "重试" },
+        "zh-TW": { offline: "無法連線 {host}", retry: "重試" },
+      };
+      const tag = (navigator.language || "en").toLowerCase();
+      const locale = tag.startsWith("ja")
+        ? "ja"
+        : tag.startsWith("ko")
+          ? "ko"
+          : /^zh-(tw|hk|mo|hant)/.test(tag)
+            ? "zh-TW"
+            : tag.startsWith("zh")
+              ? "zh-CN"
+              : "en";
+      const t = text[locale];
+      document.documentElement.lang = locale;
+      const invoke = (command, args) => window.__TAURI_INTERNALS__.invoke(command, args);
+      const reachable = (origin) =>
+        new Promise((resolve) => {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 8000);
+          fetch(`${origin}/site.webmanifest`, { mode: "no-cors", cache: "no-store", signal: controller.signal })
+            .then(() => resolve(true), () => resolve(false))
+            .finally(() => clearTimeout(timer));
+        });
+      const start = async () => {
+        document.getElementById("progress").hidden = false;
+        document.getElementById("message").hidden = true;
+        document.getElementById("retry").hidden = true;
+        const info = await invoke("launch_info", { locale });
+        const order = [info.remembered, ...info.origins].filter((o, i, all) => o && all.indexOf(o) === i);
+        // Both sites at once; the first reachable one in preference order wins.
+        const checks = order.map((origin) => reachable(origin));
+        for (const [index, origin] of order.entries()) {
+          if (await checks[index]) {
+            await invoke("remember_origin", { origin });
+            location.replace(origin + info.path);
+            return;
+          }
+        }
+        document.getElementById("progress").hidden = true;
+        const message = document.getElementById("message");
+        message.textContent = t.offline.replace("{host}", new URL(order[0]).host);
+        message.hidden = false;
+        const retry = document.getElementById("retry");
+        retry.textContent = t.retry;
+        retry.hidden = false;
+      };
+      document.getElementById("retry").addEventListener("click", start);
+      start();
+    </script>
+  </body>
+</html>
