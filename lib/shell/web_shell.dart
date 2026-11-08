@@ -604,6 +604,14 @@ class _WebShellState extends State<WebShell> {
     ];
   }
 
+  Future<Map<String, Object?>> _saveSnapshot(String key) async {
+    await AccountStore.instance.load();
+    final save = AccountStore.instance.saves
+        .where((save) => _saveKey(save) == key).firstOrNull;
+    if (save == null) throw StateError('save_not_found');
+    return {'text': exportSaveSnapshot(save)};
+  }
+
   Object? _openGameAccount(String key) {
     final save = AccountStore.instance.saves
         .where((save) => _saveKey(save) == key)
@@ -748,6 +756,7 @@ class _WebShellState extends State<WebShell> {
         'gachaHistory' => await _gachaHistory(args['key'] as String?),
         'signIn' => await _signIn('${args['provider']}'),
         'gameAccounts' => await _gameAccounts(),
+        'saveSnapshot' => await _saveSnapshot('${args['key']}'),
         'openGameAccount' => _openGameAccount('${args['key']}'),
         'addGameAccount' => _addGameAccount(),
         'pendingGachaHistory' => switch (PendingHistory.take()) {

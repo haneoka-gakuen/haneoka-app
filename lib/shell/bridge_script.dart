@@ -108,6 +108,7 @@ const _script = r'''
   window.haneokaApp = Object.freeze({
     version: __VERSION__,
     platform: __PLATFORM__,
+    capabilities: Object.freeze(["saveSnapshotV1"]),
     call(method, args) {
       const id = ++next;
       return new Promise((resolve, reject) => {
