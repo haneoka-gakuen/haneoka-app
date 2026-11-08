@@ -37,6 +37,8 @@
       const path = query.get("path");
       const latency = new Map();
       let opening = null;
+      // The remembered site did not answer: the fastest one that does opens instead.
+      let openFastest = Boolean(failed);
 
       const probe = async (origin, attempts = 3) => {
         const times = [];
@@ -136,7 +138,7 @@
         render();
         const results = await Promise.all(info.origins.map((origin) => probe(origin).then((ms) => (latency.set(origin, ms), render(), ms))));
         if (results.every((ms) => ms == null) && (await switchRoute())) return probeAll();
-        if (failed && !opening && retryAllowed()) {
+        if (openFastest && !opening && retryAllowed()) {
           const fastest = fastestSite();
           if (fastest) {
             opening = fastest;
@@ -181,6 +183,7 @@
         const message = document.getElementById("failed");
         message.textContent = t("siteFailed", { host: new URL(info.chosen).host });
         message.hidden = false;
+        openFastest = true;
         choose();
       }
     </script>
