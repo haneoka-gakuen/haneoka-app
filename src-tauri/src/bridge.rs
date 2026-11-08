@@ -159,7 +159,51 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
             let (name, text) = game::read_history(&save, platform::game_proxy().as_ref()).await.map_err(|e| e.0.to_owned())?;
             Ok(json!({ "files": [{ "name": name, "text": text }] }))
         }
-        "pendingGachaHistory" | "pendingSongProgress" | "pendingBoxImport" => Ok(Value::Null),
+        "pendingGachaHistory" => Ok(state(app).pending.lock().unwrap().gacha_history.take().unwrap_or(Value::Null)),
+        "pendingSongProgress" => Ok(state(app).pending.lock().unwrap().song_progress.take().unwrap_or(Value::Null)),
+        "pendingBoxImport" => Ok(state(app).pending.lock().unwrap().box_import.take().unwrap_or(Value::Null)),
+        "appInfo" => {
+            let state = state(app);
+            Ok(json!({
+                "origins": crate::ORIGINS,
+                "chosen": state.remembered_origin(),
+                "locale": state.preference("locale"),
+                "theme": state.preference("theme"),
+                "version": env!("CARGO_PKG_VERSION"),
+                "platform": std::env::consts::OS,
+            }))
+        }
+        "chooseOrigin" => Ok(json!(state(app).choose_origin(text(args, "origin").unwrap_or_default()))),
+        "theme" => {
+            state(app).set_preference("theme", args.clone());
+            Ok(Value::Null)
+        }
+        "saveDetail" => {
+            let save = state(app).accounts.find(text(args, "key").ok_or("key")?).ok_or("save_not_found")?;
+            Ok(export::detail(&save))
+        }
+        "teamPackage" => {
+            let save = state(app).accounts.find(text(args, "key").ok_or("key")?).ok_or("save_not_found")?;
+            Ok(json!(export::team_package(&save)))
+        }
+        "sendBox" => {
+            let save = state(app).accounts.find(text(args, "key").ok_or("key")?).ok_or("save_not_found")?;
+            let save = refreshed(app, save).await;
+            let server = save.server().unwrap_or("intl");
+            state(app).pending.lock().unwrap().box_import = Some(json!({ "server": server, "text": export::team_package(&save) }));
+            Ok(json!({ "server": server }))
+        }
+        "sendSongProgress" => {
+            let save = state(app).accounts.find(text(args, "key").ok_or("key")?).ok_or("save_not_found")?;
+            state(app).pending.lock().unwrap().song_progress = Some(json!({ "marks": export::song_marks(&save) }));
+            Ok(json!({ "server": save.server() }))
+        }
+        "readGachaHistory" => {
+            let save = state(app).accounts.find(text(args, "key").ok_or("key")?).ok_or("save_not_found")?;
+            let (name, text) = game::read_history(&save, platform::game_proxy().as_ref()).await.map_err(|e| e.0.to_owned())?;
+            state(app).pending.lock().unwrap().gacha_history = Some(json!({ "files": [{ "name": name, "text": text }] }));
+            Ok(json!({ "server": save.server() }))
+        }
         "ready" => {
             if let Some(origin) = window.url().ok().as_ref().and_then(crate::site_origin) {
                 crate::site_ready(app, origin, text(args, "locale").unwrap_or("en"));
@@ -383,7 +427,7 @@ async fn read_batches(app: &AppHandle, window: &WebviewWindow, batches: Vec<taur
 #[tauri::command]
 pub async fn bridge(app: AppHandle, window: WebviewWindow, method: String, args: Value) -> Result<Value> {
     let page = window.url().map_err(|e| e.to_string())?;
-    if crate::site_origin(&page).is_none() {
+    if crate::site_origin(&page).is_none() && !crate::local_page(&page) {
         return Err("origin".into());
     }
     dispatch(&app, &window, &method, &args).await

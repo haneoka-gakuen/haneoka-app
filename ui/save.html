@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>haneoka</title>
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <div id="bar"></div>
+    <main class="page" id="page"><div class="progress"></div></main>
+    <dialog id="dialog"></dialog>
+    <script type="module">
+      import { call, setup, t, icon, escape, bar, number, date, snackbar, failure, emblem, site, openSite, locale } from "./app.js";
+
+      await setup();
+      const key = new URLSearchParams(location.search).get("key");
+      let detail = await call("saveDetail", { key }).catch(() => null);
+      if (!detail) {
+        location.replace("saves.html");
+        throw new Error("save_not_found");
+      }
+      let catalog = null;
+      let newest = false;
+      let expanded = new Set();
+      let busy = false;
+
+      // ---------- catalogue text and data ----------
+      const TEXT = ["ja", "en", "zh-TW", "zh-CN", "ko"];
+      const FALLBACK = {
+        "zh-CN": ["zh-CN", "zh-TW", "ja", "en", "ko"],
+        "zh-TW": ["zh-TW", "ja", "en", "zh-CN", "ko"],
+        ja: ["ja", "en", "zh-TW", "zh-CN", "ko"],
+        ko: ["ko", "ja", "en", "zh-TW", "zh-CN"],
+        en: ["en", "ja", "zh-TW", "zh-CN", "ko"],
+      };
+      const text = (value) => {
+        if (typeof value === "string") return value;
+        if (!Array.isArray(value)) return "";
+        for (const code of FALLBACK[locale]) {
+          const entry = value[TEXT.indexOf(code)];
+          if (typeof entry === "string" && entry.trim()) return entry;
+        }
+        return "";
+      };
+      const int = (value) => (value == null || value === "" ? null : Number(value));
+      const player = () => detail.player ?? {};
+      const rows = (field) => {
+        const value = player()[field];
+        if (Array.isArray(value)) return value.filter((row) => row && typeof row === "object");
+        if (value && typeof value === "object") return Object.values(value).find(Array.isArray) ?? [value];
+        return [];
+      };
+
+      async function loadCatalog() {
+        const server = detail.account.server ?? "intl";
+        const base = `${site()}/api/v1/servers/${server}/`;
+        const identity = await fetch(`${base}release?projection=identity`).then((r) => r.json());
+        // Release-pinned documents are immutable: the browser keeps them after the first read.
+        const pinned = (resource, query = "") =>
+          fetch(`${base}${resource}?${query}release=${encodeURIComponent(identity.releaseId)}`)
+            .then((r) => (r.ok ? r.json() : {}))
+            .catch(() => ({}));
+        const [cards, supports, items, events, progression, songs] = await Promise.all([
+          pinned("cards"),
+          pinned("support-cards"),
+          pinned("items"),
+          pinned("events"),
+          pinned("progression"),
+          pinned("songs", "projection=4&"),
+        ]);
+        return {
+          release: identity.releaseId,
+          asset: (path) => (typeof path === "string" && path.startsWith("/") ? `${site()}${path}?release=${encodeURIComponent(identity.releaseId)}` : null),
+          cards,
+          supports,
+          items: items.items ?? {},
+          events: Array.isArray(events) ? Object.fromEntries(events.map((e) => [String(e.id), e])) : (events.entries ?? events),
+          progression,
+          songCount: Object.keys(songs ?? {}).length,
+        };
+      }
+
+      /** A card's level from its experience and training, capped as the game caps it. */
+      function level(row, member) {
+        const p = catalog?.progression;
+        const card = (member ? catalog?.cards : catalog?.supports)?.[String(row._masterId)];
+        if (!p || !card) return null;
+        const group = card[member ? "memberCardLevelGroup" : "supportCardLevelGroup"];
+        const table = p[member ? "memberCardLevels" : "supportCardLevels"];
+        if (group == null || !Array.isArray(table)) return null;
+        const exp = BigInt(String(row._exp ?? 0).split(".")[0] || "0");
+        let result = null;
+        for (const entry of table) if (String(entry.group) === String(group) && BigInt(entry.exp ?? 0) <= exp) result = Math.max(result ?? 0, Number(entry.level));
+        const limits = p[member ? "memberCardLevelLimits" : "supportCardRanks"];
+        for (const value of Array.isArray(limits) ? limits : []) {
+          const raw = value.raw ?? {};
+          const matches = member
+            ? String(raw._rarity) === String(card.rarity) && String(raw._awakeCount) === String(row._awakeCount)
+            : String(raw._group) === String(card.supportCardRankGroup) && String(raw._rank) === String(row._rank);
+          if (matches && result != null && Number(raw._limitLevel) > 0) return Math.min(result, Number(raw._limitLevel));
+        }
+        return result;
+      }
+
+      // ---------- shapes ----------
+      const sunny = (() => {
+        const points = [];
+        for (let i = 0; i < 96; i++) {
+          const angle = (i / 96) * Math.PI * 2;
+          const radius = 46 * (1 + 0.085 * Math.cos(angle * 8));
+          points.push(`${(50 + radius * Math.cos(angle)).toFixed(2)},${(50 + radius * Math.sin(angle)).toFixed(2)}`);
+        }
+        return `<svg viewBox="0 0 100 100" aria-hidden="true"><polygon points="${points.join(" ")}" /></svg>`;
+      })();
+
+      // ---------- sections ----------
+      const card = (row, member) => {
+        const id = String(row._masterId);
+        const entry = (member ? catalog?.cards : catalog?.supports)?.[id];
+        const image = catalog?.asset(entry?.images?.thumbnail);
+        const name = text(entry?.prefix) || text(entry?.cardName) || `#${id}`;
+        const lv = level(row, member);
+        const marks = [lv == null ? "" : `Lv.${lv}`, member && row._rank ? `✦${row._rank}` : "", !member && row._rank ? `✦${row._rank}` : ""].filter(Boolean).join(" ");
+        const href = `${site()}/${detail.account.server ?? "intl"}/${locale}/${member ? "member-cards" : "support-cards"}/${id}/`;
+        return `<a class="card" href="${escape(href)}" title="${escape(name)}">${
+          image ? `<img src="${escape(image)}" alt="" loading="lazy" />` : `<span class="card__name">${escape(name)}</span>`
+        }${marks ? `<span class="card__label">${escape(marks)}</span>` : ""}</a>`;
+      };
+
+      const sorted = (list, member) => {
+        const source = member ? catalog?.cards : catalog?.supports;
+        const rarity = (row) => Number(source?.[String(row._masterId)]?.rarity ?? 0);
+        const released = (row) => Number([].concat(source?.[String(row._masterId)]?.releasedAt ?? 0)[0] ?? 0) || Number(row._masterId);
+        return [...list].sort((a, b) => (newest ? released(b) - released(a) : rarity(b) - rarity(a) || Number(b._masterId) - Number(a._masterId)));
+      };
+
+      const cardSection = (field, member, title, glyph) => {
+        const list = sorted(rows(field), member);
+        if (!list.length) return "";
+        const open = expanded.has(field);
+        return `<section style="display:grid;gap:12px">
+          <h2 class="section-title"><span class="section-badge">${icon(glyph)}</span><span class="grow">${escape(title)} / ${number(list.length)}</span>
+          <button class="button button--text" type="button" data-expand="${field}">${escape(open ? t("cancel") : t("viewAll"))}</button></h2>
+          <div class="rail ${open ? "rail--wrap" : ""}">${(open ? list : list.slice(0, 24)).map((row) => card(row, member)).join("")}</div>
+        </section>`;
+      };
+
+      const clears = () => {
+        const results = rows("_liveMusicResults");
+        if (!results.length) return "";
+        const total = catalog?.songCount || results.length;
+        const difficulties = ["easy", "normal", "hard", "expert"];
+        return `<section style="display:grid;gap:12px">
+          <h2 class="section-title"><span class="section-badge">${icon("music_note")}</span><span class="grow">${escape(t("songClears"))}</span></h2>
+          <div class="clears">${difficulties
+            .map((name) => {
+              const status = results.map((row) => int(row[`_${name}ClearedStatus`]) ?? 0);
+              const line = (label, threshold) => `<div class="clear__line"><span>${escape(label)}</span><strong>${number(status.filter((s) => s >= threshold).length)}</strong></div>`;
+              return `<div class="clear"><span class="clear__difficulty">${name.toUpperCase()}</span>${line(t("cleared"), 10)}${line(t("fullCombo"), 20)}${line(t("allPerfect"), 30)}<span class="muted">${escape(t("ofSongs", { total: number(total) }))}</span></div>`;
+            })
+            .join("")}</div>
+        </section>`;
+      };
+
+      const currencies = () => {
+        const owned = Object.fromEntries(rows("_items").map((row) => [String(row._masterItemId), int(row._amount)]));
+        const list = ["1", "2", "3"].filter((id) => catalog?.items?.[id]);
+        if (!list.length) return "";
+        return `<section style="display:grid;gap:12px">
+          <h2 class="section-title"><span class="section-badge">${icon("payments")}</span><span class="grow">${escape(t("currencies"))}</span></h2>
+          <div class="stats">${list
+            .map((id) => {
+              const item = catalog.items[id];
+              const image = catalog.asset(item.image);
+              return `<div class="stat">${image ? `<img src="${escape(image)}" alt="" width="32" height="32" />` : icon("payments")}<div><span>${escape(text(item.name))}</span><strong>${number(owned[id] ?? 0)}</strong></div></div>`;
+            })
+            .join("")}</div>
+        </section>`;
+      };
+
+      const events = () => {
+        const played = rows("_events").filter((row) => (int(row._eventPointCount) ?? 0) > 0);
+        if (!played.length) return "";
+        return `<section style="display:grid;gap:12px">
+          <h2 class="section-title"><span class="section-badge">${icon("event")}</span><span class="grow">${escape(t("eventsPlayed"))}</span></h2>
+          <ul class="list">${played
+            .map((row) => {
+              const event = catalog?.events?.[String(row._masterId)];
+              const image = catalog?.asset(event?.image);
+              return `<li><a class="row" href="${escape(`${site()}/${detail.account.server ?? "intl"}/${locale}/events/${row._masterId}/`)}">
+                ${image ? `<img src="${escape(image)}" alt="" width="96" height="54" style="border-radius:8px;object-fit:cover;flex:none" loading="lazy" />` : ""}
+                <span class="row__text"><span class="row__title">${escape(text(event?.title) || `#${row._masterId}`)}</span></span>
+                <span class="row__trail"><strong>${escape(t("eventPoints", { points: number(int(row._eventPointCount)) }))}</strong></span></a></li>`;
+            })
+            .join("")}</ul>
+        </section>`;
+      };
+
+      const render = () => {
+        const a = detail.account;
+        const p = player();
+        const favorite = catalog?.cards?.[String(p._favoriteMemberCardId ?? p._lastLiveDeckLeaderMemberCardId ?? "")];
+        const art = catalog?.asset(favorite?.images?.full ?? favorite?.images?.thumbnail);
+        const started = int(p._tutorialFinishedAtUnixSeconds);
+        const rating = rows("_topHighScoreRatings").reduce((sum, row) => sum + (int(row._highScoreRating) ?? 0), 0);
+        const vip = int(p._vip?._rank);
+        document.getElementById("bar").innerHTML = bar({
+          title: a.name || a.profileId,
+          back: "saves.html",
+          actions: `<button class="icon-button icon-button--tonal" type="button" data-action="team" aria-label="${escape(t("importToTeamBuilder"))}" ${busy ? "disabled" : ""}>${icon("groups")}</button>
+            ${a.canRefresh ? `<button class="icon-button" type="button" data-action="sync" aria-label="${escape(t("syncFromGame"))}" ${busy ? "disabled" : ""}>${icon("cloud_sync")}</button>` : ""}
+            <a class="icon-button" href="import.html?update=${encodeURIComponent(key)}" aria-label="${escape(t("updateSave"))}">${icon("refresh")}</a>`,
+        });
+        document.title = a.name || a.profileId;
+        document.getElementById("page").innerHTML = `
+          <section class="surface profile">
+            ${art ? `<div class="profile__art" style="background-image:url('${escape(art)}')"></div>` : ""}
+            <div class="rank">${sunny}<div><span>RANK</span><strong>${escape(a.rank ?? "—")}</strong></div></div>
+            <div class="profile__meta">
+              <h2>${escape(a.name || a.profileId)}</h2>
+              <span class="profile__region"><img src="${emblem(detail.release, a.server)}" alt="" />${escape(a.region ?? "")}</span>
+              <button class="copy" type="button" data-action="copy-id">${escape(`${t("playerId")} ${a.profileId}`)}${icon("content_copy", "icon--small")}</button>
+              ${started ? `<span class="muted">${escape(`${t("tutorialDone")} / ${date(started * 1000)}`)}</span>` : ""}
+              ${a.savedAt ? `<span class="muted">${escape(t("savedOn", { time: date(a.savedAt, true) }))}</span>` : ""}
+            </div>
+          </section>
+          <div class="cluster">
+            ${a.canRefresh ? `<button class="button button--tonal" type="button" data-action="history" ${busy ? "disabled" : ""}>${icon("history")}${escape(t("readHistory"))}</button>` : ""}
+            <button class="button button--filled" type="button" data-action="team" ${busy ? "disabled" : ""}>${icon("groups")}${escape(t("importToTeamBuilder"))}</button>
+            <button class="button button--tonal" type="button" data-action="songs" ${busy ? "disabled" : ""}>${icon("checklist")}${escape(t("songProgress"))}</button>
+            ${a.canRefresh ? `<button class="button button--tonal" type="button" data-action="sync" ${busy ? "disabled" : ""}>${icon("cloud_sync")}${escape(t("syncFromGame"))}</button>` : ""}
+            <a class="button button--outlined" href="import.html?update=${encodeURIComponent(key)}">${icon("refresh")}${escape(t("updateSave"))}</a>
+          </div>
+          <div class="stats">
+            <div class="stat">${icon("trending_up")}<div><span>${escape(t("playerExp"))}</span><strong>${number(int(p._exp))}</strong></div></div>
+            <div class="stat">${icon("military_tech")}<div><span>${escape(t("highScoreRating"))}</span><strong>${number(rating)}</strong></div></div>
+            ${vip != null ? `<div class="stat">${icon("credit_card")}<div><span>${escape(t("vipRank"))}</span><strong>RANK ${number(vip)}</strong></div></div>` : ""}
+            <div class="stat">${icon("person")}<div><span>${escape(t("ownedMembers"))}</span><strong>${number(rows("_memberCards").length)}</strong></div></div>
+            <div class="stat">${icon("photo_library")}<div><span>${escape(t("ownedSnapshots"))}</span><strong>${number(rows("_supportCards").length)}</strong></div></div>
+          </div>
+          <div class="cluster" role="group" aria-label="${escape(t("cardSort"))}">
+            <span class="muted">${escape(t("cardSort"))}</span>
+            <button class="chip" type="button" data-sort="rarity" aria-pressed="${!newest}">${!newest ? icon("check", "icon--small") : ""}${escape(t("sortRarity"))}</button>
+            <button class="chip" type="button" data-sort="newest" aria-pressed="${newest}">${newest ? icon("check", "icon--small") : ""}${escape(t("sortNewest"))}</button>
+          </div>
+          ${cardSection("_memberCards", true, t("ownedMembers"), "person")}
+          ${cardSection("_supportCards", false, t("ownedSnapshots"), "photo_library")}
+          ${clears()}
+          ${currencies()}
+          ${events()}
+          <section style="display:grid;gap:12px">
+            <h2 class="section-title"><span class="section-badge">${icon("download")}</span><span class="grow">${escape(t("exportsTitle"))}</span></h2>
+            <ul class="list">
+              <li><button class="row" type="button" data-action="copy-package"><span class="row__lead">${icon("content_copy")}</span><span class="row__text"><span class="row__title">${escape(t("exportTeam"))}</span><span class="row__supporting">${escape(t("exportTeamHint"))}</span></span></button></li>
+              <li><button class="row" type="button" data-action="export"><span class="row__lead">${icon("download")}</span><span class="row__text"><span class="row__title">${escape(t("exportSave"))}</span><span class="row__supporting">${escape(t("exportSaveHint"))}</span></span></button></li>
+            </ul>
+            <button class="button button--text button--danger" type="button" data-action="remove" style="justify-self:start">${icon("delete")}${escape(t("removeAccount"))}</button>
+          </section>
+          <section style="display:grid;gap:12px">
+            <h2 class="section-title"><span class="section-badge">${icon("data_object")}</span><span class="grow">${escape(t("rawData"))}</span></h2>
+            <ul class="list">
+              <li><button class="row" type="button" data-json="settings"><span class="row__text"><span class="row__title">${escape(t("settings"))}</span></span><span class="row__trail">${icon("chevron_right")}</span></button></li>
+              ${detail.persist ? `<li><button class="row" type="button" data-json="persist"><span class="row__text"><span class="row__title">${escape(t("latestLive"))}</span></span><span class="row__trail">${icon("chevron_right")}</span></button></li>` : ""}
+            </ul>
+          </section>`;
+      };
+
+      // ---------- actions ----------
+      const run = async (work) => {
+        if (busy) return;
+        busy = true;
+        render();
+        try {
+          await work();
+        } catch (error) {
+          snackbar(failure(error));
+        } finally {
+          busy = false;
+          render();
+        }
+      };
+      const dialog = document.getElementById("dialog");
+
+      document.addEventListener("click", (event) => {
+        const target = event.target.closest("button");
+        if (!target || target.disabled) return;
+        if (target.dataset.sort) {
+          newest = target.dataset.sort === "newest";
+          return render();
+        }
+        if (target.dataset.expand) {
+          const field = target.dataset.expand;
+          expanded.has(field) ? expanded.delete(field) : expanded.add(field);
+          return render();
+        }
+        if (target.dataset.json) {
+          const value = target.dataset.json === "settings" ? detail.settings : detail.persist;
+          dialog.innerHTML = `<h2>${escape(target.dataset.json === "settings" ? t("settings") : t("latestLive"))}</h2><pre class="json">${escape(JSON.stringify(value, null, 2))}</pre>
+            <div class="dialog__actions"><button class="button button--text" type="button" data-close>${escape(t("back"))}</button></div>`;
+          return dialog.showModal();
+        }
+        if ("close" in target.dataset) return dialog.close();
+        switch (target.dataset.action) {
+          case "copy-id":
+            return navigator.clipboard.writeText(detail.account.profileId).then(() => snackbar(t("copied")));
+          case "team":
+            return run(async () => {
+              const { server } = await call("sendBox", { key });
+              openSite(`/{locale}/team-builder/?server=${server}`);
+            });
+          case "songs":
+            return run(async () => {
+              const { server } = await call("sendSongProgress", { key });
+              openSite(`/{locale}/song-progress/?server=${server ?? "intl"}`);
+            });
+          case "history":
+            return run(async () => {
+              await call("readGachaHistory", { key });
+              openSite(`/{locale}/gacha-history/`);
+            });
+          case "sync":
+            return run(async () => {
+              await call("refreshGameAccount", { key });
+              detail = await call("saveDetail", { key });
+              snackbar(t("syncedFromGame"));
+            });
+          case "copy-package":
+            return run(async () => {
+              await navigator.clipboard.writeText(await call("teamPackage", { key }));
+              snackbar(t("copied"));
+            });
+          case "export":
+            return run(async () => {
+              if (await call("exportGameAccount", { key })) snackbar(t("saved"));
+            });
+          case "remove":
+            dialog.innerHTML = `<h2>${escape(t("removeAccount"))}</h2><p>${escape(t("removeAccountConfirm", { name: detail.account.name || detail.account.profileId }))}</p>
+              <div class="dialog__actions"><button class="button button--text" type="button" data-close>${escape(t("cancel"))}</button>
+              <button class="button button--filled" type="button" data-action="remove-confirm">${escape(t("remove"))}</button></div>`;
+            return dialog.showModal();
+          case "remove-confirm":
+            dialog.close();
+            return run(async () => {
+              await call("deleteGameAccount", { key });
+              location.replace("saves.html");
+            });
+        }
+      });
+
+      render();
+      loadCatalog()
+        .then((loaded) => {
+          catalog = loaded;
+          render();
+        })
+        .catch(() => {});
+    </script>
+  </body>
+</html>

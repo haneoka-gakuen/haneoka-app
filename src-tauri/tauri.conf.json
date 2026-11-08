@@ -11,7 +11,7 @@
     "withGlobalTauri": false,
     "windows": [],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://haneoka.org https://haneoka.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://haneoka.org https://haneoka.com; img-src 'self' data: https://haneoka.org https://haneoka.com; style-src 'self' 'unsafe-inline'"
     }
   },
   "bundle": {

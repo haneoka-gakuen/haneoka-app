@@ -4,158 +4,108 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>haneoka</title>
-    <style>
-      :root {
-        color-scheme: light dark;
-        --background: #f6f8f9;
-        --on-background: #1b1b21;
-        --primary: #31356e;
-        --on-primary: #ffffff;
-      }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --background: #131318;
-          --on-background: #e4e1e9;
-          --primary: #bec2ff;
-          --on-primary: #262a5e;
-        }
-      }
-      html,
-      body {
-        height: 100%;
-        margin: 0;
-        background: var(--background);
-        color: var(--on-background);
-        font: 16px/1.5 Roboto, "Noto Sans", system-ui, sans-serif;
-      }
-      main {
-        min-height: 100%;
-        display: grid;
-        place-items: center;
-        align-content: center;
-        gap: 24px;
-        padding: 16px;
-        box-sizing: border-box;
-        text-align: center;
-      }
-      img {
-        width: 96px;
-        height: 96px;
-      }
-      .progress {
-        width: 160px;
-        height: 4px;
-        border-radius: 2px;
-        background: color-mix(in srgb, var(--primary) 20%, transparent);
-        overflow: hidden;
-      }
-      .progress::after {
-        content: "";
-        display: block;
-        width: 40%;
-        height: 100%;
-        border-radius: 2px;
-        background: var(--primary);
-        animation: slide 1.2s ease-in-out infinite;
-      }
-      @keyframes slide {
-        from {
-          transform: translateX(-100%);
-        }
-        to {
-          transform: translateX(250%);
-        }
-      }
-      button {
-        min-height: 48px;
-        padding: 0 24px;
-        border: 0;
-        border-radius: 24px;
-        background: var(--primary);
-        color: var(--on-primary);
-        font: 500 14px/1 inherit;
-        cursor: pointer;
-      }
-      [hidden] {
-        display: none !important;
-      }
-    </style>
+    <link rel="stylesheet" href="app.css" />
   </head>
   <body>
-    <main>
-      <img src="logo.svg" alt="" />
-      <div class="progress" id="progress"></div>
-      <p id="message" hidden></p>
-      <button id="retry" type="button" hidden></button>
+    <main class="start">
+      <img class="start__logo" src="logo.svg" alt="" />
+      <div class="start__panel" id="loading">
+        <div class="progress"></div>
+      </div>
+      <div class="start__panel" id="choose" hidden>
+        <h1 class="section-title" id="choose-title"></h1>
+        <p class="muted" id="failed" hidden></p>
+        <ul class="list" id="sites"></ul>
+        <ul class="list">
+          <li>
+            <a class="row" href="saves.html" id="saves-link">
+              <span class="row__lead" id="saves-icon"></span>
+              <span class="row__text"><span class="row__title" id="saves-label"></span></span>
+              <span class="row__trail" id="saves-trail"></span>
+            </a>
+          </li>
+        </ul>
+      </div>
     </main>
-    <script>
-      const text = {
-        en: { offline: "Cannot reach {host}", retry: "Retry" },
-        ja: { offline: "{host} に接続できません", retry: "再試行" },
-        ko: { offline: "{host}에 연결할 수 없습니다", retry: "다시 시도" },
-        "zh-CN": { offline: "无法连接 {host}", retry: "重试" },
-        "zh-TW": { offline: "無法連線 {host}", retry: "重試" },
-      };
-      const tag = (navigator.language || "en").toLowerCase();
-      const locale = tag.startsWith("ja")
-        ? "ja"
-        : tag.startsWith("ko")
-          ? "ko"
-          : /^zh-(tw|hk|mo|hant)/.test(tag)
-            ? "zh-TW"
-            : tag.startsWith("zh")
-              ? "zh-CN"
-              : "en";
-      const t = text[locale];
-      document.documentElement.lang = locale;
-      const invoke = (command, args) => window.__TAURI_INTERNALS__.invoke(command, args);
+    <script type="module">
+      import { call, info, setup, t, icon, escape } from "./app.js";
+
       const query = new URLSearchParams(location.search);
-      // A site whose page did not load comes last this time.
-      const skip = query.get("skip");
-      const reachable = (origin) =>
-        new Promise((resolve) => {
+      const failed = query.get("failed");
+      const path = query.get("path");
+      const latency = new Map();
+
+      const probe = async (origin, attempts = 3) => {
+        const times = [];
+        for (let attempt = 0; attempt < attempts; attempt++) {
           const controller = new AbortController();
           const timer = setTimeout(() => controller.abort(), 8000);
-          fetch(`${origin}/site.webmanifest`, { cache: "no-store", signal: controller.signal })
-            .then((response) => resolve(response.ok), () => resolve(false))
-            .finally(() => clearTimeout(timer));
-        });
-      const start = async () => {
-        document.getElementById("progress").hidden = false;
-        document.getElementById("message").hidden = true;
-        document.getElementById("retry").hidden = true;
-        const info = await invoke("launch_info", { locale, path: query.get("path") });
-        const order = [info.remembered, ...info.origins]
-          .filter((o, i, all) => o && all.indexOf(o) === i)
-          .sort((a, b) => (a === skip) - (b === skip));
-        // Every site at once; the first reachable one in preference order wins.
-        const checks = order.map((origin) => reachable(origin));
-        for (const [index, origin] of order.entries()) {
-          if (await checks[index]) {
-            location.replace(origin + info.path);
-            return;
+          const start = performance.now();
+          try {
+            const response = await fetch(`${origin}/site.webmanifest?probe=${Date.now()}`, { cache: "no-store", signal: controller.signal });
+            if (!response.ok) break;
+            await response.arrayBuffer();
+            times.push(performance.now() - start);
+          } catch {
+            break;
+          } finally {
+            clearTimeout(timer);
           }
         }
-        document.getElementById("progress").hidden = true;
-        const message = document.getElementById("message");
-        message.textContent = t.offline.replace("{host}", new URL(order[0]).host);
-        message.hidden = false;
-        const retry = document.getElementById("retry");
-        retry.textContent = t.retry;
-        retry.hidden = false;
+        return times.length ? Math.round(times.sort((a, b) => a - b)[Math.floor(times.length / 2)]) : null;
       };
-      const failed = () => {
-        document.getElementById("progress").hidden = true;
-        const message = document.getElementById("message");
-        message.textContent = t.offline.replace("{host}", new URL(skip || "https://haneoka.org").host);
-        message.hidden = false;
-        const retry = document.getElementById("retry");
-        retry.textContent = t.retry;
-        retry.hidden = false;
+
+      const go = async (origin) => {
+        await call("chooseOrigin", { origin });
+        const target = await window.__TAURI_INTERNALS__.invoke("launch_info", { locale: document.documentElement.lang, path });
+        location.replace(origin + target.path);
       };
-      document.getElementById("retry").addEventListener("click", start);
-      if (query.get("failed")) failed();
-      else start();
+
+      const render = () => {
+        const fastest = [...latency.entries()].filter(([, ms]) => ms != null).sort((a, b) => a[1] - b[1])[0]?.[0];
+        document.getElementById("sites").innerHTML = info.origins
+          .map((origin) => {
+            const ms = latency.get(origin);
+            const trail = !latency.has(origin) ? escape(t("testing")) : ms == null ? escape(t("unreachable")) : `<strong>${ms}</strong> ms`;
+            return `<li><button class="row site-choice" type="button" data-origin="${escape(origin)}" aria-pressed="${origin === info.chosen}" ${latency.has(origin) && ms == null ? "disabled" : ""}>
+              <span class="row__lead">${icon("public")}</span>
+              <span class="row__text"><span class="row__title">${escape(new URL(origin).host)}</span>${origin === fastest ? `<span class="row__supporting"><span class="badge">${escape(t("recommended"))}</span></span>` : ""}</span>
+              <span class="row__trail">${trail}</span>
+            </button></li>`;
+          })
+          .join("");
+      };
+
+      const choose = () => {
+        document.getElementById("loading").hidden = true;
+        document.getElementById("choose").hidden = false;
+        document.getElementById("choose-title").textContent = t("chooseSite");
+        document.getElementById("saves-icon").innerHTML = icon("sports_esports");
+        document.getElementById("saves-label").textContent = t("importedAccounts");
+        document.getElementById("saves-trail").innerHTML = icon("chevron_right");
+        if (failed) {
+          const message = document.getElementById("failed");
+          message.textContent = t("siteFailed", { host: new URL(failed).host });
+          message.hidden = false;
+        }
+        render();
+        for (const origin of info.origins) probe(origin).then((ms) => (latency.set(origin, ms), render()));
+      };
+
+      document.getElementById("sites").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-origin]");
+        if (button && !button.disabled) go(button.dataset.origin);
+      });
+
+      await setup();
+      if (failed || query.has("choose") || !info.chosen) choose();
+      else if ((await probe(info.chosen, 1)) != null) go(info.chosen);
+      else {
+        const message = document.getElementById("failed");
+        message.textContent = t("siteFailed", { host: new URL(info.chosen).host });
+        message.hidden = false;
+        choose();
+      }
     </script>
   </body>
 </html>

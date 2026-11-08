@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>haneoka</title>
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <div id="bar"></div>
+    <main class="page" id="page"></main>
+    <script type="module">
+      import { call, setup, t, icon, escape, bar, snackbar, failure, RELEASES, date } from "./app.js";
+
+      await setup();
+      const query = new URLSearchParams(location.search);
+      const updating = query.get("update");
+      document.title = t("importTitle");
+      document.getElementById("bar").innerHTML = bar({ title: t("importTitle"), back: updating ? `save.html?key=${encodeURIComponent(updating)}` : "saves.html" });
+
+      const { sources } = await call("saveSources").catch(() => ({ sources: ["files"] }));
+      const status = sources.includes("shizuku") ? await call("deviceStatus").catch(() => null) : null;
+      let release = RELEASES[0].id;
+      let busy = false;
+      let devices = null;
+      let backups = null;
+      let locked = null;
+
+      const method = (id, title, summary, body, recommended = false) => `<section class="surface" style="display:grid;gap:12px" data-method="${id}">
+        <h2 class="section-title"><span class="section-badge">${icon(
+          { shizuku: "smartphone", gameFolder: "folder_open", files: "description", folder: "folder_open", adb: "usb", iosBackup: "phone_iphone" }[id],
+        )}</span><span class="grow">${escape(title)}</span>${recommended ? `<span class="badge">${escape(t("recommended"))}</span>` : ""}</h2>
+        <p class="muted">${escape(summary)}</p>
+        ${body}
+      </section>`;
+
+      const releaseChips = () => `<div class="cluster" role="group" aria-label="${escape(t("release"))}">${RELEASES.map(
+        (r) => `<button class="chip" type="button" data-release="${r.id}" aria-pressed="${r.id === release}">${r.id === release ? icon("check", "icon--small") : ""}${escape(t(r.name))}</button>`,
+      ).join("")}</div>`;
+
+      const adbBody = () => {
+        const list =
+          devices === null
+            ? ""
+            : devices.length
+              ? `<ul class="list">${devices
+                  .map(
+                    (device) => `<li><button class="row" type="button" data-serial="${escape(device.serial)}" ${busy || device.state !== "device" || !device.releases.length ? "disabled" : ""}>
+                    <span class="row__lead">${icon("smartphone")}</span>
+                    <span class="row__text"><span class="row__title">${escape(device.model?.replaceAll("_", " ") || device.serial)}</span>
+                    <span class="row__supporting">${escape(
+                      device.state !== "device"
+                        ? t("deviceUnauthorized")
+                        : device.releases.length
+                          ? device.releases.map((id) => t(RELEASES.find((r) => r.id === id)?.name ?? "release")).join(" / ")
+                          : t("gameNotInstalled"),
+                    )}</span></span>
+                    <span class="row__trail">${icon("chevron_right")}</span></button></li>`,
+                  )
+                  .join("")}</ul>`
+              : `<p class="muted">${escape(t("noDevices"))}</p>`;
+        return `${list}
+          <div class="cluster"><button class="button button--tonal" type="button" data-action="devices" ${busy ? "disabled" : ""}>${icon("refresh")}${escape(devices === null ? t("devices") : t("refresh"))}</button></div>
+          <details><summary class="button button--text">${escape(t("pairWireless"))}</summary>
+            <form class="form" data-form="pair" style="margin-top:12px">
+              <label class="field">${escape(t("pairAddress"))}<input name="pair" autocomplete="off" inputmode="url" /></label>
+              <label class="field">${escape(t("pairCode"))}<input name="code" autocomplete="one-time-code" inputmode="numeric" /></label>
+              <label class="field">${escape(t("connectAddress"))}<input name="connect" autocomplete="off" inputmode="url" /></label>
+              <button class="button button--filled" type="submit" ${busy ? "disabled" : ""}>${escape(t("connect"))}</button>
+            </form>
+          </details>`;
+      };
+
+      const backupBody = () => {
+        if (locked)
+          return `<form class="form" data-form="password">
+            <p class="muted">${escape(locked.deviceName ?? locked.path)}</p>
+            <label class="field">${escape(t("backupPassword"))}<input name="password" type="password" autocomplete="off" required /></label>
+            <div class="cluster"><button class="button button--filled" type="submit" ${busy ? "disabled" : ""}>${escape(t("read"))}</button>
+            <button class="button button--text" type="button" data-action="unlock-cancel">${escape(t("cancel"))}</button></div>
+          </form>`;
+        const list =
+          backups === null
+            ? ""
+            : backups.length
+              ? `<ul class="list">${backups
+                  .map(
+                    (backup, index) => `<li><button class="row" type="button" data-backup="${index}" ${busy ? "disabled" : ""}>
+                    <span class="row__lead">${icon(backup.encrypted ? "lock" : "phone_iphone")}</span>
+                    <span class="row__text"><span class="row__title">${escape(backup.deviceName ?? backup.productType ?? backup.path)}</span>
+                    <span class="row__supporting">${escape([backup.productType, backup.date == null ? "" : date(backup.date, true), backup.encrypted ? t("encrypted") : ""].filter(Boolean).join(" / "))}</span></span>
+                    <span class="row__trail">${icon("chevron_right")}</span></button></li>`,
+                  )
+                  .join("")}</ul>`
+              : `<p class="muted">${escape(t("noBackups"))}</p>`;
+        return `${list}<div class="cluster">
+          <button class="button button--tonal" type="button" data-action="backups" ${busy ? "disabled" : ""}>${icon("refresh")}${escape(t("openBackups"))}</button>
+          <button class="button button--text" type="button" data-action="backup-folder" ${busy ? "disabled" : ""}>${escape(t("chooseBackupFolder"))}</button></div>`;
+      };
+
+      const render = () => {
+        const parts = [];
+        if (sources.includes("shizuku"))
+          parts.push(
+            method(
+              "shizuku",
+              t("methodShizukuTitle"),
+              status?.status === "unsupported" ? t("shizukuUnsupported") : t("methodShizukuSummary"),
+              `<div class="cluster"><button class="button button--filled" type="button" data-action="shizuku" ${busy ? "disabled" : ""}>${escape(
+                status?.status === "notRunning" ? t("openShizuku") : t("readSave"),
+              )}</button></div>`,
+              true,
+            ),
+          );
+        if (sources.includes("gameFolder") && status?.canGrantFolder)
+          parts.push(
+            method(
+              "gameFolder",
+              t("methodFolderTitle"),
+              t("methodFolderSummary"),
+              `${releaseChips()}<div class="cluster"><button class="button button--tonal" type="button" data-action="grant" ${busy ? "disabled" : ""}>${escape(t("chooseFolder"))}</button></div>`,
+            ),
+          );
+        if (sources.includes("adb")) parts.push(method("adb", t("methodAdbTitle"), t("methodAdbSummary"), adbBody(), true));
+        if (sources.includes("iosBackup")) parts.push(method("iosBackup", t("methodBackupTitle"), t("methodBackupSummary"), backupBody()));
+        parts.push(
+          method(
+            "files",
+            t("methodFilesTitle"),
+            t("methodFilesSummary"),
+            `<div class="cluster"><button class="button button--tonal" type="button" data-action="files" ${busy ? "disabled" : ""}>${escape(t("chooseFiles"))}</button>
+            ${sources.includes("folder") ? `<button class="button button--tonal" type="button" data-action="folder" ${busy ? "disabled" : ""}>${escape(t("chooseFolder"))}</button>` : ""}</div>`,
+          ),
+        );
+        document.getElementById("page").innerHTML = `<h2 class="section-title">${escape(t("importHeadline"))}</h2>${parts.join("")}`;
+      };
+
+      const run = async (work) => {
+        if (busy) return;
+        busy = true;
+        render();
+        try {
+          await work();
+        } catch (error) {
+          snackbar(failure(error));
+        } finally {
+          busy = false;
+          render();
+        }
+      };
+
+      /** After a read: back to the save being updated, the one save found, or the list. */
+      const done = (result) => {
+        if (!result) return;
+        if (!result.keys.length) {
+          snackbar(t("noSaves"));
+          return;
+        }
+        snackbar(t("foundAccounts", { count: result.keys.length }));
+        const key = updating && result.keys.includes(updating) ? updating : result.keys.length === 1 ? result.keys[0] : null;
+        location.assign(key ? `save.html?key=${encodeURIComponent(key)}` : "saves.html");
+      };
+
+      document.getElementById("page").addEventListener("click", (event) => {
+        const target = event.target.closest("button");
+        if (!target || target.disabled) return;
+        if (target.dataset.release) {
+          release = target.dataset.release;
+          render();
+          return;
+        }
+        if (target.dataset.serial) return run(async () => done(await call("adbRead", { serial: target.dataset.serial })));
+        if (target.dataset.backup) {
+          const backup = backups[Number(target.dataset.backup)];
+          if (backup.encrypted) {
+            locked = backup;
+            render();
+            return;
+          }
+          return run(async () => done(await call("iosBackupRead", { path: backup.path })));
+        }
+        switch (target.dataset.action) {
+          case "shizuku":
+            return run(async () => {
+              let current = (await call("deviceStatus")).status;
+              if (current === "notRunning") {
+                await call("openShizuku");
+                return;
+              }
+              if (current === "needsPermission") current = (await call("shizukuRequest")).granted ? "ready" : current;
+              if (current === "ready") done(await call("shizukuRead"));
+            });
+          case "grant":
+            return run(async () => done(await call("gameFolder", { release })));
+          case "files":
+            return run(async () => done(await call("readFiles", {})));
+          case "folder":
+            return run(async () => done(await call("readFiles", { folder: true })));
+          case "devices":
+            return run(async () => (devices = await call("adbDevices")));
+          case "backups":
+            return run(async () => (backups = await call("iosBackups", {})));
+          case "backup-folder":
+            return run(async () => {
+              const found = await call("iosBackups", { pick: true });
+              if (found) backups = [...found, ...(backups ?? []).filter((b) => !found.some((f) => f.path === b.path))];
+            });
+          case "unlock-cancel":
+            locked = null;
+            render();
+        }
+      });
+
+      document.getElementById("page").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const form = event.target;
+        const data = new FormData(form);
+        if (form.dataset.form === "password")
+          return run(async () => {
+            const result = await call("iosBackupRead", { path: locked.path, password: String(data.get("password")) });
+            locked = null;
+            done(result);
+          });
+        if (form.dataset.form === "pair")
+          return run(async () => {
+            const pair = String(data.get("pair") ?? "").trim(),
+              code = String(data.get("code") ?? "").trim(),
+              connect = String(data.get("connect") ?? "").trim();
+            if (pair && code && !(await call("adbPair", { address: pair, code }))) snackbar(t("pairFailed"));
+            if (connect) await call("adbConnect", { address: connect });
+            devices = await call("adbDevices");
+          });
+      });
+
+      render();
+      if (sources.includes("adb")) run(async () => (devices = await call("adbDevices")));
+      if (sources.includes("iosBackup")) call("iosBackups", {}).then((found) => ((backups = found), render())).catch(() => {});
+    </script>
+  </body>
+</html>

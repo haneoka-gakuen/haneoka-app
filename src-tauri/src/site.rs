@@ -1,6 +1,6 @@
-//! Which site the window uses. A site counts as working only once one of its
-//! pages has loaded and said so; a page that never does sends the window
-//! back to the launch page, which tries the other site first.
+//! Which site the window uses. The reader chooses on the start page; a site
+//! page that never reports the site's markup sends the window back there,
+//! naming the site that did not open.
 
 use std::sync::Mutex;
 use std::time::Duration;
@@ -18,8 +18,6 @@ const OVERALL: Duration = Duration::from_secs(30);
 #[derive(Default)]
 pub struct Watch {
     state: Mutex<(u64, bool)>,
-    /// Fallbacks since a page last loaded; both sites failing stops at Retry.
-    failures: Mutex<u32>,
 }
 
 impl Watch {
@@ -44,18 +42,19 @@ impl Watch {
         let mut state = self.state.lock().unwrap();
         let first = !state.1;
         state.1 = true;
-        *self.failures.lock().unwrap() = 0;
         first
     }
 }
 
-pub fn launch_url(skip: &str, path: &str, failed: bool) -> tauri::Url {
-    let base = if cfg!(any(windows, target_os = "android")) { "http://tauri.localhost/index.html" } else { "tauri://localhost/index.html" };
-    let mut url = tauri::Url::parse(base).expect("launch url");
-    url.query_pairs_mut().append_pair("skip", skip).append_pair("path", path);
-    if failed {
-        url.query_pairs_mut().append_pair("failed", "1");
-    }
+/// One of the app's bundled pages.
+pub fn local_url(page: &str) -> tauri::Url {
+    let base = if cfg!(any(windows, target_os = "android")) { "http://tauri.localhost/" } else { "tauri://localhost/" };
+    tauri::Url::parse(base).and_then(|b| b.join(page)).expect("local url")
+}
+
+pub fn launch_url(failed: &str, path: &str) -> tauri::Url {
+    let mut url = local_url("index.html");
+    url.query_pairs_mut().append_pair("failed", failed).append_pair("path", path);
     url
 }
 
@@ -71,12 +70,7 @@ fn fall_back(app: &AppHandle, generation: u64, delay: Duration) {
         let Ok(page) = window.url() else { return };
         let Some(origin) = site_origin(&page) else { return };
         let path = format!("{}{}", page.path(), page.query().map(|q| format!("?{q}")).unwrap_or_default());
-        let failures = {
-            let mut failures = state.watch.failures.lock().unwrap();
-            *failures += 1;
-            *failures
-        };
-        let _ = window.navigate(launch_url(origin, &path, failures > 2));
+        let _ = window.navigate(launch_url(origin, &path));
     });
 }
 

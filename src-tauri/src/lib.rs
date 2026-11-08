@@ -25,8 +25,17 @@ pub struct AppState {
     pub pending_path: Mutex<Option<String>>,
     pub sign_in: sign_in::Waiter,
     pub watch: site::Watch,
+    /// What the app's own pages hand to a website page, taken once there.
+    pub pending: Mutex<Pending>,
     #[cfg(desktop)]
     pub resources: Option<PathBuf>,
+}
+
+#[derive(Default)]
+pub struct Pending {
+    pub box_import: Option<serde_json::Value>,
+    pub song_progress: Option<serde_json::Value>,
+    pub gacha_history: Option<serde_json::Value>,
 }
 
 impl AppState {
@@ -34,11 +43,46 @@ impl AppState {
         self.config.join("site-origin")
     }
 
+    pub fn choose_origin(&self, origin: &str) -> bool {
+        if !ORIGINS.contains(&origin) {
+            return false;
+        }
+        let _ = std::fs::create_dir_all(&self.config);
+        std::fs::write(self.origin_file(), origin).is_ok()
+    }
+
+    fn preferences(&self) -> serde_json::Value {
+        std::fs::read(self.config.join("preferences.json"))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+            .unwrap_or_else(|| serde_json::json!({}))
+    }
+
+    /// The site's locale and colours, kept for the app's own pages.
+    pub fn preference(&self, key: &str) -> serde_json::Value {
+        self.preferences().get(key).cloned().unwrap_or(serde_json::Value::Null)
+    }
+
+    pub fn set_preference(&self, key: &str, value: serde_json::Value) {
+        let mut all = self.preferences();
+        if all.get(key) == Some(&value) {
+            return;
+        }
+        all[key] = value;
+        let _ = std::fs::create_dir_all(&self.config);
+        let _ = std::fs::write(self.config.join("preferences.json"), all.to_string());
+    }
+
     pub fn remembered_origin(&self) -> Option<String> {
         let text = std::fs::read_to_string(self.origin_file()).ok()?;
         let text = text.trim();
         ORIGINS.contains(&text).then(|| text.to_owned())
     }
+}
+
+/// The app's bundled pages: launch, saves, import and a save's page.
+pub fn local_page(url: &url::Url) -> bool {
+    url.scheme() == "tauri" || url.host_str() == Some("tauri.localhost")
 }
 
 pub fn site_origin(url: &url::Url) -> Option<&'static str> {
@@ -58,6 +102,7 @@ pub fn current_origin(app: &AppHandle) -> String {
 
 #[derive(Serialize)]
 struct LaunchInfo {
+    chosen: Option<String>,
     origins: Vec<&'static str>,
     remembered: Option<String>,
     path: String,
@@ -75,6 +120,7 @@ fn default_path(locale: &str) -> String {
 fn launch_info(state: tauri::State<'_, AppState>, locale: String, path: Option<String>) -> LaunchInfo {
     LaunchInfo {
         origins: ORIGINS.to_vec(),
+        chosen: state.remembered_origin(),
         remembered: state.remembered_origin(),
         path: path
             .filter(|p| p.starts_with('/') && !p.starts_with("//"))
@@ -84,15 +130,16 @@ fn launch_info(state: tauri::State<'_, AppState>, locale: String, path: Option<S
     }
 }
 
-/// A page of [origin] loaded the site: the origin works and is remembered.
+/// A page of [origin] loaded the site. The reader's choice of site stays as
+/// they made it; the first site that works is kept until they choose.
 pub fn site_ready(app: &AppHandle, origin: &str, locale: &str) {
     let state = app.state::<AppState>();
+    state.set_preference("locale", serde_json::json!(locale));
     if !state.watch.ready() {
         return;
     }
-    if state.remembered_origin().as_deref() != Some(origin) {
-        let _ = std::fs::create_dir_all(&state.config);
-        let _ = std::fs::write(state.origin_file(), origin);
+    if state.remembered_origin().is_none() {
+        state.choose_origin(origin);
     }
     update::check(app, origin.to_owned(), locale.to_owned());
 }
@@ -106,7 +153,12 @@ fn open_link(app: &AppHandle, url: &url::Url) {
                 app.state::<AppState>().sign_in.deliver(url.clone());
                 return;
             }
-            Some("saves") => Some("/en/saves/".to_owned()),
+            Some("saves") => {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.navigate(site::local_url("saves.html"));
+                }
+                return;
+            }
             Some("gacha-history") => Some("/intl/en/gacha-history/".to_owned()),
             _ => None,
         }
@@ -147,9 +199,11 @@ fn build_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     let script = include_str!("bridge.js")
         .replace("__ORIGINS__", &serde_json::to_string(&ORIGINS).unwrap())
         .replace("__VERSION__", env!("CARGO_PKG_VERSION"))
-        .replace("__PLATFORM__", std::env::consts::OS);
+        .replace("__PLATFORM__", std::env::consts::OS)
+        .replace("__LOCAL__", site::local_url("").as_str());
     let handle = app.clone();
-    let builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+    let first = if cfg!(debug_assertions) { std::env::var("HANEOKA_LOCAL_PAGE").ok() } else { None };
+    let builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App(first.unwrap_or_else(|| "index.html".into()).into()))
         .initialization_script(&script)
         .on_navigation(move |url| {
             if site_origin(url).is_some()
@@ -223,6 +277,7 @@ pub fn run() {
                 pending_path: Mutex::new(None),
                 sign_in: sign_in::Waiter::default(),
                 watch: site::Watch::default(),
+                pending: Mutex::new(Pending::default()),
                 #[cfg(desktop)]
                 resources: paths.resource_dir().ok(),
             });

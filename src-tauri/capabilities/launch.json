@@ -1,12 +1,13 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "launch",
-  "description": "The bundled launch page picks a reachable site.",
+  "description": "The app's bundled pages: launch, saves, import and a save's page.",
   "windows": [
     "main"
   ],
   "permissions": [
     "core:default",
-    "allow-launch-info"
+    "allow-launch-info",
+    "allow-bridge"
   ]
 }

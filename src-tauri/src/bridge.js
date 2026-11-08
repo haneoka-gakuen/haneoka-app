@@ -18,16 +18,19 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready, { once: true });
   else ready();
 
-  const locale = () => document.documentElement.dataset.locale || location.pathname.split("/")[2] || "en";
-  const local = new Set(["openGameAccount", "addGameAccount"]);
+  // The app's own pages: a save's page and save reading, bundled with the app.
+  const localBase = "__LOCAL__";
+  const local = {
+    openGameAccount: (args) => `save.html?key=${encodeURIComponent(args?.key ?? "")}`,
+    addGameAccount: () => "import.html",
+  };
   window.haneokaApp = Object.freeze({
     version: "__VERSION__",
     platform: "__PLATFORM__",
-    capabilities: Object.freeze(["saveSnapshotV1", "saveSourcesV1", "accountKeysV1"]),
+    capabilities: Object.freeze(["accountKeysV1"]),
     call(method, args) {
-      // The saves page is where the app's saves are read and shown.
-      if (local.has(method)) {
-        location.assign(`/${locale()}/saves/`);
+      if (local[method]) {
+        location.assign(localBase + local[method](args));
         return Promise.resolve(null);
       }
       return invoke(method, args);
@@ -105,6 +108,23 @@
       true,
     );
   };
+  // The site's colours, for the app's own pages.
+  const reportTheme = () => {
+    const root = getComputedStyle(document.documentElement);
+    const colors = {};
+    for (const name of ["primary", "on-primary", "primary-container", "on-primary-container", "secondary-container", "on-secondary-container",
+      "tertiary-container", "on-tertiary-container", "surface", "on-surface", "on-surface-variant", "surface-container-lowest",
+      "surface-container-low", "surface-container", "surface-container-high", "surface-container-highest", "outline", "outline-variant",
+      "error", "inverse-surface", "inverse-on-surface"]) colors[name] = root.getPropertyValue("--md-sys-color-" + name).trim();
+    if (colors.primary) invoke("theme", { dark: document.documentElement.dataset.theme === "dark", colors }).catch(() => {});
+  };
+  const watchTheme = () => {
+    reportTheme();
+    new MutationObserver(reportTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watchTheme, { once: true });
+  else watchTheme();
+
   // Android draws the status and navigation bars: they take the app bar's colour.
   if ("__PLATFORM__" === "android") {
     let reported = "";

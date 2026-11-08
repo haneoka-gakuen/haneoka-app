@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>haneoka</title>
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <div id="bar"></div>
+    <main class="page" id="page"></main>
+    <script type="module">
+      import { call, setup, t, icon, escape, bar, number, date, emblem, openSite } from "./app.js";
+
+      await setup();
+      document.title = t("importedAccounts");
+      document.getElementById("bar").innerHTML = bar({
+        title: t("importedAccounts"),
+        back: "#back",
+        actions: `<a class="icon-button" href="index.html?choose" aria-label="${escape(t("chooseSite"))}">${icon("public")}</a>
+          <a class="icon-button icon-button--tonal" href="import.html" aria-label="${escape(t("readSave"))}">${icon("add")}</a>`,
+      });
+      document.querySelector('[href="#back"]').addEventListener("click", (event) => {
+        event.preventDefault();
+        if (history.length > 1) history.back();
+        else openSite("/intl/{locale}/");
+      });
+
+      const render = async () => {
+        const saves = await call("gameAccounts").catch(() => []);
+        const page = document.getElementById("page");
+        if (!saves.length) {
+          page.innerHTML = `<section class="surface" style="display:grid;gap:16px;justify-items:start">
+            <p class="muted">${escape(t("noAccountsYet"))}</p>
+            <a class="button button--filled" href="import.html">${icon("add")}${escape(t("readSave"))}</a>
+          </section>`;
+          return;
+        }
+        page.innerHTML = `<ul class="list">${saves
+          .map(
+            (save) => `<li><a class="row" href="save.html?key=${encodeURIComponent(save.key)}">
+              <span class="row__lead" style="background:none"><img src="${emblem(save.release, save.server)}" alt="" width="32" height="32" /></span>
+              <span class="row__text">
+                <span class="row__title">${escape(save.name || save.profileId)}</span>
+                <span class="row__supporting">${[save.region, `${t("playerId")} ${save.profileId}`, save.rank == null ? "" : `RANK ${number(save.rank)}`, save.savedAt == null ? "" : t("savedOn", { time: date(save.savedAt, true) })]
+                  .filter(Boolean)
+                  .map(escape)
+                  .join(" / ")}</span>
+              </span>
+              <span class="row__trail">${icon("chevron_right")}</span>
+            </a></li>`,
+          )
+          .join("")}</ul>
+          <a class="button button--tonal" href="import.html" style="justify-self:start">${icon("add")}${escape(t("importMore"))}</a>`;
+      };
+      await render();
+    </script>
+  </body>
+</html>
