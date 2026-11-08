@@ -11,9 +11,9 @@ use tauri::{AppHandle, Manager, WebviewWindow};
 use crate::{site_origin, AppState};
 
 /// A page that finished loading without the site's own markup is an error page.
-const AFTER_FINISH: Duration = Duration::from_secs(4);
+const AFTER_FINISH: Duration = Duration::from_secs(15);
 /// A page that has not loaded at all by now is not coming.
-const OVERALL: Duration = Duration::from_secs(30);
+const OVERALL: Duration = Duration::from_secs(45);
 
 #[derive(Default)]
 pub struct Watch {

@@ -111,7 +111,29 @@
         latency.clear();
         render();
         const results = await Promise.all(info.origins.map((origin) => probe(origin).then((ms) => (latency.set(origin, ms), render(), ms))));
-        if (results.every((ms) => ms == null) && (await switchRoute())) await probeAll();
+        if (results.every((ms) => ms == null) && (await switchRoute())) return probeAll();
+        if (failed && !opening && retryAllowed()) {
+          const fastest = [...latency.entries()].filter(([, ms]) => ms != null).sort((a, b) => a[1] - b[1])[0]?.[0];
+          if (fastest) {
+            opening = fastest;
+            document.getElementById("opening").hidden = false;
+            render();
+            go(fastest);
+          }
+        }
+      };
+
+      // After a site failed to load, the fastest site that answers opens by itself, twice at most within three minutes.
+      const retryAllowed = () => {
+        try {
+          const now = Date.now();
+          const recent = JSON.parse(sessionStorage.getItem("haneoka:auto-retries") ?? "[]").filter((at) => now - at < 180_000);
+          if (recent.length >= 2) return false;
+          sessionStorage.setItem("haneoka:auto-retries", JSON.stringify([...recent, now]));
+          return true;
+        } catch {
+          return false;
+        }
       };
 
       // The site takes a moment to load; the row says so until it replaces this page.
