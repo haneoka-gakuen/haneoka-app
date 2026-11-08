@@ -48,7 +48,7 @@ jobs:
             adb: linux
             arch: x64
           - name: linux-arm64
-            runner: ubuntu-22.04-arm
+            runner: ubuntu-24.04-arm
             platform: linux
             adb: linux
             arch: arm64
@@ -133,10 +133,9 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - uses: android-actions/setup-android@v3
       - name: NDK
         run: |
-          sdkmanager "ndk;27.2.12479018" "build-tools;35.0.0" "platforms;android-36"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.2.12479018" "build-tools;35.0.0" "platforms;android-36" > /dev/null
           echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -200,19 +199,34 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: brew install xcodegen ldid
-      - run: npx tauri ios init --ci
-      - name: Build without signing
+      - name: Unsigned project
+        env:
+          # A placeholder team: the archive is built without signing, and the
+          # sideloading tool or TrollStore signs it on the reader's side.
+          APPLE_DEVELOPMENT_TEAM: "0000000000"
         run: |
-          project=$(ls -d src-tauri/gen/apple/*.xcodeproj | head -1)
-          scheme=$(xcodebuild -list -project "$project" -json | jq -r '.project.schemes[] | select(endswith("_iOS"))' | head -1)
-          xcodebuild -project "$project" -scheme "$scheme" -configuration release -sdk iphoneos -destination 'generic/platform=iOS' \
-            -archivePath build/haneoka.xcarchive archive \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            MARKETING_VERSION=${{ needs.version.outputs.version }} CURRENT_PROJECT_VERSION=${{ github.run_number }}
+          npx tauri ios init --ci
+          python3 - <<'PYTHON'
+          import pathlib, re
+          path = pathlib.Path('src-tauri/gen/apple/project.yml')
+          text = path.read_text()
+          text = re.sub(r'(settingGroups:\n  app:\n    base:\n)', r'\1      CODE_SIGNING_ALLOWED: NO\n      CODE_SIGNING_REQUIRED: NO\n      CODE_SIGN_IDENTITY: ""\n', text, count=1)
+          assert 'CODE_SIGNING_ALLOWED' in text
+          path.write_text(text)
+          PYTHON
+          (cd src-tauri/gen/apple && xcodegen generate)
+      - name: Build without signing
+        env:
+          APPLE_DEVELOPMENT_TEAM: "0000000000"
+        run: |
+          # The archive needs no signature; only the App Store export does, and that step is expected to fail.
+          npx tauri ios build --ci --config '{"version":"${{ needs.version.outputs.version }}"}' || true
+          archive=$(find src-tauri/gen/apple/build -maxdepth 2 -name '*.xcarchive' | head -1)
+          test -n "$archive" && echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
       - name: Packages
         run: |
           mkdir -p dist build/ios/standard/Payload build/ios/trollstore/Payload
-          app=$(find build/haneoka.xcarchive/Products/Applications -maxdepth 1 -name '*.app' | head -1)
+          app=$(find "$ARCHIVE/Products/Applications" -maxdepth 1 -name '*.app' | head -1)
           ditto "$app" "build/ios/standard/Payload/$(basename "$app")"
           codesign --force --sign - --timestamp=none "build/ios/standard/Payload/$(basename "$app")"
           ditto "build/ios/standard/Payload/$(basename "$app")" "build/ios/trollstore/Payload/$(basename "$app")"
