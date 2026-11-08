@@ -76,6 +76,9 @@ fn fall_back(app: &AppHandle, generation: u64, delay: Duration) {
 
 pub fn page_load(window: &WebviewWindow, event: PageLoadEvent, url: &tauri::Url) {
     if site_origin(url).is_none() {
+        if url.path().ends_with("/saves.html") {
+            window.app_handle().state::<AppState>().pending.lock().unwrap().page = None;
+        }
         return;
     }
     let app = window.app_handle();

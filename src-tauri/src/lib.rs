@@ -156,13 +156,11 @@ fn open_link(app: &AppHandle, url: &url::Url) {
                 return;
             }
             Some("saves") => {
-                let window = app.get_webview_window("main");
-                let settled = window.as_ref().and_then(|w| w.url().ok()).is_some_and(|u| site_origin(&u).is_some() || !u.path().ends_with("/index.html"));
-                match window {
-                    Some(window) if settled => {
-                        let _ = window.navigate(site::local_url("saves.html"));
-                    }
-                    _ => app.state::<AppState>().pending.lock().unwrap().page = Some("saves.html".into()),
+                // The launch page opens it when the window is not ready yet;
+                // the saves page clears it once it loads.
+                app.state::<AppState>().pending.lock().unwrap().page = Some("saves.html".into());
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.navigate(site::local_url("saves.html"));
                 }
                 return;
             }
@@ -299,13 +297,13 @@ pub fn run() {
                     open_link(&links, &url);
                 }
             });
-            build_window(&handle)?;
-            // The link that launched the app needs the window to open in.
+            // Before the window exists: the launch page picks up what the link asked for.
             if let Ok(Some(urls)) = app.deep_link().get_current() {
                 for url in urls {
                     open_link(&handle, &url);
                 }
             }
+            build_window(&handle)?;
             Ok(())
         })
         .run(tauri::generate_context!())
