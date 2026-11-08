@@ -216,8 +216,13 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
             let result = sign_in::sign_in(app, &state(app).sign_in, &origin, provider).await?;
             Ok(result.map_or(Value::Null, |(code, verifier)| json!({ "code": code, "verifier": verifier })))
         }
-        "orientation" | "systemBars" => {
+        "orientation" => {
             #[cfg(target_os = "android")]
+            app.device().call::<Value, _>(method, args).await?;
+            Ok(Value::Null)
+        }
+        "systemBars" => {
+            #[cfg(mobile)]
             app.device().call::<Value, _>(method, args).await?;
             Ok(Value::Null)
         }

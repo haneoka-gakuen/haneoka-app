@@ -197,7 +197,7 @@ jobs:
           fi
           sign() {
             "$tools/zipalign" -f -p 4 "$1" "$RUNNER_TEMP/aligned.apk"
-            "$tools/apksigner" sign --ks "$KEYSTORE_FILE" --ks-pass "pass:$STORE_PASSWORD" --ks-key-alias "$KEY_ALIAS" --key-pass "pass:$KEY_PASSWORD" \
+            "$tools/apksigner" sign --v4-signing-enabled false --ks "$KEYSTORE_FILE" --ks-pass "pass:$STORE_PASSWORD" --ks-key-alias "$KEY_ALIAS" --key-pass "pass:$KEY_PASSWORD" \
               --out "$2" "$RUNNER_TEMP/aligned.apk"
           }
           sign "$apk" dist/haneoka-android.apk

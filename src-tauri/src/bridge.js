@@ -125,8 +125,8 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watchTheme, { once: true });
   else watchTheme();
 
-  // Android draws the status and navigation bars: they take the app bar's colour.
-  if ("__PLATFORM__" === "android") {
+  // Phones draw the status and navigation bars: they take the app bar's colour.
+  if ("__PLATFORM__" === "android" || "__PLATFORM__" === "ios") {
     let reported = "";
     const bars = () => {
       const bar = document.querySelector(".top-app-bar") || document.body;

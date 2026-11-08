@@ -10,8 +10,11 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
+import android.view.View
+import android.view.ViewGroup
 import android.webkit.WebView
 import androidx.activity.result.ActivityResult
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -90,10 +93,23 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
         }
     }
 
+    private var container: View? = null
+    @Volatile private var fullscreenActive = false
+
     override fun load(webView: WebView) {
         Shizuku.addRequestPermissionResultListener(permissionListener)
-        // The page draws its own bars' colours; content stays clear of them.
-        WindowCompat.setDecorFitsSystemWindows(activity.window, true)
+        // Android 15 draws every app edge to edge: the page sits inside the
+        // system bars and display cutout, which show the page's bar colour.
+        val root = (webView.parent as? ViewGroup) ?: webView
+        container = root
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+            if (fullscreenActive) view.setPadding(0, 0, 0, 0)
+            else view.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, ime.bottom))
+            WindowInsetsCompat.CONSUMED
+        }
+        root.post { ViewCompat.requestApplyInsets(root) }
     }
 
     private fun background(invoke: Invoke, work: () -> JSObject) {
@@ -218,10 +234,14 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
             val window = activity.window
             val color = runCatching { Color.parseColor(args.color) }.getOrNull()
             if (color != null) {
-                @Suppress("DEPRECATION")
-                window.statusBarColor = color
-                @Suppress("DEPRECATION")
-                window.navigationBarColor = color
+                container?.setBackgroundColor(color)
+                window.decorView.setBackgroundColor(color)
+                if (Build.VERSION.SDK_INT < 35) {
+                    @Suppress("DEPRECATION")
+                    window.statusBarColor = color
+                    @Suppress("DEPRECATION")
+                    window.navigationBarColor = color
+                }
             }
             val controller = WindowCompat.getInsetsController(window, window.decorView)
             controller.isAppearanceLightStatusBars = !args.dark
@@ -236,7 +256,8 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
         activity.runOnUiThread {
             val window = activity.window
             val controller = WindowCompat.getInsetsController(window, window.decorView)
-            WindowCompat.setDecorFitsSystemWindows(window, !args.active)
+            fullscreenActive = args.active
+            container?.let { ViewCompat.requestApplyInsets(it) }
             if (args.active) {
                 controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                 controller.hide(WindowInsetsCompat.Type.systemBars())
