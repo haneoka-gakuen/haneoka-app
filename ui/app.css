@@ -1285,3 +1285,26 @@ dialog h2 {
     height: 64px;
   }
 }
+
+.snackbar:has(button) {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.snackbar > .button {
+  flex: none;
+  color: var(--md-sys-color-inverse-primary, var(--md-sys-color-inverse-on-surface));
+}
+[data-history-help-dialog] li + li {
+  margin-block-start: 8px;
+}
+
+[data-history-help-dialog][open] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dialog__body {
+  min-height: 0;
+  overflow: auto;
+}

@@ -13,12 +13,15 @@
     <script type="module">
       import { call, setup, t, icon, escape, bar, date, emblem, openSite, sunny } from "./app.js";
 
+      import { historyHelpButton, installHistoryHelp } from "./history-help.js";
+
       await setup();
+      installHistoryHelp();
       document.title = t("accountTitle");
       document.getElementById("bar").innerHTML = bar({
         title: t("accountTitle"),
         back: "#back",
-        actions: `<a class="icon-button" href="index.html?choose" aria-label="${escape(t("chooseSite"))}">${icon("public")}</a>
+        actions: `${historyHelpButton()}<a class="icon-button" href="index.html?choose" aria-label="${escape(t("chooseSite"))}">${icon("public")}</a>
           <a class="icon-button" href="import.html" aria-label="${escape(t("importMore"))}">${icon("add")}</a>`,
       });
       document.querySelector('[href="#back"]').addEventListener("click", (event) => {

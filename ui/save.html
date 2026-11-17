@@ -12,9 +12,12 @@
     <main class="page" id="page"><div class="progress"></div></main>
     <dialog id="dialog"></dialog>
     <script type="module">
-      import { call, setup, t, icon, escape, bar, number, date, snackbar, failure, emblem, site, openSite, locale, sunny } from "./app.js";
+      import { call, setup, t, icon, escape, bar, number, date, snackbar, emblem, site, openSite, locale, sunny } from "./app.js";
+
+      import { historyHelpButton, installHistoryHelp, showReadingFailure } from "./history-help.js";
 
       await setup();
+      installHistoryHelp();
       const key = new URLSearchParams(location.search).get("key");
       let detail = await call("saveDetail", { key }).catch(() => null);
       if (!detail) {
@@ -313,7 +316,7 @@
         document.getElementById("bar").innerHTML = bar({
           title: a.name || a.profileId,
           back: "saves.html",
-          actions: `<button class="icon-button icon-button--tonal" type="button" data-action="team" aria-label="${escape(t("importToTeamBuilder"))}" ${busy ? "disabled" : ""}>${icon("groups")}</button>
+          actions: `${historyHelpButton()}<button class="icon-button icon-button--tonal" type="button" data-action="team" aria-label="${escape(t("importToTeamBuilder"))}" ${busy ? "disabled" : ""}>${icon("groups")}</button>
             ${a.canRefresh ? `<button class="icon-button" type="button" data-action="sync" aria-label="${escape(t("syncFromGame"))}" ${busy ? "disabled" : ""}>${icon("cloud_sync")}</button>` : ""}
             <a class="icon-button" href="import.html?update=${encodeURIComponent(key)}" aria-label="${escape(t("updateSave"))}">${icon("refresh")}</a>`,
         });
@@ -388,7 +391,7 @@
         try {
           await work();
         } catch (error) {
-          snackbar(failure(error));
+          showReadingFailure(error);
         } finally {
           busy = false;
           render();

@@ -2,7 +2,9 @@
 // icons, snackbars and links into the website.
 import strings from "./strings.js";
 
-export const call = (method, args = {}) => window.__TAURI_INTERNALS__.invoke("bridge", { method, args });
+export const call = (method, args = {}) => window.__TAURI_INTERNALS__
+  ? window.__TAURI_INTERNALS__.invoke("bridge", { method, args })
+  : Promise.reject(new Error("app_unavailable"));
 
 const LOCALES = ["en", "ja", "ko", "zh-CN", "zh-TW"];
 const fromTag = (tag) => {
@@ -34,7 +36,7 @@ export const escape = (value) =>
   String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 let snackbarTimer = 0;
-export function snackbar(message) {
+export function snackbar(message, options = {}) {
   let element = document.querySelector(".snackbar");
   if (!element) {
     element = document.createElement("div");
@@ -42,10 +44,18 @@ export function snackbar(message) {
     element.setAttribute("role", "status");
     document.body.append(element);
   }
-  element.textContent = message;
+  element.replaceChildren(document.createTextNode(message));
+  if (options.action) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "button button--text";
+    button.textContent = options.action.label;
+    button.addEventListener("click", () => { element.hidden = true; options.action.run(); });
+    element.append(button);
+  }
   element.hidden = false;
   clearTimeout(snackbarTimer);
-  snackbarTimer = setTimeout(() => (element.hidden = true), 4000);
+  snackbarTimer = setTimeout(() => (element.hidden = true), options.action ? 8000 : 4000);
 }
 
 /** The site the reader chose; the first site until they choose. */
@@ -100,11 +110,16 @@ export function bar({ title, back, actions = "" }) {
 /** Reasons the bridge gives, as the reader reads them. */
 export function failure(error) {
   const code = String(error?.message ?? error ?? "");
-  if (code.includes("history_session_expired") || code.includes("no_session") || code.includes("history_missing_session")) return t("syncSessionExpired");
-  if (code.includes("player_data_unrecognized") || code.includes("history_response_invalid")) return t("syncUnrecognized");
+  if (code.includes("history_missing_session") || code.includes("no_session")) return t("errorMissingSession");
+  if (code.includes("history_session_expired")) return t("errorSessionExpired");
+  if (code.includes("history_response_invalid")) return t("errorResponseInvalid");
+  if (code.includes("history_network_error")) return t("errorNetwork");
+  if (code.includes("history_service_unavailable")) return t("errorServiceUnavailable");
+  if (code.includes("history_version_unavailable")) return t("errorVersionUnavailable");
+  if (code.includes("player_data_unrecognized")) return t("syncUnrecognized");
   if (code.includes("backup_password")) return t("wrongPassword");
   if (code.includes("adb_missing")) return t("adbMissing");
-  if (code.includes("history_")) return t("syncFailed");
+  if (code.includes("history_")) return t("errorGameReadFailed");
   return t("readFailed");
 }
 

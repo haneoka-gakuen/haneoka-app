@@ -11,9 +11,12 @@
     <div id="bar"></div>
     <main class="page" id="page"></main>
     <script type="module">
-      import { call, setup, t, icon, escape, bar, snackbar, failure, RELEASES, date, info } from "./app.js";
+      import { call, setup, t, icon, escape, bar, snackbar, RELEASES, date, info } from "./app.js";
+
+      import { historyHelpButton, installHistoryHelp, showReadingFailure } from "./history-help.js";
 
       await setup();
+      installHistoryHelp();
       const query = new URLSearchParams(location.search);
       const updating = query.get("update");
       const updatingName = updating
@@ -22,7 +25,7 @@
             .catch(() => "")
         : "";
       document.title = t("importTitle");
-      document.getElementById("bar").innerHTML = bar({ title: t("importTitle"), back: updating ? `save.html?key=${encodeURIComponent(updating)}` : "saves.html" });
+      document.getElementById("bar").innerHTML = bar({ title: t("importTitle"), back: updating ? `save.html?key=${encodeURIComponent(updating)}` : "saves.html", actions: historyHelpButton() });
 
       const { sources } = await call("saveSources").catch(() => ({ sources: ["files"] }));
       const status = sources.includes("shizuku") ? await call("deviceStatus").catch(() => null) : null;
@@ -211,7 +214,7 @@
         try {
           await work();
         } catch (error) {
-          snackbar(failure(error));
+          showReadingFailure(error);
         } finally {
           busy = false;
           render();
