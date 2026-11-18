@@ -181,6 +181,33 @@ pub fn account_entry(save: &GameSave) -> Value {
     })
 }
 
+pub fn player_summary(save: &GameSave) -> Value {
+    let player = save.player();
+    let int = |key| player.and_then(|row| row.get(key)).and_then(integer);
+    let mut clears = Map::new();
+    for difficulty in ["easy", "normal", "hard", "expert"] {
+        let key = format!("_{difficulty}ClearedStatus");
+        let mut counts = [0; 3];
+        for row in save.rows("_liveMusicResults") {
+            let status = row.get(&key).and_then(integer).unwrap_or(0);
+            for (count, threshold) in counts.iter_mut().zip([10, 20, 30]) {
+                *count += usize::from(status >= threshold);
+            }
+        }
+        clears.insert(difficulty.to_owned(), json!(counts));
+    }
+    json!({
+        "rank": save.player_rank(),
+        "exp": int("_exp"),
+        "rating": save.rows("_topHighScoreRatings").iter().filter_map(|row| row.get("_highScoreRating").and_then(integer)).fold(0i64, i64::saturating_add),
+        "members": save.rows("_memberCards").len(),
+        "snapshots": save.rows("_supportCards").len(),
+        "favoriteMemberCardId": int("_favoriteMemberCardId").or_else(|| int("_lastLiveDeckLeaderMemberCardId")),
+        "startedAt": int("_tutorialFinishedAtUnixSeconds").filter(|time| *time > 0),
+        "clears": clears,
+    })
+}
+
 /// Everything a save's page shows, without identity: the player document,
 /// the settings beside it and the latest-live document.
 pub fn detail(save: &GameSave) -> Value {
@@ -188,6 +215,7 @@ pub fn detail(save: &GameSave) -> Value {
     let settings: Map<String, Value> = cache.iter().filter(|(k, _)| *k != "_player").map(|(k, v)| (k.clone(), v.clone())).collect();
     json!({
         "account": account_entry(save),
+        "summary": player_summary(save),
         "release": save.release.map(|r| r.package_id()),
         "player": cache.get("_player").map(without_identity).unwrap_or(Value::Null),
         "settings": without_identity(&Value::Object(settings)),

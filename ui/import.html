@@ -11,7 +11,7 @@
     <div id="bar"></div>
     <main class="page" id="page"></main>
     <script type="module">
-      import { call, setup, t, icon, escape, bar, snackbar, RELEASES, date, info, returnToSavePage } from "./app.js";
+      import { call, setup, t, icon, escape, bar, snackbar, RELEASES, date, info, returnToSavePage, site, locale } from "./app.js";
 
       import { historyHelpButton, installHistoryHelp, showReadingFailure } from "./history-help.js";
 
@@ -20,7 +20,8 @@
       const query = new URLSearchParams(location.search);
       const updating = query.get("update");
       const from = query.get("from");
-      const back = updating ? `save.html?key=${encodeURIComponent(updating)}` : "saves.html";
+      const list = from === "account" ? `${site()}/${locale}/account/?section=games` : "saves.html";
+      const back = updating ? `save.html?key=${encodeURIComponent(updating)}` : list;
       const updatingName = updating
         ? await call("saveDetail", { key: updating })
             .then(({ account }) => `${account.name || account.profileId} / ${account.profileId}`)
@@ -31,7 +32,7 @@
       header.innerHTML = bar({ title: t("importTitle"), back, actions: historyHelpButton() });
       header.querySelector("a").addEventListener("click", (event) => {
         event.preventDefault();
-        returnToSavePage(back, from === (updating ? "save" : "saves"));
+        returnToSavePage(back, updating ? from === "save" : from === "saves" || from === "account");
       });
 
       const { sources } = await call("saveSources").catch(() => ({ sources: ["files"] }));
@@ -238,8 +239,8 @@
         snackbar(t("foundAccounts", { count: result.keys.length }));
         const key = updating && result.keys.includes(updating) ? updating : result.keys.length === 1 ? result.keys[0] : null;
         if (key && key === updating) return returnToSavePage(back, from === "save");
-        if (!key) return returnToSavePage("saves.html", from === "saves");
-        const parent = from === "saves" ? "&from=saves" : "";
+        if (!key) return returnToSavePage(list, from === "saves" || from === "account");
+        const parent = from === "saves" || from === "account" ? `&from=${from}` : "";
         location.replace(`save.html?key=${encodeURIComponent(key)}${parent}`);
       };
 

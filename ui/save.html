@@ -20,9 +20,10 @@
       installHistoryHelp();
       const query = new URLSearchParams(location.search);
       const key = query.get("key");
-      const fromSaves = query.get("from") === "saves";
+      const from = query.get("from");
+      const backUrl = from === "account" ? `${site()}/${locale}/account/?section=games` : "saves.html";
       const updateUrl = `import.html?update=${encodeURIComponent(key)}&amp;from=save`;
-      const back = () => returnToSavePage("saves.html", fromSaves);
+      const back = () => returnToSavePage(backUrl, from === "saves" || from === "account");
       let detail = await call("saveDetail", { key }).catch(() => null);
       if (!detail) {
         back();
@@ -265,23 +266,7 @@
         </section>`;
       };
 
-      /** The public numbers a linked player shows; never the save itself. */
-      const summary = () => {
-        const p = player();
-        const results = rows("_liveMusicResults");
-        const count = (difficulty, threshold) => results.filter((row) => (int(row[`_${difficulty}ClearedStatus`]) ?? 0) >= threshold).length;
-        const started = int(p._tutorialFinishedAtUnixSeconds);
-        return {
-          rank: detail.account.rank ?? null,
-          exp: int(p._exp),
-          rating: rows("_topHighScoreRatings").reduce((sum, row) => sum + (int(row._highScoreRating) ?? 0), 0),
-          members: rows("_memberCards").length,
-          snapshots: rows("_supportCards").length,
-          favoriteMemberCardId: int(p._favoriteMemberCardId ?? p._lastLiveDeckLeaderMemberCardId),
-          startedAt: started && started > 0 ? started : null,
-          clears: Object.fromEntries(["easy", "normal", "hard", "expert"].map((d) => [d, [count(d, 10), count(d, 20), count(d, 30)]])),
-        };
-      };
+      const summary = () => detail.summary;
 
       const linkPanel = () => {
         const explain = `<p class="muted link__explain">${escape(t("linkExplain"))}</p>`;
@@ -321,9 +306,8 @@
         const vip = int(p._vip?._rank);
         document.getElementById("bar").innerHTML = bar({
           title: a.name || a.profileId,
-          back: "saves.html",
-          actions: `${historyHelpButton()}<button class="icon-button icon-button--tonal" type="button" data-action="team" aria-label="${escape(t("importToTeamBuilder"))}" ${busy ? "disabled" : ""}>${icon("groups")}</button>
-            ${a.canRefresh ? `<button class="icon-button" type="button" data-action="sync" aria-label="${escape(t("syncFromGame"))}" ${busy ? "disabled" : ""}>${icon("cloud_sync")}</button>` : ""}
+          back: backUrl,
+          actions: `${historyHelpButton()}
             <a class="icon-button" href="${updateUrl}" aria-label="${escape(t("updateSave"))}">${icon("refresh")}</a>`,
         });
         document.title = a.name || a.profileId;
@@ -339,14 +323,15 @@
               ${a.savedAt ? `<span class="muted">${escape(t("savedOn", { time: date(a.savedAt, true) }))}</span>` : ""}
             </div>
           </section>
-          <div class="cluster">
-            ${a.canRefresh ? `<button class="button button--tonal" type="button" data-action="history" ${busy ? "disabled" : ""}>${icon("history")}${escape(t("readHistory"))}</button>` : ""}
-            <button class="button button--filled" type="button" data-action="team" ${busy ? "disabled" : ""}>${icon("groups")}${escape(t("importToTeamBuilder"))}</button>
-            <button class="button button--tonal" type="button" data-action="songs" ${busy ? "disabled" : ""}>${icon("checklist")}${escape(t("songProgress"))}</button>
-            ${a.canRefresh ? `<button class="button button--tonal" type="button" data-action="sync" ${busy ? "disabled" : ""}>${icon("cloud_sync")}${escape(t("syncFromGame"))}</button>` : ""}
-            <a class="button button--outlined" href="${updateUrl}">${icon("refresh")}${escape(t("updateSave"))}</a>
-          </div>
-          <p class="muted hint">${escape(t("importToTeamHint"))}</p>
+          <ul class="list surface">
+            ${[["team", "groups", "importToTeamBuilder"], ["songs", "checklist", "songProgress"],
+                ...(a.canRefresh ? [["history", "history", "readHistory"]] : [])].map(([action, glyph, label]) => `
+              <li><button class="row" type="button" data-action="${action}" ${busy ? "disabled" : ""}>
+                <span class="row__lead">${icon(glyph)}</span>
+                <span class="row__text"><span class="row__title">${escape(t(label))}</span></span>
+                <span class="row__trail">${icon("chevron_right")}</span>
+              </button></li>`).join("")}
+          </ul>
           <div class="stats">
             <div class="stat">${icon("trending_up")}<div><span>${escape(t("playerExp"))}</span><strong>${number(int(p._exp))}</strong></div></div>
             <div class="stat">${icon("military_tech")}<div><span>${escape(t("highScoreRating"))}</span><strong>${number(rating)}</strong></div></div>
@@ -369,9 +354,10 @@
             ${linkPanel()}
           </section>
           <details class="fold" data-fold="exports" ${folds.has("exports") ? "open" : ""}>
-            <summary>${escape(t("exportsTitle"))}${icon("expand_more")}</summary>
+            <summary>${escape(t("manageSave"))}${icon("expand_more")}</summary>
             <div class="fold__body">
               <div class="exports">
+                ${a.canRefresh ? `<button class="export" type="button" data-action="sync" ${busy ? "disabled" : ""}>${icon("cloud_sync")}<span class="grow"><strong>${escape(t("syncFromGame"))}</strong></span>${icon("chevron_right")}</button>` : ""}
                 <button class="export" type="button" data-action="copy-package">${icon("content_copy")}<span class="grow"><strong>${escape(t("exportTeam"))}</strong><span>${escape(t("exportTeamHint"))}</span></span>${icon("chevron_right")}</button>
                 <button class="export" type="button" data-action="export">${icon("download")}<span class="grow"><strong>${escape(t("exportSave"))}</strong><span>${escape(t("exportSaveHint"))}</span></span>${icon("chevron_right")}</button>
               </div>
@@ -510,7 +496,7 @@
         });
       });
       document.getElementById("bar").addEventListener("click", (event) => {
-        if (!event.target.closest('a[href="saves.html"]')) return;
+        if (event.target.closest("a")?.getAttribute("href") !== backUrl) return;
         event.preventDefault();
         back();
       });

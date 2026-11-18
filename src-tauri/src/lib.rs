@@ -5,6 +5,7 @@ mod bridge;
 mod platform;
 mod session;
 mod sign_in;
+mod save_import;
 mod site;
 mod update;
 
@@ -28,6 +29,7 @@ pub struct AppState {
     pub watch: site::Watch,
     /// What the app's own pages hand to a website page, taken once there.
     pub pending: Mutex<Pending>,
+    pub save_import_reads: tokio::sync::Mutex<()>,
     /// The web view's loopback route and its port; `None` when it could not start.
     pub route: haneoka_core::direct::Router,
     pub route_port: Option<u16>,
@@ -335,6 +337,7 @@ pub fn run() {
                 sign_in: sign_in::Waiter::default(),
                 watch: site::Watch::default(),
                 pending: Mutex::new(Pending::default()),
+                save_import_reads: tokio::sync::Mutex::new(()),
                 #[cfg(desktop)]
                 resources: paths.resource_dir().ok(),
             });

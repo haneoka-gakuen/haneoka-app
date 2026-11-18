@@ -614,6 +614,42 @@ fn ids(rows: Option<&Value>) -> std::collections::HashSet<String> {
         .unwrap_or_default()
 }
 
+/// GetPlayerDataResponse.playerData (1) → PlayerData.playerMissionData (24)
+/// → PlayerMissionData.missionCounters (1).
+pub async fn read_mission_counters(save: &GameSave, proxy: Option<&Proxy>) -> Result<Vec<Value>, GameError> {
+    let (Some(session), Some(region)) = (session(save), Region::of(save)) else {
+        return Err(GameError("no_session"));
+    };
+    let (bytes, _) = authenticated(&session, region, "app.player.PlayerService/GetPlayerData", proxy).await?;
+    let mut counters = Vec::new();
+    let mut response = Reader::new(&bytes);
+    while let Some((field, value)) = response.next()? {
+        let (1, Field::Bytes(player)) = (field, value) else { continue };
+        let mut player = Reader::new(player);
+        while let Some((field, value)) = player.next()? {
+            let (24, Field::Bytes(missions)) = (field, value) else { continue };
+            let mut missions = Reader::new(missions);
+            while let Some((field, value)) = missions.next()? {
+                let (1, Field::Bytes(counter)) = (field, value) else { continue };
+                let mut values = [0; 4];
+                let mut counter = Reader::new(counter);
+                while let Some((field, value)) = counter.next()? {
+                    if let (1..=4, Field::Varint(value)) = (field, value) {
+                        values[field as usize - 1] = value;
+                    }
+                }
+                let [kind, song, difficulty, count] = values;
+                if matches!(kind, 76 | 77 | 78 | 81 | 102 | 108 | 137 | 144 | 145 | 146)
+                    && count <= i64::MAX as u64
+                {
+                    counters.push(json!({ "missionType": kind, "param1": song, "param2": difficulty, "progress": count.to_string() }));
+                }
+            }
+        }
+    }
+    Ok(counters)
+}
+
 /// The save with its card, character and band item lists replaced by the
 /// game server's current ones. A response missing cards the save already has
 /// is refused: cards are never lost in the game.

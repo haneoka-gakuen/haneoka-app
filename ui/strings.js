@@ -1,6 +1,7 @@
 // Generated from the Flutter app's catalogues (lib/l10n) and the website's; five locales.
 export default{
  "en": {
+  "manageSave": "Manage save",
   "checkAppUpdate": "Check for updates",
   "appUpToDate": "You’re up to date",
   "appCheckingUpdate": "Checking for updates",
@@ -171,6 +172,7 @@ export default{
   "close": "Close"
  },
  "ja": {
+  "manageSave": "セーブの管理",
   "checkAppUpdate": "アップデートを確認",
   "appUpToDate": "最新版です",
   "appCheckingUpdate": "アップデートを確認中",
@@ -341,6 +343,7 @@ export default{
   "close": "閉じる"
  },
  "ko": {
+  "manageSave": "저장 데이터 관리",
   "checkAppUpdate": "업데이트 확인",
   "appUpToDate": "최신 버전입니다",
   "appCheckingUpdate": "업데이트 확인 중",
@@ -511,6 +514,7 @@ export default{
   "close": "닫기"
  },
  "zh-CN": {
+  "manageSave": "管理存档",
   "checkAppUpdate": "检查更新",
   "appUpToDate": "已是最新版本",
   "appCheckingUpdate": "正在检查更新",
@@ -681,6 +685,7 @@ export default{
   "close": "关闭"
  },
  "zh-TW": {
+  "manageSave": "管理存檔",
   "checkAppUpdate": "檢查更新",
   "appUpToDate": "已是最新版本",
   "appCheckingUpdate": "正在檢查更新",

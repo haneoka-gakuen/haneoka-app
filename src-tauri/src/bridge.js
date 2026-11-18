@@ -17,17 +17,18 @@
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready, { once: true });
   else ready();
+  addEventListener("pageshow", (event) => { if (event.persisted) ready(); });
 
   // The app's own pages: a save's page and save reading, bundled with the app.
   const localBase = "__LOCAL__";
   const local = {
-    openGameAccount: (args) => `save.html?key=${encodeURIComponent(args?.key ?? "")}`,
-    addGameAccount: () => "import.html",
+    openGameAccount: (args) => `save.html?key=${encodeURIComponent(args?.key ?? "")}${args?.fromAccount ? "&from=account" : ""}`,
+    addGameAccount: (args) => args?.fromAccount ? "import.html?from=account" : "import.html",
   };
   window.haneokaApp = Object.freeze({
     version: "__VERSION__",
     platform: "__PLATFORM__",
-    capabilities: Object.freeze(["accountKeysV1", "saveSnapshotV1", "songProgressCountsV1", "appUpdateV1"]),
+    capabilities: Object.freeze(["accountKeysV1", "saveSnapshotV1", "songProgressCountsV1", "appUpdateV1", "saveAutomationV1"]),
     call(method, args) {
       if (local[method]) {
         location.assign(localBase + local[method](args));
