@@ -1,6 +1,7 @@
 // Generated from the Flutter app's catalogues (lib/l10n) and the website's; five locales.
 export default{
  "en": {
+  "shizukuPermission": "Allow access in Shizuku, then try again.",
   "manageSave": "Manage save",
   "checkAppUpdate": "Check for updates",
   "appUpToDate": "You’re up to date",
@@ -172,6 +173,7 @@ export default{
   "close": "Close"
  },
  "ja": {
+  "shizukuPermission": "Shizuku でアクセスを許可してから、もう一度お試しください。",
   "manageSave": "セーブの管理",
   "checkAppUpdate": "アップデートを確認",
   "appUpToDate": "最新版です",
@@ -343,6 +345,7 @@ export default{
   "close": "閉じる"
  },
  "ko": {
+  "shizukuPermission": "Shizuku에서 접근을 허용한 뒤 다시 시도해 주세요.",
   "manageSave": "저장 데이터 관리",
   "checkAppUpdate": "업데이트 확인",
   "appUpToDate": "최신 버전입니다",
@@ -514,6 +517,7 @@ export default{
   "close": "닫기"
  },
  "zh-CN": {
+  "shizukuPermission": "请在 Shizuku 中授权后重试。",
   "manageSave": "管理存档",
   "checkAppUpdate": "检查更新",
   "appUpToDate": "已是最新版本",
@@ -685,6 +689,7 @@ export default{
   "close": "关闭"
  },
  "zh-TW": {
+  "shizukuPermission": "請在 Shizuku 中授權後重試。",
   "manageSave": "管理存檔",
   "checkAppUpdate": "檢查更新",
   "appUpToDate": "已是最新版本",

@@ -270,7 +270,13 @@
                 await call("openShizuku");
                 return;
               }
-              if (current === "needsPermission") current = (await call("shizukuRequest")).granted ? "ready" : current;
+              if (current === "needsPermission") {
+                if (!(await call("shizukuRequest")).granted) {
+                  snackbar(t("shizukuPermission"));
+                  return;
+                }
+                current = "ready";
+              }
               if (current === "ready") done(await call("shizukuRead"));
             });
           case "grant":

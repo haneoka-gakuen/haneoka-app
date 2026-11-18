@@ -7,6 +7,8 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
@@ -104,13 +106,22 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
     private val timeouts = Executors.newSingleThreadScheduledExecutor()
     private val imports = File(activity.cacheDir, "save-imports").apply { mkdirs() }
     private val batches = mutableMapOf<String, File>()
-    private var pendingPermission: Invoke? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var permissionRequest = SHIZUKU_REQUEST
+    private var pendingPermission: Pair<Int, Invoke>? = null
+    private val permissionTimeout = Runnable { finishPermission(shizukuStatusText() == "ready") }
     private val permissionListener = Shizuku.OnRequestPermissionResultListener { code, result ->
-        if (code == SHIZUKU_REQUEST) {
-            val pending = pendingPermission
-            pendingPermission = null
-            pending?.resolve(JSObject().put("granted", result == PackageManager.PERMISSION_GRANTED))
+        activity.runOnUiThread {
+            if (code == pendingPermission?.first)
+                finishPermission(result == PackageManager.PERMISSION_GRANTED)
         }
+    }
+
+    private fun finishPermission(granted: Boolean) {
+        val pending = pendingPermission
+        pendingPermission = null
+        mainHandler.removeCallbacks(permissionTimeout)
+        pending?.second?.resolve(JSObject().put("granted", granted))
     }
 
     private var container: View? = null
@@ -164,21 +175,26 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun shizukuRequest(invoke: Invoke) {
-        val status = shizukuStatusText()
-        if (status != "needsPermission") {
-            invoke.resolve(JSObject().put("granted", status == "ready"))
-            return
-        }
-        if (pendingPermission != null) {
-            invoke.reject("Permission request already open")
-            return
-        }
-        pendingPermission = invoke
-        try {
-            Shizuku.requestPermission(SHIZUKU_REQUEST)
-        } catch (error: Exception) {
-            pendingPermission = null
-            invoke.reject(error.message ?: "shizuku")
+        activity.runOnUiThread {
+            val status = shizukuStatusText()
+            if (status != "needsPermission") {
+                invoke.resolve(JSObject().put("granted", status == "ready"))
+                return@runOnUiThread
+            }
+            if (pendingPermission != null) {
+                invoke.reject("Permission request already open")
+                return@runOnUiThread
+            }
+            val code = permissionRequest++
+            pendingPermission = code to invoke
+            mainHandler.postDelayed(permissionTimeout, 20_000)
+            try {
+                Shizuku.requestPermission(code)
+            } catch (error: Exception) {
+                pendingPermission = null
+                mainHandler.removeCallbacks(permissionTimeout)
+                invoke.reject(error.message ?: "shizuku")
+            }
         }
     }
 
