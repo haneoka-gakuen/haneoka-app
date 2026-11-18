@@ -118,7 +118,7 @@ jobs:
           mkdir dist
           bundle=target/release/bundle
           [[ -n "${{ matrix.target }}" ]] && bundle=target/${{ matrix.target }}/release/bundle
-          name=haneoka-${{ matrix.name }}
+          name=haneoka-${{ needs.version.outputs.version }}-${{ matrix.name }}
           shopt -s nullglob
           copy() { cp "$1" "dist/$2"; [[ -f "$1.sig" ]] && cp "$1.sig" "dist/$2.sig"; true; }
           for file in $bundle/deb/*.deb; do copy "$file" "$name.deb"; done
@@ -141,7 +141,7 @@ jobs:
           ls dist/*.sig > /dev/null
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.name }}
+          name: ${{ matrix.name }}-${{ needs.version.outputs.version }}
           path: dist/*
 
   android:
@@ -216,14 +216,15 @@ jobs:
             "$tools/apksigner" sign --v4-signing-enabled false --ks "$KEYSTORE_FILE" --ks-pass "pass:$STORE_PASSWORD" --ks-key-alias "$KEY_ALIAS" --key-pass "pass:$KEY_PASSWORD" \
               --out "$2" "$RUNNER_TEMP/aligned.apk"
           }
-          sign "$apk" dist/haneoka-android.apk
-          sign "$RUNNER_TEMP/arm64/haneoka.apk" dist/haneoka-android-arm64-v8a.apk
-          cp "$aab" dist/haneoka-android.aab
-          jarsigner -keystore "$KEYSTORE_FILE" -storepass "$STORE_PASSWORD" -keypass "$KEY_PASSWORD" dist/haneoka-android.aab "$KEY_ALIAS"
-          "$tools/apksigner" verify --print-certs dist/haneoka-android.apk | head -3
+          name=haneoka-${{ needs.version.outputs.version }}-android
+          sign "$apk" "dist/$name.apk"
+          sign "$RUNNER_TEMP/arm64/haneoka.apk" "dist/$name-arm64-v8a.apk"
+          cp "$aab" "dist/$name.aab"
+          jarsigner -keystore "$KEYSTORE_FILE" -storepass "$STORE_PASSWORD" -keypass "$KEY_PASSWORD" "dist/$name.aab" "$KEY_ALIAS"
+          "$tools/apksigner" verify --print-certs "dist/$name.apk" | head -3
       - uses: actions/upload-artifact@v4
         with:
-          name: android
+          name: android-${{ needs.version.outputs.version }}
           path: dist/*
 
   ios:
@@ -275,13 +276,14 @@ jobs:
           ditto "$app" "build/ios/standard/Payload/$(basename "$app")"
           codesign --force --sign - --timestamp=none "build/ios/standard/Payload/$(basename "$app")"
           ditto "build/ios/standard/Payload/$(basename "$app")" "build/ios/trollstore/Payload/$(basename "$app")"
-          (cd build/ios/standard && zip -qry "$GITHUB_WORKSPACE/dist/haneoka-ios-unsigned.ipa" Payload)
+          name=haneoka-${{ needs.version.outputs.version }}-ios
+          (cd build/ios/standard && zip -qry "$GITHUB_WORKSPACE/dist/$name-unsigned.ipa" Payload)
           binary=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "build/ios/trollstore/Payload/$(basename "$app")/Info.plist")
           ldid -Spackaging/ios-trollstore.entitlements "build/ios/trollstore/Payload/$(basename "$app")/$binary"
-          (cd build/ios/trollstore && zip -qry "$GITHUB_WORKSPACE/dist/haneoka-ios-trollstore.tipa" Payload)
+          (cd build/ios/trollstore && zip -qry "$GITHUB_WORKSPACE/dist/$name-trollstore.tipa" Payload)
       - uses: actions/upload-artifact@v4
         with:
-          name: ios
+          name: ios-${{ needs.version.outputs.version }}
           path: dist/*
 
   publish:
