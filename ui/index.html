@@ -26,11 +26,18 @@
               <span class="row__trail" id="saves-trail"></span>
             </a>
           </li>
+          <li>
+            <button class="row" type="button" id="check-update">
+              <span class="row__lead" id="update-icon"></span>
+              <span class="row__text"><span class="row__title" id="update-label"></span></span>
+              <span class="row__trail" id="update-version"></span>
+            </button>
+          </li>
         </ul>
       </div>
     </main>
     <script type="module">
-      import { call, info, setup, t, icon, escape } from "./app.js";
+      import { call, info, setup, t, icon, escape, snackbar } from "./app.js";
 
       const query = new URLSearchParams(location.search);
       const failed = query.get("failed");
@@ -173,6 +180,19 @@
       });
 
       await setup();
+      const updateButton = document.getElementById("check-update");
+      document.getElementById("update-icon").innerHTML = icon("download");
+      document.getElementById("update-label").textContent = t("checkAppUpdate");
+      document.getElementById("update-version").textContent = info.version ? `v${info.version}` : "";
+      updateButton.addEventListener("click", async () => {
+        updateButton.disabled = true;
+        updateButton.setAttribute("aria-busy", "true");
+        const status = await call("checkAppUpdate").catch(() => "unavailable");
+        const message = { current: "appUpToDate", busy: "appCheckingUpdate", unavailable: "appUpdateUnavailable", install_failed: "appInstallFailed" }[status];
+        if (message) snackbar(t(message));
+        updateButton.disabled = false;
+        updateButton.removeAttribute("aria-busy");
+      });
       route = await call("siteRoute").catch(() => route);
       const page = await call("pendingPage").catch(() => null);
       if (page) location.replace(page);

@@ -177,6 +177,11 @@ fn player_link(players: Option<Vec<Value>>, save: &GameSave) -> Value {
 async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &Value) -> Result<Value> {
     let window = window.clone();
     match method {
+        "checkAppUpdate" => {
+            let origin = crate::current_origin(app);
+            let locale = state(app).preference("locale");
+            Ok(json!(crate::update::check_now(app, &origin, locale.as_str().unwrap_or("en")).await))
+        }
         "gameAccounts" => Ok(Value::Array(state(app).accounts.saves().iter().map(export::account_entry).collect())),
         "saveSnapshot" => {
             let save = state(app).accounts.find(text(args, "key").unwrap_or_default()).ok_or("save_not_found")?;
@@ -244,6 +249,7 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
             Ok(json!({
                 "origins": crate::ORIGINS,
                 "chosen": state.remembered_origin(),
+                "version": env!("CARGO_PKG_VERSION"),
                 "locale": state.preference("locale"),
                 "theme": state.preference("theme"),
                 "version": env!("CARGO_PKG_VERSION"),

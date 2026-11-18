@@ -1,6 +1,11 @@
 // Generated from the Flutter app's catalogues (lib/l10n) and the website's; five locales.
 export default{
  "en": {
+  "checkAppUpdate": "Check for updates",
+  "appUpToDate": "You’re up to date",
+  "appCheckingUpdate": "Checking for updates",
+  "appUpdateUnavailable": "Could not check for updates",
+  "appInstallFailed": "Could not install the update",
   "importTitle": "Add game account",
   "sourceShizuku": "This phone (Shizuku)",
   "sourceGrantFolder": "This phone (game folder)",
@@ -166,6 +171,11 @@ export default{
   "close": "Close"
  },
  "ja": {
+  "checkAppUpdate": "アップデートを確認",
+  "appUpToDate": "最新版です",
+  "appCheckingUpdate": "アップデートを確認中",
+  "appUpdateUnavailable": "アップデートを確認できませんでした",
+  "appInstallFailed": "アップデートをインストールできませんでした",
   "importTitle": "ゲームアカウントを追加",
   "sourceShizuku": "この端末（Shizuku）",
   "sourceGrantFolder": "この端末（ゲームフォルダ）",
@@ -331,6 +341,11 @@ export default{
   "close": "閉じる"
  },
  "ko": {
+  "checkAppUpdate": "업데이트 확인",
+  "appUpToDate": "최신 버전입니다",
+  "appCheckingUpdate": "업데이트 확인 중",
+  "appUpdateUnavailable": "업데이트를 확인하지 못했습니다",
+  "appInstallFailed": "업데이트를 설치하지 못했습니다",
   "importTitle": "게임 계정 추가",
   "sourceShizuku": "이 휴대폰(Shizuku)",
   "sourceGrantFolder": "이 휴대폰(게임 폴더)",
@@ -496,6 +511,11 @@ export default{
   "close": "닫기"
  },
  "zh-CN": {
+  "checkAppUpdate": "检查更新",
+  "appUpToDate": "已是最新版本",
+  "appCheckingUpdate": "正在检查更新",
+  "appUpdateUnavailable": "无法检查更新",
+  "appInstallFailed": "更新安装失败",
   "importTitle": "添加游戏账号",
   "sourceShizuku": "本机（Shizuku）",
   "sourceGrantFolder": "本机（游戏文件夹）",
@@ -661,6 +681,11 @@ export default{
   "close": "关闭"
  },
  "zh-TW": {
+  "checkAppUpdate": "檢查更新",
+  "appUpToDate": "已是最新版本",
+  "appCheckingUpdate": "正在檢查更新",
+  "appUpdateUnavailable": "無法檢查更新",
+  "appInstallFailed": "更新安裝失敗",
   "importTitle": "新增遊戲帳號",
   "sourceShizuku": "本機（Shizuku）",
   "sourceGrantFolder": "本機（遊戲資料夾）",

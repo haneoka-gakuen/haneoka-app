@@ -10,6 +10,7 @@ use tauri_plugin_opener::OpenerExt;
 use crate::ORIGINS;
 
 static CHECKED: AtomicBool = AtomicBool::new(false);
+static UPDATE_CHECK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[cfg_attr(not(desktop), allow(dead_code))]
 struct Text {
@@ -72,12 +73,30 @@ pub fn check(app: &AppHandle, origin: String, locale: String) {
     }
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        #[cfg(desktop)]
-        if self_updating() && install(&app, &origin, &locale).await {
-            return;
-        }
-        notify(&app, &origin, &locale).await;
+        check_now(&app, &origin, &locale).await;
     });
+}
+
+pub async fn check_now(app: &AppHandle, origin: &str, locale: &str) -> &'static str {
+    let Ok(_guard) = UPDATE_CHECK.try_lock() else { return "busy" };
+    CHECKED.store(true, Ordering::SeqCst);
+    #[cfg(desktop)]
+    let signed = if self_updating() {
+        match install(app, origin, locale).await {
+            "handled" => return "handled",
+            "install_failed" => return "install_failed",
+            "current" => true,
+            _ => false,
+        }
+    } else {
+        false
+    };
+    #[cfg(not(desktop))]
+    let signed = false;
+    match notify(app, origin, locale).await {
+        "unavailable" if signed => "current",
+        status => status,
+    }
 }
 
 /// Installed from the updater's own packages: Windows and macOS installs and
@@ -88,7 +107,7 @@ fn self_updating() -> bool {
 }
 
 #[cfg(desktop)]
-async fn install(app: &AppHandle, origin: &str, locale: &str) -> bool {
+async fn install(app: &AppHandle, origin: &str, locale: &str) -> &'static str {
     use tauri_plugin_updater::UpdaterExt;
     let mut builder = app.updater_builder().timeout(std::time::Duration::from_secs(60));
     if let Ok(with_feeds) = app.updater_builder().endpoints(feeds(origin, "updater.json")) {
@@ -97,11 +116,11 @@ async fn install(app: &AppHandle, origin: &str, locale: &str) -> bool {
     if let Some(proxy) = crate::platform::game_proxy().and_then(|p| tauri::Url::parse(&format!("http://{}:{}", p.host, p.port)).ok()) {
         builder = builder.proxy(proxy);
     }
-    let Ok(updater) = builder.build() else { return false };
+    let Ok(updater) = builder.build() else { return "unavailable" };
     let mut update = match updater.check().await {
         Ok(Some(update)) => update,
-        Ok(None) => return true,
-        Err(_) => return false,
+        Ok(None) => return "current",
+        Err(_) => return "unavailable",
     };
     update.download_url = on_site(&update.download_url, origin);
     let words = text(locale);
@@ -110,22 +129,30 @@ async fn install(app: &AppHandle, origin: &str, locale: &str) -> bool {
     let accepted = tauri::async_runtime::spawn_blocking(move || ask(&handle, words.title, message, words.update, words.later))
         .await
         .unwrap_or(false);
-    if accepted && update.download_and_install(|_, _| {}, || {}).await.is_ok() {
+    if accepted {
+        if update.download_and_install(|_, _| {}, || {}).await.is_err() {
+            let _ = app.opener().open_url(download_page(origin, locale), None::<&str>);
+            return "install_failed";
+        }
         app.restart();
     }
-    true
+    "handled"
 }
 
 /// Phones and package-managed installs: the download page.
-async fn notify(app: &AppHandle, origin: &str, locale: &str) {
-    let mut latest = None;
+async fn notify(app: &AppHandle, origin: &str, locale: &str) -> &'static str {
+    let mut reachable = false;
+    let mut newer_version = None;
     for feed in feeds(origin, "release-version.json") {
-        if let Ok(Some(version)) = fetch_version(&feed).await {
-            latest = Some(version);
-            break;
+        if let Ok(Ok(version)) = tokio::time::timeout(std::time::Duration::from_secs(8), fetch_version(&feed)).await {
+            reachable = true;
+            if newer(&version, env!("CARGO_PKG_VERSION")) {
+                newer_version = Some(version);
+                break;
+            }
         }
     }
-    let Some(version) = latest.filter(|v| newer(v, env!("CARGO_PKG_VERSION"))) else { return };
+    let Some(version) = newer_version else { return if reachable { "current" } else { "unavailable" } };
     let words = text(locale);
     let message = words.available.replace("{version}", &version);
     let handle = app.clone();
@@ -133,14 +160,22 @@ async fn notify(app: &AppHandle, origin: &str, locale: &str) {
         .await
         .unwrap_or(false);
     if accepted {
-        let locale = if ["en", "ja", "ko", "zh-CN", "zh-TW"].contains(&locale) { locale } else { "en" };
-        let _ = app.opener().open_url(format!("{origin}/{locale}/download/"), None::<&str>);
+        return if app.opener().open_url(download_page(origin, locale), None::<&str>).is_ok() { "handled" } else { "unavailable" };
     }
+    "handled"
+}
+
+fn download_page(origin: &str, locale: &str) -> String {
+    let locale = if ["en", "ja", "ko", "zh-CN", "zh-TW"].contains(&locale) { locale } else { "en" };
+    format!("{origin}/{locale}/download/")
 }
 
 /// `release-version.json` from a release: `{ "version": … }`.
-async fn fetch_version(url: &tauri::Url) -> Result<Option<String>, ()> {
+async fn fetch_version(url: &tauri::Url) -> Result<String, ()> {
     let body = haneoka_core::http::get(url.as_str(), 64 * 1024).await.map_err(|_| ())?;
     let value: serde_json::Value = serde_json::from_slice(&body).map_err(|_| ())?;
-    Ok(value.get("version").and_then(|v| v.as_str()).map(str::to_owned))
+    value.get("version").and_then(|v| v.as_str()).filter(|v| {
+        let parts: Vec<_> = v.trim_start_matches('v').split('.').collect();
+        parts.len() == 3 && parts.iter().all(|part| part.parse::<u64>().is_ok())
+    }).map(str::to_owned).ok_or(())
 }
