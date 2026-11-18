@@ -12,16 +12,20 @@
     <main class="page" id="page"><div class="progress"></div></main>
     <dialog id="dialog"></dialog>
     <script type="module">
-      import { call, setup, t, icon, escape, bar, number, date, snackbar, emblem, site, openSite, locale, sunny } from "./app.js";
+      import { call, setup, t, icon, escape, bar, number, date, snackbar, emblem, site, openSite, locale, sunny, returnToSavePage } from "./app.js";
 
       import { historyHelpButton, installHistoryHelp, showReadingFailure } from "./history-help.js";
 
       await setup();
       installHistoryHelp();
-      const key = new URLSearchParams(location.search).get("key");
+      const query = new URLSearchParams(location.search);
+      const key = query.get("key");
+      const fromSaves = query.get("from") === "saves";
+      const updateUrl = `import.html?update=${encodeURIComponent(key)}&amp;from=save`;
+      const back = () => returnToSavePage("saves.html", fromSaves);
       let detail = await call("saveDetail", { key }).catch(() => null);
       if (!detail) {
-        location.replace("saves.html");
+        back();
         throw new Error("save_not_found");
       }
       let catalog = null;
@@ -138,7 +142,9 @@
       }
 
       // ---------- sections ----------
-      const RARITY = { 2: "R", 3: "SR", 4: "SSR", 10: "EX", 20: "BD" };
+      const RARITIES = [[2, "R"], [3, "SR"], [10, "EX"], [20, "BD"], [4, "SSR"]];
+      const RARITY = Object.fromEntries(RARITIES);
+      const RARITY_RANK = Object.fromEntries(RARITIES.map(([id], index) => [id, index + 1]));
       const COLOURS = ["", "Red", "Blue", "Green", "Yellow", "Purple"];
       const outlined = (value, cls) => `<span class="art__number ${cls}">${escape(value)}</span>`;
       const sprite = (url, cls, label = "") => (url ? `<img class="${cls}" src="${escape(url)}" alt="${escape(label)}" loading="lazy" />` : "");
@@ -182,7 +188,7 @@
 
       const sorted = (list, member) => {
         const source = member ? catalog?.cards : catalog?.supports;
-        const rarity = (row) => Number(source?.[String(row._masterId)]?.rarity ?? 0);
+        const rarity = (row) => RARITY_RANK[source?.[String(row._masterId)]?.rarity] ?? 0;
         const released = (row) => Number([].concat(source?.[String(row._masterId)]?.releasedAt ?? 0)[0] ?? 0) || Number(row._masterId);
         return [...list].sort((a, b) => (newest ? released(b) - released(a) : rarity(b) - rarity(a) || Number(b._masterId) - Number(a._masterId)));
       };
@@ -318,7 +324,7 @@
           back: "saves.html",
           actions: `${historyHelpButton()}<button class="icon-button icon-button--tonal" type="button" data-action="team" aria-label="${escape(t("importToTeamBuilder"))}" ${busy ? "disabled" : ""}>${icon("groups")}</button>
             ${a.canRefresh ? `<button class="icon-button" type="button" data-action="sync" aria-label="${escape(t("syncFromGame"))}" ${busy ? "disabled" : ""}>${icon("cloud_sync")}</button>` : ""}
-            <a class="icon-button" href="import.html?update=${encodeURIComponent(key)}" aria-label="${escape(t("updateSave"))}">${icon("refresh")}</a>`,
+            <a class="icon-button" href="${updateUrl}" aria-label="${escape(t("updateSave"))}">${icon("refresh")}</a>`,
         });
         document.title = a.name || a.profileId;
         document.getElementById("page").innerHTML = `
@@ -338,7 +344,7 @@
             <button class="button button--filled" type="button" data-action="team" ${busy ? "disabled" : ""}>${icon("groups")}${escape(t("importToTeamBuilder"))}</button>
             <button class="button button--tonal" type="button" data-action="songs" ${busy ? "disabled" : ""}>${icon("checklist")}${escape(t("songProgress"))}</button>
             ${a.canRefresh ? `<button class="button button--tonal" type="button" data-action="sync" ${busy ? "disabled" : ""}>${icon("cloud_sync")}${escape(t("syncFromGame"))}</button>` : ""}
-            <a class="button button--outlined" href="import.html?update=${encodeURIComponent(key)}">${icon("refresh")}${escape(t("updateSave"))}</a>
+            <a class="button button--outlined" href="${updateUrl}">${icon("refresh")}${escape(t("updateSave"))}</a>
           </div>
           <p class="muted hint">${escape(t("importToTeamHint"))}</p>
           <div class="stats">
@@ -486,7 +492,7 @@
             dialog.close();
             return run(async () => {
               await call("deleteGameAccount", { key });
-              location.replace("saves.html");
+              back();
             });
         }
       });
@@ -502,6 +508,17 @@
             linkFailure(error);
           }
         });
+      });
+      document.getElementById("bar").addEventListener("click", (event) => {
+        if (!event.target.closest('a[href="saves.html"]')) return;
+        event.preventDefault();
+        back();
+      });
+      addEventListener("pageshow", async (event) => {
+        if (!event.persisted) return;
+        detail = await call("saveDetail", { key }).catch(() => null);
+        if (detail) render();
+        else back();
       });
       document.addEventListener(
         "toggle",

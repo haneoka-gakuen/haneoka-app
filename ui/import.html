@@ -11,7 +11,7 @@
     <div id="bar"></div>
     <main class="page" id="page"></main>
     <script type="module">
-      import { call, setup, t, icon, escape, bar, snackbar, RELEASES, date, info } from "./app.js";
+      import { call, setup, t, icon, escape, bar, snackbar, RELEASES, date, info, returnToSavePage } from "./app.js";
 
       import { historyHelpButton, installHistoryHelp, showReadingFailure } from "./history-help.js";
 
@@ -19,13 +19,20 @@
       installHistoryHelp();
       const query = new URLSearchParams(location.search);
       const updating = query.get("update");
+      const from = query.get("from");
+      const back = updating ? `save.html?key=${encodeURIComponent(updating)}` : "saves.html";
       const updatingName = updating
         ? await call("saveDetail", { key: updating })
             .then(({ account }) => `${account.name || account.profileId} / ${account.profileId}`)
             .catch(() => "")
         : "";
       document.title = t("importTitle");
-      document.getElementById("bar").innerHTML = bar({ title: t("importTitle"), back: updating ? `save.html?key=${encodeURIComponent(updating)}` : "saves.html", actions: historyHelpButton() });
+      const header = document.getElementById("bar");
+      header.innerHTML = bar({ title: t("importTitle"), back, actions: historyHelpButton() });
+      header.querySelector("a").addEventListener("click", (event) => {
+        event.preventDefault();
+        returnToSavePage(back, from === (updating ? "save" : "saves"));
+      });
 
       const { sources } = await call("saveSources").catch(() => ({ sources: ["files"] }));
       const status = sources.includes("shizuku") ? await call("deviceStatus").catch(() => null) : null;
@@ -230,7 +237,10 @@
         }
         snackbar(t("foundAccounts", { count: result.keys.length }));
         const key = updating && result.keys.includes(updating) ? updating : result.keys.length === 1 ? result.keys[0] : null;
-        location.assign(key ? `save.html?key=${encodeURIComponent(key)}` : "saves.html");
+        if (key && key === updating) return returnToSavePage(back, from === "save");
+        if (!key) return returnToSavePage("saves.html", from === "saves");
+        const parent = from === "saves" ? "&from=saves" : "";
+        location.replace(`save.html?key=${encodeURIComponent(key)}${parent}`);
       };
 
       document.getElementById("page").addEventListener("click", (event) => {

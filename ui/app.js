@@ -66,6 +66,11 @@ export function openSite(path) {
   location.assign(site() + path.replace("{locale}", locale));
 }
 
+export function returnToSavePage(page, hasParent) {
+  if (hasParent && history.length > 1) history.back();
+  else location.replace(page);
+}
+
 const BAR_TOKENS = ["primary", "on-primary", "primary-container", "on-primary-container", "secondary-container", "on-secondary-container", "tertiary-container",
   "on-tertiary-container", "surface", "on-surface", "on-surface-variant", "surface-container-lowest", "surface-container-low", "surface-container",
   "surface-container-high", "surface-container-highest", "outline", "outline-variant", "error", "inverse-surface", "inverse-on-surface"];
