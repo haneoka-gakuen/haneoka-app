@@ -147,6 +147,25 @@ pub fn song_marks(save: &GameSave) -> Map<String, Value> {
     marks
 }
 
+/// Clear marks and lifetime counters use one payload for both bridge entrypoints.
+pub fn song_progress(save: &GameSave) -> Value {
+    let counters: Vec<Value> = save.rows("_missionCounters").iter().map(|row| {
+        Value::Object(row.iter().map(|(key, value)| {
+            let value = match value {
+                Value::Number(number) => Value::String(number.to_string()),
+                other => other.clone(),
+            };
+            (key.clone(), value)
+        }).collect())
+    }).collect();
+    json!({
+        "marks": song_marks(save),
+        "missionCounters": counters,
+        "key": save.key(),
+        "server": save.server(),
+    })
+}
+
 /// One row of the bridge's `gameAccounts`.
 pub fn account_entry(save: &GameSave) -> Value {
     json!({

@@ -194,7 +194,7 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
         "songProgress" => {
             let server = text(args, "server");
             let save = choose(app, args, |s| server.is_none_or(|server| s.server() == Some(server)))?;
-            Ok(save.map_or(Value::Null, |save| json!({ "marks": export::song_marks(&save), "key": save.key() })))
+            Ok(save.map_or(Value::Null, |save| export::song_progress(&save)))
         }
         "gachaHistory" => {
             let history = text(args, "key");
@@ -293,7 +293,7 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
         }
         "sendSongProgress" => {
             let save = state(app).accounts.find(text(args, "key").ok_or("key")?).ok_or("save_not_found")?;
-            state(app).pending.lock().unwrap().song_progress = Some(json!({ "marks": export::song_marks(&save) }));
+            state(app).pending.lock().unwrap().song_progress = Some(export::song_progress(&save));
             Ok(json!({ "server": save.server() }))
         }
         "readGachaHistory" => {
