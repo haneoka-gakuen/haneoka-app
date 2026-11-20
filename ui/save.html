@@ -15,6 +15,8 @@
       import { call, setup, t, icon, escape, bar, number, date, snackbar, emblem, site, openSite, locale, sunny, returnToSavePage } from "./app.js";
 
       import { historyHelpButton, installHistoryHelp, showReadingFailure } from "./history-help.js";
+      import { saveDetailPanels, saveTabs } from "./save-detail-tabs.js";
+      import { mountScrollableTabBar, scrollableTabBar } from "./scrollable-tabs.js";
 
       await setup();
       installHistoryHelp();
@@ -35,6 +37,11 @@
       const folds = new Set();
       let link = null;
       let busy = false;
+      let tab = "overview";
+      const panels = saveDetailPanels((value) => text(value));
+      let detailCatalog;
+      let detailCatalogRequest;
+      let unmountTabs;
 
       // ---------- catalogue text and data ----------
       const TEXT = ["ja", "en", "zh-TW", "zh-CN", "ko"];
@@ -104,6 +111,7 @@
         ]);
         return {
           release: identity.releaseId,
+          read: pinned,
           asset: (path) => (typeof path === "string" && path.startsWith("/") ? `${site()}${path}?release=${encodeURIComponent(identity.releaseId)}` : null),
           cards,
           supports,
@@ -118,6 +126,15 @@
             return typeof path === "string" ? `${site()}/runtime/${server}/${path.replace(/^runtime\//, "")}` : null;
           },
         };
+      }
+
+      function loadTabCatalog() {
+        if (!catalog || detailCatalogRequest || !["characters", "friendships"].includes(tab)) return;
+        detailCatalogRequest = Promise.all(["bands", "friendships", "character-missions"].map((resource) => catalog.read(resource)))
+          .then(([bands, friendships, missions]) => {
+            detailCatalog = { bands: bands.entries ?? bands, friendships: friendships.friendships, missions: missions.missions };
+            if (tab === "characters" || tab === "friendships") render();
+          });
       }
 
       /** A card's level from its experience and training, capped as the game caps it. */
@@ -311,7 +328,23 @@
             <a class="icon-button" href="${updateUrl}" aria-label="${escape(t("updateSave"))}">${icon("refresh")}</a>`,
         });
         document.title = a.name || a.profileId;
-        document.getElementById("page").innerHTML = `
+        const page = document.getElementById("page");
+        const stripOffset = page.querySelector(".save-tabs")?.scrollLeft ?? 0;
+        const focusedTab = page.contains(document.activeElement) && document.activeElement?.dataset.tab;
+        unmountTabs?.();
+        page.innerHTML = `
+          <div class="save-quick-actions" role="group" aria-label="${escape(t("exportsTitle"))}">
+            ${[["team", "groups", "importToTeamBuilder"], ["songs", "checklist", "songProgress"],
+              ["history", "history", "recruitmentHistory"]].map(([action, glyph, label]) => `
+                <button class="button ${action === "team" ? "button--filled" : "button--tonal"}" type="button"
+                  data-action="${action}" ${busy || action === "history" && !a.canRefresh ? "disabled" : ""}
+                  ${action === "history" && !a.canRefresh ? `title="${escape(t("errorMissingSession"))}"` : ""}>
+                  ${icon(glyph, "icon--small")}<span>${escape(t(label))}</span>
+                </button>`).join("")}
+          </div>
+          ${scrollableTabBar({ id: "save-tab", label: t("importedAccounts"), tabs: saveTabs, active: tab })}
+          <div class="save-tab-panel" id="save-tab-panel" role="tabpanel" aria-labelledby="save-tab-${tab}">
+          ${tab === "overview" ? `
           <section class="surface profile">
             ${art ? `<img class="profile__art" src="${escape(art)}" alt="" decoding="async" />` : ""}
             <div class="rank">${sunny}<div><span>RANK</span><strong>${escape(a.rank ?? "—")}</strong></div></div>
@@ -323,15 +356,6 @@
               ${a.savedAt ? `<span class="muted">${escape(t("savedOn", { time: date(a.savedAt, true) }))}</span>` : ""}
             </div>
           </section>
-          <ul class="list surface">
-            ${[["team", "groups", "importToTeamBuilder"], ["songs", "checklist", "songProgress"],
-                ...(a.canRefresh ? [["history", "history", "readHistory"]] : [])].map(([action, glyph, label]) => `
-              <li><button class="row" type="button" data-action="${action}" ${busy ? "disabled" : ""}>
-                <span class="row__lead">${icon(glyph)}</span>
-                <span class="row__text"><span class="row__title">${escape(t(label))}</span></span>
-                <span class="row__trail">${icon("chevron_right")}</span>
-              </button></li>`).join("")}
-          </ul>
           <div class="stats">
             <div class="stat">${icon("trending_up")}<div><span>${escape(t("playerExp"))}</span><strong>${number(int(p._exp))}</strong></div></div>
             <div class="stat">${icon("military_tech")}<div><span>${escape(t("highScoreRating"))}</span><strong>${number(rating)}</strong></div></div>
@@ -363,17 +387,21 @@
               </div>
               <button class="button button--text button--danger" type="button" data-action="remove" style="justify-self:start">${icon("delete")}${escape(t("removeAccount"))}</button>
             </div>
-          </details>
-          <details class="fold" data-fold="raw" ${folds.has("raw") ? "open" : ""}>
-            <summary>${escape(t("rawData"))}${icon("expand_more")}</summary>
-            <div class="fold__body">
-              <ul class="list">
-                <li><button class="row" type="button" data-json="settings"><span class="row__text"><span class="row__title">${escape(t("settings"))}</span></span><span class="row__trail">${icon("chevron_right")}</span></button></li>
-                ${detail.persist ? `<li><button class="row" type="button" data-json="persist"><span class="row__text"><span class="row__title">${escape(t("latestLive"))}</span></span><span class="row__trail">${icon("chevron_right")}</span></button></li>` : ""}
-              </ul>
-            </div>
-          </details>`;
+          </details>` : panels.render(tab, detail, catalog, detailCatalog)}
+          </div>`;
+        unmountTabs = mountScrollableTabBar(page.querySelector(".tab-scroll"), { scrollLeft: stripOffset, select: selectTab });
+        if (focusedTab === tab) document.getElementById(`save-tab-${tab}`)?.focus({ preventScroll: true });
       };
+
+      function selectTab(id) {
+        if (tab === id) return;
+        tab = id;
+        render();
+        const button = document.getElementById(`save-tab-${tab}`);
+        button?.scrollIntoView({ block: "nearest", inline: "nearest" });
+        button?.focus({ preventScroll: true });
+        loadTabCatalog();
+      }
 
       // ---------- actions ----------
       const run = async (work) => {
@@ -394,6 +422,20 @@
       document.addEventListener("click", (event) => {
         const target = event.target.closest("button");
         if (!target || target.disabled) return;
+        if (target.dataset.pair) {
+          panels.state[target.dataset.pair] = target.dataset.value;
+          if (target.dataset.pair === "lead") panels.state.partner = "";
+          return render();
+        }
+        if (target.dataset.band !== undefined) {
+          panels.state.band = target.dataset.band;
+          panels.state.character = "";
+          return render();
+        }
+        if (target.dataset.character) {
+          panels.state.character = target.dataset.character;
+          return render();
+        }
         if (target.dataset.sort) {
           newest = target.dataset.sort === "newest";
           return render();
@@ -402,12 +444,6 @@
           const field = target.dataset.expand;
           expanded.has(field) ? expanded.delete(field) : expanded.add(field);
           return render();
-        }
-        if (target.dataset.json) {
-          const value = target.dataset.json === "settings" ? detail.settings : detail.persist;
-          dialog.innerHTML = `<h2>${escape(target.dataset.json === "settings" ? t("settings") : t("latestLive"))}</h2><pre class="json">${escape(JSON.stringify(value, null, 2))}</pre>
-            <div class="dialog__actions"><button class="button button--text" type="button" data-close>${escape(t("back"))}</button></div>`;
-          return dialog.showModal();
         }
         if ("close" in target.dataset) return dialog.close();
         switch (target.dataset.action) {
@@ -511,6 +547,7 @@
         (event) => {
           const fold = event.target.closest?.("[data-fold]");
           if (fold) fold.open ? folds.add(fold.dataset.fold) : folds.delete(fold.dataset.fold);
+          if (event.target.open && event.target.matches?.("[data-save-field]")) panels.openField(event.target, detail);
         },
         true,
       );
@@ -521,6 +558,7 @@
         .then((loaded) => {
           catalog = loaded;
           render();
+          loadTabCatalog();
         })
         .catch(() => {});
     </script>

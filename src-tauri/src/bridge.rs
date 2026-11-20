@@ -264,7 +264,12 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
         "gameAccounts" => Ok(Value::Array(state(app).accounts.saves().iter().map(export::account_entry).collect())),
         "saveSnapshot" => {
             let save = state(app).accounts.find(text(args, "key").unwrap_or_default()).ok_or("save_not_found")?;
-            Ok(json!({ "text": export::snapshot(&save) }))
+            let snapshot = if args["complete"] == true {
+                String::from_utf8(export::full(&save)).map_err(|error| error.to_string())?
+            } else {
+                export::snapshot(&save)
+            };
+            Ok(json!({ "text": snapshot }))
         }
         "boxAccount" => {
             let server = text(args, "server");

@@ -208,8 +208,7 @@ pub fn player_summary(save: &GameSave) -> Value {
     })
 }
 
-/// Everything a save's page shows, without identity: the player document,
-/// the settings beside it and the latest-live document.
+/// Everything a save's page shows, with the documents stripped of identity.
 pub fn detail(save: &GameSave) -> Value {
     let cache = save.documents.get(&DocumentKind::Cache).map(|d| d.data.clone()).unwrap_or_default();
     let settings: Map<String, Value> = cache.iter().filter(|(k, _)| *k != "_player").map(|(k, v)| (k.clone(), v.clone())).collect();
@@ -220,5 +219,6 @@ pub fn detail(save: &GameSave) -> Value {
         "player": cache.get("_player").map(without_identity).unwrap_or(Value::Null),
         "settings": without_identity(&Value::Object(settings)),
         "persist": save.documents.get(&DocumentKind::Persist).map(|d| without_identity(&Value::Object(d.data.clone()))).unwrap_or(Value::Null),
+        "permanent": save.documents.get(&DocumentKind::Permanent).map(|d| without_identity(&Value::Object(d.data.clone()))).unwrap_or(Value::Null),
     })
 }
