@@ -17,6 +17,7 @@ import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.WebView
 import androidx.activity.result.ActivityResult
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -122,6 +123,20 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
         pendingPermission = null
         mainHandler.removeCallbacks(permissionTimeout)
         pending?.second?.resolve(JSObject().put("granted", granted))
+    }
+
+    override fun onPause(activity: AppCompatActivity) {
+        // Shizuku presents consent in a separate activity. Give the user time to respond.
+        mainHandler.removeCallbacks(permissionTimeout)
+    }
+
+    override fun onResume(activity: AppCompatActivity) {
+        if (pendingPermission != null) mainHandler.postDelayed(permissionTimeout, 1_000)
+    }
+
+    override fun onDestroy(activity: AppCompatActivity) {
+        Shizuku.removeRequestPermissionResultListener(permissionListener)
+        finishPermission(false)
     }
 
     private var container: View? = null
