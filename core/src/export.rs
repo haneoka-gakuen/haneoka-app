@@ -175,6 +175,7 @@ pub fn account_entry(save: &GameSave) -> Value {
         "region": save.region().and_then(crate::save::region_name),
         "server": save.server(),
         "rank": save.player_rank(),
+        "favoriteCardId": save.player().and_then(|player| player.get("_favoriteMemberCardId")).and_then(integer).filter(|&id| id > 0),
         "savedAt": save.modified_at().map(|d| d.timestamp_millis()),
         "canRefresh": crate::game::session(save).is_some() && crate::game::Region::of(save).is_some(),
         "release": save.release.map(|r| r.package_id()),

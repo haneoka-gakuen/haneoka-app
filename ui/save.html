@@ -478,7 +478,7 @@
           case "team":
             return run(async () => {
               const { server } = await call("sendBox", { key });
-              openSite(`/{locale}/team-builder/?server=${server}`);
+              openSite(`/{locale}/team-builder/?server=${server}&tab=box&appBox=1`);
             });
           case "songs":
             return run(async () => {

@@ -160,10 +160,17 @@ async fn site_session(app: &AppHandle, origin: &str) -> Option<String> {
 
 /// The linked-player list of the reader's Haneoka account; `None` when signed out.
 async fn linked_players(app: &AppHandle, method: &str, path: &str, body: Option<Value>) -> Result<Option<Vec<Value>>> {
+    linked_players_for_owner(app, method, path, body, None).await
+}
+
+async fn linked_players_for_owner(app: &AppHandle, method: &str, path: &str, body: Option<Value>, owner: Option<&str>) -> Result<Option<Vec<Value>>> {
     let origin = crate::current_origin(app);
     let Some(cookie) = site_session(app, &origin).await else { return Ok(None) };
     let payload = body.map(|value| value.to_string());
     let mut headers = vec![("Cookie", cookie.as_str()), ("Origin", origin.as_str())];
+    if let Some(owner) = owner {
+        headers.push(("X-Haneoka-Expected-User", owner));
+    }
     if payload.is_some() {
         headers.push(("Content-Type", "application/json"));
     }
@@ -206,12 +213,18 @@ async fn prepare_save_import(app: &AppHandle, id: &str, action: &str) -> Result<
     let jobs = crate::save_import::jobs(&state);
     let job = jobs.iter().find(|job| job.id == id && job.actions.iter().any(|value| value == action)).ok_or("save_import_obsolete")?;
     if crate::save_import::options(&state)[action] == false { return Ok(Value::Null); }
+    let save = state.accounts.find(&job.key).ok_or("save_not_found")?;
+    if job.saved_at.is_some_and(|expected| save.modified_at().map(|date| date.timestamp_millis()) != Some(expected)) {
+        return Err("save_import_obsolete".to_owned());
+    }
     if cache {
         if let Some(result) = crate::save_import::prepared(&state, id, action) { return result; }
     }
-    let save = state.accounts.find(&job.key).ok_or("save_not_found")?;
+    let server = save.server().filter(|server| *server == job.server.as_str()).ok_or("save_import_server")?;
     let result = match action {
-        "team" => Ok(json!({ "text": export::team_package(&save) })),
+        "team" => Ok(json!({ "server": server, "key": save.key(), "text": export::team_package(&save) })),
+        "save" => Ok(json!({ "server": server, "key": save.key(), "name": save.name, "rank": save.player_rank(),
+            "text": String::from_utf8(export::full(&save)).map_err(|error| error.to_string())? })),
         "songs" => Ok(song_progress(&save).await),
         "history" => {
             game::read_history(&save, platform::game_proxy().as_ref()).await
@@ -219,7 +232,11 @@ async fn prepare_save_import(app: &AppHandle, id: &str, action: &str) -> Result<
                 .map_err(|error| error.0.to_owned())
         }
         "link" => {
-            let Some(players) = linked_players(app, "GET", "/api/v1/account/game-accounts", None).await? else {
+            if job.account_scoped && job.owner.is_none() {
+                return Ok(Value::Null);
+            }
+            let owner = job.owner.as_deref();
+            let Some(players) = linked_players_for_owner(app, "GET", "/api/v1/account/game-accounts", None, owner).await? else {
                 return Ok(Value::Null);
             };
             let linked = player_link(Some(players), &save);
@@ -229,7 +246,7 @@ async fn prepare_save_import(app: &AppHandle, id: &str, action: &str) -> Result<
                 "visibility": visibility, "savedAt": save.modified_at().map(|time| time.timestamp_millis()),
                 "summary": export::player_summary(&save),
             });
-            Ok(player_link(linked_players(app, "PUT", "/api/v1/account/game-accounts", Some(body)).await?, &save))
+            Ok(player_link(linked_players_for_owner(app, "PUT", "/api/v1/account/game-accounts", Some(body), owner).await?, &save))
         }
         _ => Err("save_import_action".to_owned()),
     };
@@ -250,7 +267,24 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
                 Ok(crate::save_import::options(&state))
             }
         }
-        "saveImportJobs" => Ok(json!(crate::save_import::jobs(&state(app)))),
+        "saveImportJobs" => {
+            let mut jobs = crate::save_import::jobs(&state(app));
+            if args["accountScoped"] != true {
+                for job in jobs.iter_mut().filter(|job| job.account_scoped) {
+                    job.actions.retain(|action| !matches!(action.as_str(), "team" | "songs" | "save"));
+                }
+                jobs.retain(|job| !job.actions.is_empty());
+            }
+            Ok(json!(jobs))
+        }
+        "saveImportOwner" => {
+            if crate::site_origin(&window.url().map_err(|error| error.to_string())?).is_none() {
+                return Err("origin".into());
+            }
+            let owner = args["owner"].as_str().filter(|owner| !owner.is_empty() && owner.len() <= 128);
+            state(app).set_preference("saveImportOwner", json!(owner));
+            Ok(Value::Null)
+        }
         "completeSaveImport" => {
             crate::save_import::complete(&state(app), text(args, "id").ok_or("id")?, text(args, "action").ok_or("action")?)?;
             Ok(Value::Null)
@@ -295,7 +329,7 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
             };
             let Some(save) = save else { return Ok(Value::Null) };
             let (name, text) = game::read_history(&save, platform::game_proxy().as_ref()).await.map_err(|e| e.0.to_owned())?;
-            Ok(json!({ "files": [{ "name": name, "text": text }] }))
+            Ok(json!({ "key": save.key(), "files": [{ "name": name, "text": text }] }))
         }
         "pendingGachaHistory" => Ok(state(app).pending.lock().unwrap().gacha_history.take().unwrap_or(Value::Null)),
         "pendingSongProgress" => Ok(state(app).pending.lock().unwrap().song_progress.take().unwrap_or(Value::Null)),
@@ -376,9 +410,9 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
         }
         "sendBox" => {
             let save = state(app).accounts.find(text(args, "key").ok_or("key")?).ok_or("save_not_found")?;
+            let server = save.server().ok_or("save_import_server")?;
             let save = refreshed(app, save).await;
-            let server = save.server().unwrap_or("intl");
-            state(app).pending.lock().unwrap().box_import = Some(json!({ "server": server, "text": export::team_package(&save) }));
+            state(app).pending.lock().unwrap().box_import = Some(json!({ "server": server, "key": save.key(), "text": export::team_package(&save) }));
             Ok(json!({ "server": server }))
         }
         "sendSongProgress" => {
@@ -390,7 +424,7 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
         "readGachaHistory" => {
             let save = state(app).accounts.find(text(args, "key").ok_or("key")?).ok_or("save_not_found")?;
             let (name, text) = game::read_history(&save, platform::game_proxy().as_ref()).await.map_err(|e| e.0.to_owned())?;
-            state(app).pending.lock().unwrap().gacha_history = Some(json!({ "files": [{ "name": name, "text": text }] }));
+            state(app).pending.lock().unwrap().gacha_history = Some(json!({ "key": save.key(), "files": [{ "name": name, "text": text }] }));
             Ok(json!({ "server": save.server() }))
         }
         "ready" => {
@@ -549,10 +583,19 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
                 None => GameRelease::ALL.to_vec(),
             };
             let mut batches = Vec::new();
+            let mut errors = Vec::new();
             for release in releases {
-                batches.push(app.device().shizuku_read(release.package_id()).await?);
+                match app.device().shizuku_read(release.package_id()).await {
+                    Ok(batch) => batches.push(batch),
+                    Err(error) => errors.push(error),
+                }
             }
-            read_batches(app, &window, batches).await
+            let mut result = read_batches(app, &window, batches).await?;
+            if result["keys"].as_array().is_some_and(Vec::is_empty) && !errors.is_empty() {
+                return Err(errors.remove(0));
+            }
+            result["unreadable"] = json!(result["unreadable"].as_u64().unwrap_or(0) + errors.len() as u64);
+            Ok(result)
         }
         "gameFolder" => {
             let mut uris: Vec<String> = Vec::new();

@@ -28,7 +28,7 @@
   window.haneokaApp = Object.freeze({
     version: "__VERSION__",
     platform: "__PLATFORM__",
-    capabilities: Object.freeze(["accountKeysV1", "saveSnapshotV1", "songProgressCountsV1", "appUpdateV1", "saveAutomationV1"]),
+    capabilities: Object.freeze(["accountKeysV1", "saveSnapshotV1", "songProgressCountsV1", "appUpdateV1", "saveAutomationV1", "saveAutomationV2"]),
     call(method, args) {
       if (local[method]) {
         location.assign(localBase + local[method](args));

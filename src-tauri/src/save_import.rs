@@ -11,9 +11,15 @@ pub struct Job {
     pub key: String,
     pub server: String,
     pub actions: Vec<String>,
+    #[serde(default, rename = "accountScoped")]
+    pub account_scoped: bool,
+    #[serde(default)]
+    pub owner: Option<String>,
+    #[serde(default, rename = "savedAt")]
+    pub saved_at: Option<i64>,
 }
 
-const ACTIONS: [&str; 4] = ["team", "songs", "history", "link"];
+const ACTIONS: [&str; 5] = ["team", "songs", "history", "link", "save"];
 
 pub fn options(state: &AppState) -> serde_json::Value {
     let saved = read(&state.config.join("save-import-options.json"));
@@ -40,22 +46,23 @@ pub fn enqueue(state: &AppState, keys: &[String]) -> Result<(), String> {
     let mut jobs = read_jobs(state);
     let previous = jobs.clone();
     let accounts = state.accounts.saves();
-    let mut regions = std::collections::HashSet::new();
+    let owner = state.preference("saveImportOwner").as_str().map(str::to_owned);
     for save in accounts.iter().filter(|save| keys.contains(&save.key())) {
         let Some(server) = save.server() else { continue };
         let key = save.key();
-        let regional = regions.insert(server);
-        jobs.retain(|job| job.key != key);
+        jobs.retain(|job| job.key != key || job.account_scoped && job.owner != owner);
         let actions = ACTIONS.into_iter().filter(|action| options[*action] == true)
-            .filter(|action| regional || !matches!(*action, "team" | "songs"))
             .map(str::to_owned).collect::<Vec<_>>();
         if actions.is_empty() { continue; }
-        if regional {
-            for job in jobs.iter_mut().filter(|job| job.server == server) {
-                job.actions.retain(|action| !matches!(action.as_str(), "team" | "songs"));
-            }
-        }
-        jobs.push(Job { id: format!("{:016x}", rand::random::<u64>()), key, server: server.into(), actions });
+        jobs.push(Job {
+            id: format!("{:016x}", rand::random::<u64>()),
+            key,
+            server: server.into(),
+            actions,
+            account_scoped: true,
+            owner: owner.clone(),
+            saved_at: save.modified_at().map(|date| date.timestamp_millis()),
+        });
     }
     jobs.retain(|job| !job.actions.is_empty());
     write(&state.config.join("save-import-jobs.json"), &jobs)?;
