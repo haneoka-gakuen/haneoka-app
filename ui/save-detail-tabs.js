@@ -76,7 +76,7 @@ const rank = ({ level, exp, fraction }) => `<span class="save-level">${level ? `
     aria-valuenow="${fraction}"><i style="width:${fraction}%"></i></span>`}
 </span>`;
 const rankRow = (name, portraits, progress) => `<span class="save-detail-portraits">${portraits.map(portrait).join("")}</span>
-  <span class="row__text"><span class="row__title">${escape(name)}</span>${rank(progress)}</span>`;
+  <span class="row__text"><span class="row__title">${escape(name)}</span>${progress ? rank(progress) : ""}</span>`;
 
 export function saveDetailPanels(text) {
   const state = { band: "", character: "", lead: "", partner: "", limits: new Map() };
@@ -175,14 +175,16 @@ export function saveDetailPanels(text) {
     const involving = (pair, id) => !id || pair.characters.some((row) => row.id === id);
     const partners = new Set(model.friendships.filter((row) => involving(row, state.lead)).flatMap((row) => row.characters.map((character) => character.id)));
     const pairs = model.friendships.filter((row) => involving(row, state.lead) && involving(row, state.partner));
+    const hasProgress = model.friendships.some(({ rank }) => rank.exp !== null || rank.level);
     return `<section class="surface stack">${heading(t("saveFriendships"), "groups", pairs.length)}
+      ${pairs.length && !hasProgress ? `<p class="muted">${escape(t("saveFriendshipProgressUnavailable"))}</p>` : ""}
       <div class="save-pair-filters">
         ${picker("lead", state.lead, candidates)}
         ${picker("partner", state.partner, candidates.filter((row) => row.id !== state.lead && partners.has(row.id)))}
       </div>
       ${pairs.length ? `<div class="save-detail-pairs">${pairs.map((pair) => `<div class="save-detail-row">
         ${rankRow(pair.characters.length === 2 ? pair.characters.map((row) => row.name).join(" × ") : `#${pair.id}`,
-          pair.characters.length ? pair.characters.map((row) => row.image) : [null], pair.rank)}</div>`).join("")}</div>` : empty()}
+          pair.characters.length ? pair.characters.map((row) => row.image) : [null], hasProgress ? pair.rank : null)}</div>`).join("")}</div>` : empty()}
     </section>`;
   }
 

@@ -566,6 +566,7 @@ const PLAYER_COLLECTIONS: &[(u64, &str, &[(u64, &str)])] = &[
     (3, "_supportCards", &[(2, "_masterId"), (3, "_exp"), (5, "_rank"), (7, "_duplicateCount")]),
     (8, "_bandItems", &[(1, "_masterId"), (2, "_level")]),
     (12, "_characters", &[(1, "_masterId"), (2, "_exp")]),
+    (13, "_characterFriendships", &[(1, "_masterId"), (2, "_exp")]),
 ];
 
 /// The progress in a GetPlayerDataResponse, keyed as LocalCacheData's `_player`.
@@ -604,6 +605,10 @@ pub fn decode_player_data(response: &[u8]) -> Result<Map<String, Value>, FormatE
             return Err(FormatError("player_data_identity"));
         }
         out.get_mut(*key).unwrap().as_array_mut().unwrap().push(Value::Object(row));
+    }
+    // An omitted friendship list does not replace progress in the local save.
+    if out["_characterFriendships"].as_array().is_some_and(Vec::is_empty) {
+        out.remove("_characterFriendships");
     }
     Ok(out)
 }
@@ -650,7 +655,7 @@ pub async fn read_mission_counters(save: &GameSave, proxy: Option<&Proxy>) -> Re
     Ok(counters)
 }
 
-/// The save with its card, character and band item lists replaced by the
+/// The save with its card, character, friendship and band item lists updated from the
 /// game server's current ones. A response missing cards the save already has
 /// is refused: cards are never lost in the game.
 pub async fn refresh(save: &GameSave, proxy: Option<&Proxy>) -> Result<GameSave, GameError> {
