@@ -25,6 +25,8 @@ pub struct AppState {
     pub config: PathBuf,
     /// A website page a link asked for before the window had a site loaded.
     pub pending_path: Mutex<Option<String>>,
+    /// Navigation callbacks can read this without waiting on Android's UI thread.
+    active_page: Mutex<Option<tauri::Url>>,
     pub sign_in: sign_in::Waiter,
     pub watch: site::Watch,
     /// What the app's own pages hand to a website page, taken once there.
@@ -199,12 +201,12 @@ fn open_link(app: &AppHandle, url: &url::Url) {
         None
     };
     let Some(path) = path else { return };
-    let window = app.get_webview_window("main");
-    let loaded = window.as_ref().and_then(|w| w.url().ok()).is_some_and(|u| site_origin(&u).is_some());
-    match window {
-        Some(window) if loaded => {
-            let path = localized(&window, &path);
-            if let Ok(target) = url::Url::parse(&format!("{}{path}", current_origin(app))) {
+    let page = app.state::<AppState>().active_page.lock().unwrap().clone();
+    let site = page.as_ref().and_then(|page| site_origin(page).map(|origin| (page, origin)));
+    match (app.get_webview_window("main"), site) {
+        (Some(window), Some((page, origin))) => {
+            let path = localized(page, &path);
+            if let Ok(target) = url::Url::parse(&format!("{origin}{path}")) {
                 let _ = window.navigate(target);
             }
             let _ = window.set_focus();
@@ -214,15 +216,10 @@ fn open_link(app: &AppHandle, url: &url::Url) {
 }
 
 /// `/en/…` placeholders take the reader's current locale.
-fn localized(window: &WebviewWindow, path: &str) -> String {
-    let current = window.url().ok();
-    let segments: Vec<String> =
-        current.iter().flat_map(|u| u.path_segments().into_iter().flatten().map(str::to_owned)).collect();
-    let locale = segments
-        .iter()
-        .find(|s| ["en", "ja", "ko", "zh-CN", "zh-TW"].contains(&s.as_str()))
-        .cloned()
-        .unwrap_or_else(|| "en".into());
+fn localized(page: &tauri::Url, path: &str) -> String {
+    let locale = page.path_segments().into_iter().flatten()
+        .find(|s| ["en", "ja", "ko", "zh-CN", "zh-TW"].contains(s))
+        .unwrap_or("en");
     path.replacen("/en/", &format!("/{locale}/"), 1)
 }
 
@@ -270,6 +267,7 @@ fn build_window(app: &AppHandle, direct: Option<u16>) -> tauri::Result<WebviewWi
             }
         })
         .on_page_load(|window, payload| {
+            *window.state::<AppState>().active_page.lock().unwrap() = Some(payload.url().clone());
             site::page_load(&window, payload.event(), payload.url());
             if cfg!(debug_assertions) {
                 eprintln!("page {:?} {}", payload.event(), payload.url());
@@ -334,6 +332,7 @@ pub fn run() {
                 accounts,
                 config: paths.app_config_dir()?,
                 pending_path: Mutex::new(None),
+                active_page: Mutex::new(None),
                 sign_in: sign_in::Waiter::default(),
                 watch: site::Watch::default(),
                 pending: Mutex::new(Pending::default()),
