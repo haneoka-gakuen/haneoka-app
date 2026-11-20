@@ -9,7 +9,7 @@ export default{
   "saveFriendshipProgressUnavailable": "Bond progress is unavailable in this save.",
   "saveCollection": "Collection",
   "saveRecords": "Records",
-  "recruitmentHistory": "Recruitment records",
+  "recruitmentHistory": "Gacha history",
   "saveCharacterMissions": "Character missions",
   "saveExperience": "EXP",
   "saveNoRecords": "No records",
