@@ -23,6 +23,7 @@ pub const ORIGINS: [&str; 2] = ["https://haneoka.org", "https://haneoka.com"];
 pub struct AppState {
     pub accounts: AccountStore,
     pub config: PathBuf,
+    preferences_lock: Mutex<()>,
     /// A website page a link asked for before the window had a site loaded.
     pub pending_path: Mutex<Option<String>>,
     /// Navigation callbacks can read this without waiting on Android's UI thread.
@@ -90,10 +91,12 @@ impl AppState {
 
     /// The site's locale and colours, kept for the app's own pages.
     pub fn preference(&self, key: &str) -> serde_json::Value {
+        let _lock = self.preferences_lock.lock().unwrap();
         self.preferences().get(key).cloned().unwrap_or(serde_json::Value::Null)
     }
 
     pub fn set_preference(&self, key: &str, value: serde_json::Value) {
+        let _lock = self.preferences_lock.lock().unwrap();
         let mut all = self.preferences();
         if all.get(key) == Some(&value) {
             return;
@@ -257,7 +260,14 @@ fn build_window(app: &AppHandle, direct: Option<u16>) -> tauri::Result<WebviewWi
             if url.scheme() == "haneoka" {
                 open_link(&handle, url);
             } else if matches!(url.scheme(), "http" | "https" | "mailto") {
-                let _ = handle.opener().open_url(url.as_str(), None::<&str>);
+                // The mobile opener waits for a reply from the activity's UI thread.
+                let handle = handle.clone();
+                let url = url.to_string();
+                tauri::async_runtime::spawn_blocking(move || {
+                    if let Err(error) = handle.opener().open_url(url, None::<&str>) {
+                        log::warn!("Could not open external link: {error}");
+                    }
+                });
             }
             false
         })
@@ -331,6 +341,7 @@ pub fn run() {
                 route_port,
                 accounts,
                 config: paths.app_config_dir()?,
+                preferences_lock: Mutex::new(()),
                 pending_path: Mutex::new(None),
                 active_page: Mutex::new(None),
                 sign_in: sign_in::Waiter::default(),

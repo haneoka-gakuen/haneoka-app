@@ -31,8 +31,10 @@
     capabilities: Object.freeze(["accountKeysV1", "saveSnapshotV1", "songProgressCountsV1", "appUpdateV1", "saveAutomationV1", "saveAutomationV2"]),
     call(method, args) {
       if (local[method]) {
-        location.assign(localBase + local[method](args));
-        return Promise.resolve(null);
+        return reportTheme().then(() => {
+          location.assign(localBase + local[method](args));
+          return null;
+        });
       }
       return invoke(method, args);
     },
@@ -110,18 +112,32 @@
     );
   };
   // The site's colours, for the app's own pages.
+  let themeKey = "";
+  let themeWrite = Promise.resolve();
   const reportTheme = () => {
-    const root = getComputedStyle(document.documentElement);
+    const element = document.documentElement;
+    const root = getComputedStyle(element);
     const colors = {};
     for (const name of ["primary", "on-primary", "primary-container", "on-primary-container", "secondary-container", "on-secondary-container",
       "tertiary-container", "on-tertiary-container", "surface", "on-surface", "on-surface-variant", "surface-container-lowest",
       "surface-container-low", "surface-container", "surface-container-high", "surface-container-highest", "outline", "outline-variant",
       "error", "inverse-surface", "inverse-on-surface"]) colors[name] = root.getPropertyValue("--md-sys-color-" + name).trim();
-    if (colors.primary) invoke("theme", { dark: document.documentElement.dataset.theme === "dark", colors }).catch(() => {});
+    if (!colors.primary) return themeWrite;
+    const snapshot = { dark: element.dataset.theme === "dark", preference: element.dataset.themePreference, colors };
+    const key = JSON.stringify(snapshot);
+    if (key === themeKey) return themeWrite;
+    themeKey = key;
+    themeWrite = themeWrite.then(() => invoke("theme", snapshot)).catch(() => {
+      if (themeKey === key) themeKey = "";
+    });
+    return themeWrite;
   };
   const watchTheme = () => {
     reportTheme();
-    new MutationObserver(reportTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    new MutationObserver(reportTheme).observe(document.documentElement, {
+      attributes: true, attributeFilter: ["data-theme", "data-theme-preference", "data-seed"],
+    });
+    document.addEventListener("astro:after-swap", reportTheme);
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watchTheme, { once: true });
   else watchTheme();

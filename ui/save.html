@@ -318,7 +318,6 @@
         const p = player();
         const favorite = catalog?.cards?.[String(p._favoriteMemberCardId ?? p._lastLiveDeckLeaderMemberCardId ?? "")];
         const art = catalog?.asset(favorite?.images?.full ?? favorite?.images?.thumbnail);
-        const started = int(p._tutorialFinishedAtUnixSeconds);
         const rating = rows("_topHighScoreRatings").reduce((sum, row) => sum + (int(row._highScoreRating) ?? 0), 0);
         const vip = int(p._vip?._rank);
         document.getElementById("bar").innerHTML = bar({
@@ -352,7 +351,6 @@
               <h2>${escape(a.name || a.profileId)}</h2>
               <span class="profile__region"><img src="${emblem(detail.release, a.server)}" alt="" />${escape(a.region ?? "")}</span>
               <button class="copy" type="button" data-action="copy-id">${escape(`${t("playerId")} ${a.profileId}`)}${icon("content_copy", "icon--small")}</button>
-              ${started ? `<span class="muted">${escape(`${t("tutorialDone")} / ${date(started * 1000)}`)}</span>` : ""}
               ${a.savedAt ? `<span class="muted">${escape(t("savedOn", { time: date(a.savedAt, true) }))}</span>` : ""}
             </div>
           </section>

@@ -75,22 +75,19 @@ const BAR_TOKENS = ["primary", "on-primary", "primary-container", "on-primary-co
   "on-tertiary-container", "surface", "on-surface", "on-surface-variant", "surface-container-lowest", "surface-container-low", "surface-container",
   "surface-container-high", "surface-container-highest", "outline", "outline-variant", "error", "inverse-surface", "inverse-on-surface"];
 
-/** Language, colours and bars for this page; resolves once the app answered. */
-export async function setup() {
-  try {
-    info = { ...info, ...(await call("appInfo")) };
-  } catch {}
-  if (info.locale && LOCALES.includes(info.locale)) locale = info.locale;
-  document.documentElement.lang = locale;
+const systemTheme = matchMedia("(prefers-color-scheme: dark)");
+function applyTheme() {
+  const root = document.documentElement;
   const theme = info.theme;
-  if (theme?.colors) {
-    const dark = matchMedia("(prefers-color-scheme: dark)").matches;
-    // The site's colours apply when the reader's light or dark setting matches them.
-    if (Boolean(theme.dark) === dark) {
-      for (const name of BAR_TOKENS) if (theme.colors[name]) document.documentElement.style.setProperty(`--md-sys-color-${name}`, theme.colors[name]);
-    }
+  const dark = typeof theme?.dark === "boolean" && theme.preference !== "system" ? theme.dark : systemTheme.matches;
+  root.dataset.theme = dark ? "dark" : "light";
+  const colors = theme?.dark === dark ? theme.colors : undefined;
+  for (const name of BAR_TOKENS) {
+    const property = `--md-sys-color-${name}`;
+    if (colors?.[name]) root.style.setProperty(property, colors[name]);
+    else root.style.removeProperty(property);
   }
-  const surface = getComputedStyle(document.documentElement).getPropertyValue("--md-sys-color-surface").trim();
+  const surface = getComputedStyle(root).getPropertyValue("--md-sys-color-surface").trim();
   const rgb = surface.match(/^#([0-9a-f]{6})$/i)
     ? surface
     : (() => {
@@ -101,6 +98,20 @@ export async function setup() {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(rgb.slice(i, i + 2), 16));
   call("systemBars", { color: rgb, dark: 0.299 * r + 0.587 * g + 0.114 * b < 128 }).catch(() => {});
 }
+
+/** Language, colours and bars for this page; resolves once the app answered. */
+export async function setup() {
+  document.documentElement.dataset.theme ??= systemTheme.matches ? "dark" : "light";
+  try {
+    info = { ...info, ...(await call("appInfo")) };
+  } catch {}
+  if (info.locale && LOCALES.includes(info.locale)) locale = info.locale;
+  document.documentElement.lang = locale;
+  applyTheme();
+}
+
+systemTheme.addEventListener("change", applyTheme);
+addEventListener("pageshow", (event) => { if (event.persisted) void setup(); });
 
 /** The top app bar: back, title and actions. */
 export function bar({ title, back, actions = "" }) {
