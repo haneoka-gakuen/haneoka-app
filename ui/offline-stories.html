@@ -11,20 +11,23 @@
 <body>
   <div id="bar"></div>
   <main class="page offline-stories">
-    <section id="storage"></section>
-    <section id="installed"></section>
-    <section>
-      <h2 id="catalog-title" class="methods-title"></h2>
-      <div class="cluster" id="catalog-actions"></div>
+    <section id="storage" class="surface story-storage"></section>
+    <section id="installed" class="surface story-panel" aria-labelledby="library-title"></section>
+    <section class="surface story-panel story-browser" aria-labelledby="catalog-title">
+      <h2 class="section-title"><span id="catalog-icon" class="section-badge"></span><span id="catalog-title"></span></h2>
+      <div class="story-filters" id="catalog-actions"></div>
+      <label class="field" id="offline-search-field" hidden>
+        <input type="search" id="offline-search" />
+      </label>
       <div id="catalog"></div>
     </section>
   </main>
-  <dialog id="delete-dialog">
-    <form method="dialog" class="offline-stories__dialog">
-      <p id="delete-label"></p>
-      <div class="cluster">
+  <dialog id="delete-dialog" aria-labelledby="delete-label">
+    <form method="dialog">
+      <h2 id="delete-label"></h2><p class="muted" id="delete-chapter"></p>
+      <div class="dialog__actions">
         <button value="cancel" class="button button--text" id="delete-cancel"></button>
-        <button value="delete" class="button button--filled" id="delete-confirm"></button>
+        <button value="delete" class="button button--text button--danger" id="delete-confirm"></button>
       </div>
     </form>
   </dialog>

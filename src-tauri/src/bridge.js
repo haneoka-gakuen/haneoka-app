@@ -36,7 +36,7 @@
     version: "__VERSION__",
     platform: "__PLATFORM__",
     capabilities: Object.freeze([
-      "accountKeysV1", "saveSnapshotV1", "songProgressCountsV1", "appUpdateV1", "saveAutomationV1", "saveAutomationV2", "offlineStoriesV1",
+      "accountKeysV1", "saveSnapshotV1", "songProgressCountsV1", "appUpdateV1", "saveAutomationV1", "saveAutomationV2", "offlineStoriesV1", "portableOfflineStoriesV1",
       ...(["android", "ios"].includes("__PLATFORM__") ? ["audioPlaybackV1"] : []),
     ]),
     call(method, args) {

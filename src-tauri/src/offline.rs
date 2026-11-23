@@ -25,6 +25,10 @@ use tauri::{
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+#[path = "offline_sources.rs"]
+mod sources;
+use sources::Source;
+
 type Result<T> = std::result::Result<T, String>;
 const SCHEMA: &str = "haneoka-story-offline-v1";
 const PROTOCOL: &str = "haneoka-story";
@@ -40,6 +44,8 @@ struct Player {
     version: String,
     sha256: String,
     bytes: u64,
+    #[serde(default)]
+    portable_story: bool,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -55,6 +61,10 @@ struct Package {
     manifest: String,
     bytes: u64,
     episodes: Vec<Episode>,
+    #[serde(default, skip_serializing_if = "Value::is_null")]
+    group: Value,
+    #[serde(default)]
+    missing_media: usize,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -104,6 +114,12 @@ struct Chapter {
     objects: BTreeMap<String, Object>,
 }
 
+impl Chapter {
+    fn supports_player(&self, player: &Player) -> bool {
+        Source::parse(&self.server).is_none() || player.portable_story
+    }
+}
+
 #[derive(Default, Deserialize, Serialize)]
 #[serde(default)]
 struct Library {
@@ -130,6 +146,7 @@ struct Transfer {
     downloaded: AtomicU64,
     total: AtomicU64,
     paused: AtomicBool,
+    discovering: AtomicBool,
 }
 
 pub struct Offline {
@@ -609,8 +626,12 @@ impl Offline {
             .buffer_unordered(6)
             .try_collect::<Vec<_>>()
             .await?;
+        self.commit_chapter(chapter)
+    }
+
+    fn commit_chapter(&self, chapter: Chapter) -> Result<()> {
         let mut library = self.library.lock().unwrap();
-        let key = format!("{server}/{id}");
+        let key = format!("{}/{}", chapter.server, chapter.package.id);
         let previous = library.chapters.insert(key.clone(), chapter);
         if let Err(error) = self.persist(&library) {
             if let Some(previous) = previous {
@@ -668,6 +689,7 @@ impl Offline {
             json!({
                 "bytes": status.downloaded.load(Ordering::Relaxed),
                 "total": status.total.load(Ordering::Relaxed),
+                "discovering": status.discovering.load(Ordering::Relaxed),
             })
         })
     }
@@ -680,7 +702,9 @@ impl Offline {
             .flat_map(|chapter| chapter.objects.iter())
             .collect();
         let story_bytes: u64 = objects.values().map(|entry| entry.bytes).sum();
-        let bytes = story_bytes + directory_bytes(&self.root.join("players"));
+        let bytes = story_bytes
+            + directory_bytes(&self.root.join("players"))
+            + directory_bytes(&self.root.join("partial-assets"));
         let installed: Vec<_> = library.chapters.iter().map(|(key, chapter)| {
             json!({"key": key, "server": chapter.server, "package": chapter.package})
         }).collect();
@@ -692,9 +716,14 @@ impl Offline {
         })
     }
 
-    fn player_present(&self) -> bool {
+    fn player_present(&self, portable: bool) -> bool {
         let library = self.library.lock().unwrap();
-        library.active.is_some() || library.pending.is_some()
+        library
+            .active
+            .iter()
+            .chain(library.pending.iter())
+            .chain(library.previous.iter())
+            .any(|player| !portable || player.portable_story)
     }
 
     fn open(
@@ -720,10 +749,10 @@ impl Offline {
             .find(|row| row.id == episode)
             .ok_or("story_missing")?
             .clone();
-        let player = library
-            .pending
-            .as_ref()
-            .or(library.active.as_ref())
+        let player = [&library.pending, &library.active, &library.previous]
+            .into_iter()
+            .flatten()
+            .find(|player| chapter.supports_player(player))
             .ok_or("player_missing")?
             .clone();
         let candidate = library
@@ -805,7 +834,12 @@ impl Offline {
                     library.pending = None;
                     library.rejected = Some(session.player.sha256.clone());
                     let _ = offline.persist(&library);
-                    library.active.clone()
+                    library
+                        .active
+                        .iter()
+                        .chain(library.previous.iter())
+                        .find(|player| session.chapter.supports_player(player))
+                        .cloned()
                 };
                 if let Some(active) = active {
                     let _ = offline.launch(
@@ -881,6 +915,7 @@ impl Offline {
                     "server": session.chapter.server, "releaseId": session.chapter.release_id, "episode": session.episode.id,
                     "title": title, "locale": session.locale, "returnUrl": crate::site::local_url("offline-stories.html").as_str(), "progress": progress,
                     "token": session.token, "theme": session.theme,
+                    "portableStory": Source::parse(&session.chapter.server).is_some(),
                 })).map_err(fail)?);
             }
             ("POST", "offline/ready" | "offline/progress") => {
@@ -912,7 +947,16 @@ impl Offline {
             ("GET" | "HEAD", _) => {}
             _ => return Err("method".into()),
         }
-        if let Some(reference) = session.chapter.resources.get(&key) {
+        let resource = if let Some(query) = request.uri().query() {
+            session
+                .chapter
+                .resources
+                .get(&format!("{key}?{query}"))
+                .or_else(|| session.chapter.resources.get(&key))
+        } else {
+            session.chapter.resources.get(&key)
+        };
+        if let Some(reference) = resource {
             let path = self.root.join("objects").join(&reference.sha256);
             if let Some(selector) = &reference.selector {
                 let body = fs::read(path).map_err(fail)?;
@@ -994,10 +1038,11 @@ impl Offline {
                 .transfer(|status| async move { self.install_player(origin, &status).await })
                 .await;
         }
-        let server = args["server"]
-            .as_str()
-            .filter(|value| matches!(*value, "jp" | "intl"))
-            .ok_or("story_server")?;
+        let server = args["server"].as_str().ok_or("story_server")?;
+        let source = Source::parse(server);
+        if source.is_none() && !matches!(server, "jp" | "intl") {
+            return Err("story_server".into());
+        }
         if method == "offlinePlay" {
             let id = args["chapter"].as_str().ok_or("story_chapter")?;
             let episode = args["episode"].as_str().ok_or("story_episode")?;
@@ -1011,23 +1056,43 @@ impl Offline {
         let _guard = self.action.try_lock().map_err(|_| "offline_busy")?;
         if method == "offlineCatalog" {
             let client = client()?;
-            let _ = self
-                .latest(
+            if let Some(source) = source {
+                self.load_portable_catalog(
+                    &client,
+                    origin,
+                    server,
+                    source,
+                    args["section"].as_str().unwrap_or(""),
+                    args["episode"].as_str(),
+                )
+                .await?;
+            } else {
+                self.latest(
                     &client,
                     &format!("{origin}/downloads/stories/{server}"),
                     server,
                 )
                 .await?;
+            }
             return Ok(self.view());
         }
         let id = args["chapter"].as_str().ok_or("story_chapter")?;
         match method {
             "offlineDownload" => {
                 self.transfer(|status| async move {
-                    if !self.player_present() {
+                    let portable = source.is_some();
+                    if !self.player_present(portable) {
                         self.install_player(origin, &status).await?;
+                        if !self.player_present(portable) {
+                            return Err("player_missing".into());
+                        }
                     }
-                    self.install_chapter(origin, server, id, &status).await
+                    if let Some(source) = source {
+                        self.install_portable_story(origin, server, source, id, &status)
+                            .await
+                    } else {
+                        self.install_chapter(origin, server, id, &status).await
+                    }
                 })
                 .await
             }
