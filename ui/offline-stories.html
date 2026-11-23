@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="referrer" content="no-referrer" />
+  <title>Haneoka</title>
+  <link rel="stylesheet" href="app.css" />
+  <script type="module" src="offline-stories.js"></script>
+</head>
+<body>
+  <div id="bar"></div>
+  <main class="page offline-stories">
+    <section id="storage"></section>
+    <section id="installed"></section>
+    <section>
+      <h2 id="catalog-title" class="methods-title"></h2>
+      <div class="cluster" id="catalog-actions"></div>
+      <div id="catalog"></div>
+    </section>
+  </main>
+  <dialog id="delete-dialog">
+    <form method="dialog" class="offline-stories__dialog">
+      <p id="delete-label"></p>
+      <div class="cluster">
+        <button value="cancel" class="button button--text" id="delete-cancel"></button>
+        <button value="delete" class="button button--filled" id="delete-confirm"></button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>

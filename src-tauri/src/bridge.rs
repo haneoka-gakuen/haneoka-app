@@ -690,5 +690,12 @@ pub async fn bridge(app: AppHandle, window: WebviewWindow, method: String, args:
     if crate::site_origin(&page).is_none() && !crate::local_page(&page) {
         return Err("origin".into());
     }
+    if method.starts_with("offline") {
+        if !crate::local_page(&page) {
+            return Err("origin".into());
+        }
+        let origin = crate::current_origin(&app);
+        return state(&app).offline.command(&window, &origin, &method, &args).await;
+    }
     dispatch(&app, &window, &method, &args).await
 }

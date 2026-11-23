@@ -42,7 +42,13 @@
     },
     "linux": {
       "deb": {
-        "depends": []
+        "depends": ["gstreamer1.0-plugins-good"]
+      },
+      "rpm": {
+        "depends": ["gstreamer1-plugins-good"]
+      },
+      "appimage": {
+        "bundleMediaFramework": true
       }
     },
     "windows": {

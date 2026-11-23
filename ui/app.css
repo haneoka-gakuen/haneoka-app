@@ -1429,3 +1429,35 @@ dialog h2 {
   min-height: 0;
   overflow: auto;
 }
+
+.offline-stories {
+  display: grid;
+  align-content: start;
+  gap: 24px;
+}
+.offline-stories .button,
+.offline-stories__transfer {
+  min-height: 48px;
+}
+.offline-stories__chapter > summary,
+.offline-stories__catalog-row {
+  min-height: 48px;
+  padding: 8px 12px;
+}
+.offline-stories__chapter > summary {
+  cursor: pointer;
+  align-content: center;
+  background: var(--md-sys-color-surface-container);
+}
+.offline-stories__chapter + .offline-stories__chapter {
+  margin-top: 4px;
+}
+.offline-stories__catalog-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.offline-stories__dialog {
+  padding: 20px;
+}

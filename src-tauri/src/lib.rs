@@ -2,6 +2,7 @@
 //! work the website asks for over `window.haneokaApp` (src/bridge.js).
 
 mod bridge;
+mod offline;
 mod platform;
 mod session;
 mod sign_in;
@@ -22,6 +23,7 @@ pub const ORIGINS: [&str; 2] = ["https://haneoka.org", "https://haneoka.com"];
 
 pub struct AppState {
     pub accounts: AccountStore,
+    pub offline: offline::Offline,
     pub config: PathBuf,
     preferences_lock: Mutex<()>,
     /// A website page a link asked for before the window had a site loaded.
@@ -251,7 +253,7 @@ fn build_window(app: &AppHandle, direct: Option<u16>) -> tauri::Result<WebviewWi
     let builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App(first.unwrap_or_else(|| "index.html".into()).into()))
         .initialization_script(&script)
         .on_navigation(move |url| {
-            if site_origin(url).is_some()
+            if offline::is_player_url(url) || site_origin(url).is_some()
                 || matches!(url.scheme(), "tauri" | "about" | "blob" | "data" | "asset")
                 || url.host_str() == Some("tauri.localhost")
             {
@@ -278,7 +280,12 @@ fn build_window(app: &AppHandle, direct: Option<u16>) -> tauri::Result<WebviewWi
         })
         .on_page_load(|window, payload| {
             *window.state::<AppState>().active_page.lock().unwrap() = Some(payload.url().clone());
-            site::page_load(&window, payload.event(), payload.url());
+            if !offline::is_player_url(payload.url()) {
+                site::page_load(&window, payload.event(), payload.url());
+                if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                    window.state::<AppState>().offline.clear_session();
+                }
+            }
             if cfg!(debug_assertions) {
                 eprintln!("page {:?} {}", payload.event(), payload.url());
                 if std::env::var_os("HANEOKA_SELF_TEST").is_some()
@@ -321,6 +328,12 @@ pub fn run() {
         }
     }));
     builder
+        .register_asynchronous_uri_scheme_protocol("haneoka-story", |context, request, responder| {
+            let app = context.app_handle().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                responder.respond(app.state::<AppState>().offline.respond(request));
+            });
+        })
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -340,6 +353,7 @@ pub fn run() {
                 route,
                 route_port,
                 accounts,
+                offline: offline::Offline::new(data.join("offline-stories")),
                 config: paths.app_config_dir()?,
                 preferences_lock: Mutex::new(()),
                 pending_path: Mutex::new(None),

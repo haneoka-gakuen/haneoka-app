@@ -23,9 +23,15 @@ tauri-plugin-opener = "2.7"
 tauri-plugin-deep-link = "2.6"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["arbitrary_precision", "preserve_order"] }
-tokio = { version = "1", features = ["net", "io-util", "time", "sync"] }
+tokio = { version = "1", features = ["net", "io-util", "time", "sync", "fs"] }
 base64 = "0.22"
 sha2 = "0.10"
+minisign-verify = "0.3"
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "stream"] }
+zip = { version = "2", default-features = false, features = ["deflate"] }
+percent-encoding = "2"
+futures-util = "0.3"
+rustls = { version = "0.23", default-features = false, features = ["std", "ring"] }
 rand = "0.8"
 url = "2"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }

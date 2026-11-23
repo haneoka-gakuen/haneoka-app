@@ -1584,9 +1584,14 @@ dependencies = [
  "android_logger",
  "base64 0.22.1",
  "chrono",
+ "futures-util",
  "haneoka-core",
  "log",
+ "minisign-verify",
+ "percent-encoding",
  "rand",
+ "reqwest",
+ "rustls",
  "serde",
  "serde_json",
  "sha2",
@@ -1602,6 +1607,7 @@ dependencies = [
  "tokio",
  "url",
  "winreg 0.55.0",
+ "zip 2.6.1",
 ]
 
 [[package]]
