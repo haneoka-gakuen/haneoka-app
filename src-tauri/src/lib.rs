@@ -334,6 +334,12 @@ pub fn run() {
                 responder.respond(app.state::<AppState>().offline.respond(request));
             });
         })
+        .register_asynchronous_uri_scheme_protocol("haneoka-cover", |context, request, responder| {
+            let app = context.app_handle().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                responder.respond(app.state::<AppState>().offline.cover(request));
+            });
+        })
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -381,6 +387,7 @@ pub fn run() {
                 }
             }
             build_window(&handle, handle.state::<AppState>().route_port)?;
+            offline::Offline::kick_queue(&handle);
             if handle.state::<AppState>().preference("route") == "direct" {
                 let route = handle.clone();
                 tauri::async_runtime::spawn(async move { route.state::<AppState>().set_direct(&route, true).await });

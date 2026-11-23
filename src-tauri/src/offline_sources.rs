@@ -44,7 +44,7 @@ impl<'a> Source<'a> {
         }
     }
 
-    fn valid_id(self, id: &str) -> bool {
+    pub(super) fn valid_id(self, id: &str) -> bool {
         if id.is_empty()
             || id.len() > 240
             || !id
@@ -92,6 +92,10 @@ struct CatalogRow {
     title: Value,
     #[serde(default)]
     group: Value,
+    #[serde(default, rename = "groupId")]
+    group_id: Option<String>,
+    #[serde(default, alias = "coverUrl")]
+    thumbnail: Option<String>,
     #[serde(default)]
     bytes: u64,
 }
@@ -102,12 +106,17 @@ impl CatalogRow {
             episodes: vec![Episode {
                 id: self.id.clone(),
                 title: self.title.clone(),
+                manifest: None,
+                thumbnail: self.thumbnail.clone(),
+                bytes: None,
             }],
             id: self.id,
             title: self.title,
             manifest: String::new(),
             bytes: self.bytes,
             group: self.group,
+            group_id: self.group_id,
+            thumbnail: self.thumbnail,
             missing_media: 0,
         }
     }
@@ -128,7 +137,10 @@ struct PortableStory {
     #[serde(default)]
     live2d: Vec<Value>,
     #[serde(default)]
+    characters: Vec<Value>,
+    #[serde(default)]
     project: Option<Value>,
+    thumbnail: Option<String>,
     #[serde(default)]
     assets: Vec<Pin>,
 }
@@ -198,6 +210,8 @@ impl Offline {
                         .cloned()
                         .unwrap_or_else(|| json!(id)),
                     group: Value::Null,
+                    group_id: None,
+                    thumbnail: story.thumbnail,
                     bytes: story.assets.iter().map(|asset| asset.bytes).sum(),
                 }
                 .package(),
@@ -211,6 +225,7 @@ impl Offline {
                 schema: "haneoka-portable-story-v1".to_owned(),
                 server: server.to_owned(),
                 common: String::new(),
+                root_sha: None,
                 packages,
             },
         );
@@ -235,11 +250,21 @@ impl Offline {
                 .map(|(section, _)| section)
                 .ok_or("story_section")?,
         };
-        let package = {
+        let key = catalog_key(server, section);
+        let has_catalog = self.library.lock().unwrap().catalogs.contains_key(&key);
+        if !has_catalog {
+            if let Err(error) = self
+                .load_portable_catalog(&client, origin, server, source, section, None)
+                .await
+            {
+                log::debug!("Offline catalogue {}: {error}", source.base());
+            }
+        }
+        let mut package = {
             let library = self.library.lock().unwrap();
             library
                 .catalogs
-                .get(&catalog_key(server, section))
+                .get(&key)
                 .and_then(|catalog| {
                     catalog
                         .packages
@@ -256,11 +281,39 @@ impl Offline {
                             .cloned()
                             .unwrap_or_else(|| json!(id)),
                         group: Value::Null,
+                        group_id: None,
+                        thumbnail: portable.thumbnail.clone(),
                         bytes: 0,
                     }
                     .package()
                 })
         };
+        if let Some(title) = portable.story.get("title").filter(|title| !title.is_null()) {
+            package.title = title.clone();
+            package.episodes[0].title = title.clone();
+        }
+        if let Some(group) = portable
+            .story
+            .get("chapterName")
+            .filter(|group| !group.is_null())
+        {
+            package.group = group.clone();
+        }
+        if let Some(group_id) = portable
+            .story
+            .get("chapterKey")
+            .and_then(Value::as_str)
+            .filter(|id| !id.is_empty())
+        {
+            package.group_id = Some(group_id.to_owned());
+        }
+        if let Some(thumb) = portable
+            .thumbnail
+            .as_deref()
+            .or_else(|| portable.story.get("episodeImage").and_then(Value::as_str))
+        {
+            package.thumbnail = Some(thumb.to_owned());
+        }
         let objects_dir = self.root.join("objects");
         let partial_dir = self.root.join("partial-assets");
         fs::create_dir_all(&objects_dir).map_err(fail)?;
@@ -273,11 +326,11 @@ impl Offline {
             objects: BTreeMap::new(),
         };
         let mut document = json!({
-            "story": portable.story, "live2d": portable.live2d, "project": portable.project,
+            "story": portable.story, "live2d": portable.live2d, "characters": portable.characters, "project": portable.project,
             "provider": !matches!(source, Source::Community),
         });
         let mut pending = BTreeMap::new();
-        collect_urls(&mut document, &url, &mut pending, false);
+        collect_urls(&mut document, &url, &mut pending, false, false);
         for pin in portable.assets {
             let target = media_url(&url, &pin.url, false).ok_or("story_asset_url")?;
             if !digest(&pin.sha256) || pin.bytes > MAX_OBJECT {
@@ -288,6 +341,7 @@ impl Offline {
                 Asset {
                     url: target,
                     pin: Some(pin),
+                    optional: false,
                 },
             );
         }
@@ -337,10 +391,7 @@ impl Offline {
                 .await?;
             for (key, asset, result) in saved {
                 let Some((mut hash, mut object)) = result else {
-                    unavailable.insert(
-                        key,
-                        fallback_media(&asset.url).ok_or("story_asset_missing")?,
-                    );
+                    unavailable.insert(key, fallback_media(&asset.url).unwrap_or(""));
                     continue;
                 };
                 let file = objects_dir.join(&hash);
@@ -376,6 +427,39 @@ impl Offline {
         }
         replace_unavailable(&mut document, &url, &unavailable);
         chapter.package.missing_media = unavailable.len();
+        if let Some(cover) = chapter
+            .package
+            .thumbnail
+            .as_ref()
+            .and_then(|src| media_url(&url, src, false))
+        {
+            let key = media_key(&cover)?;
+            if !chapter.resources.contains_key(&key) {
+                let asset = Asset {
+                    url: cover,
+                    pin: None,
+                    optional: true,
+                };
+                match download_asset(&client, &asset, &objects_dir, &partial_dir, transfer).await {
+                    Ok(Some((hash, object))) if thumbnail_type(&object.media_type) => {
+                        chapter.resources.insert(
+                            key.clone(),
+                            Reference {
+                                sha256: hash.clone(),
+                                selector: None,
+                            },
+                        );
+                        chapter.objects.insert(hash, object);
+                    }
+                    Err(error) if error == "paused" => return Err(error),
+                    _ => {}
+                }
+            }
+            if chapter.resources.contains_key(&key) {
+                chapter.package.thumbnail = Some(format!("/{key}"));
+                chapter.package.episodes[0].thumbnail = chapter.package.thumbnail.clone();
+            }
+        }
         let body = serde_json::to_vec(&document).map_err(fail)?;
         let sha256 = format!("{:x}", Sha256::digest(&body));
         atomic(&objects_dir.join(&sha256), &body)?;
@@ -399,6 +483,9 @@ impl Offline {
         );
         chapter.package.manifest = chapter.release_id.clone();
         chapter.package.bytes = chapter.objects.values().map(|entry| entry.bytes).sum();
+        if transfer.paused.load(Ordering::Relaxed) {
+            return Err("paused".into());
+        }
         self.commit_chapter(chapter)
     }
 }
@@ -467,6 +554,7 @@ fn media_key(url: &Url) -> Result<String> {
 struct Asset {
     url: Url,
     pin: Option<Pin>,
+    optional: bool,
 }
 
 fn collect_urls(
@@ -474,6 +562,7 @@ fn collect_urls(
     base: &Url,
     pending: &mut BTreeMap<String, Asset>,
     relative: bool,
+    optional: bool,
 ) {
     match value {
         Value::String(text) => {
@@ -491,18 +580,35 @@ fn collect_urls(
                         url.query().map(|q| format!("?{q}")).unwrap_or_default()
                     );
                 }
-                pending.entry(key).or_insert(Asset { url, pin: None });
+                pending
+                    .entry(key)
+                    .and_modify(|asset| asset.optional &= optional)
+                    .or_insert(Asset {
+                        url,
+                        pin: None,
+                        optional,
+                    });
             }
         }
         Value::Array(rows) => rows
             .iter_mut()
-            .for_each(|row| collect_urls(row, base, pending, relative)),
+            .for_each(|row| collect_urls(row, base, pending, relative, optional)),
         Value::Object(row) => row.iter_mut().for_each(|(key, value)| {
             if !matches!(
                 key.as_str(),
                 "sourcePath" | "raw" | "sourceDiagnostics" | "provenance"
             ) {
-                collect_urls(value, base, pending, relative);
+                collect_urls(
+                    value,
+                    base,
+                    pending,
+                    relative,
+                    optional
+                        || matches!(
+                            key.as_str(),
+                            "thumbnail" | "episodeImage" | "faceImage" | "coverUrl"
+                        ),
+                );
             }
         }),
         _ => {}
@@ -522,11 +628,11 @@ fn expand_asset(
         let mut data: Value = read_json(&fs::read(file).map_err(fail)?)?;
         let original = data.clone();
         if let Some(references) = data.get_mut("FileReferences") {
-            collect_urls(references, url, pending, true);
+            collect_urls(references, url, pending, true, false);
         } else if data.get("model").is_some() && data.get("textures").is_some() {
-            collect_urls(&mut data, url, pending, true);
+            collect_urls(&mut data, url, pending, true, false);
         } else if path.contains("/sources/") {
-            collect_urls(&mut data, url, pending, false);
+            collect_urls(&mut data, url, pending, false, false);
         }
         if original != data {
             return serde_json::to_vec(&data).map(Some).map_err(fail);
@@ -541,7 +647,13 @@ fn expand_asset(
             if line.is_empty() {
                 page_start = true;
             } else if page_start {
-                collect_urls(&mut Value::String(line.to_owned()), url, pending, true);
+                collect_urls(
+                    &mut Value::String(line.to_owned()),
+                    url,
+                    pending,
+                    true,
+                    false,
+                );
                 page_start = false;
             }
         }
@@ -743,7 +855,7 @@ async fn download_asset(
             }
             expected = Some(full_size);
         }
-        404 | 410 if fallback_media(url).is_some() => {
+        404 | 410 if asset.optional || fallback_media(url).is_some() => {
             let _ = fs::remove_file(partial);
             let _ = fs::remove_file(tag_file);
             return Ok(None);

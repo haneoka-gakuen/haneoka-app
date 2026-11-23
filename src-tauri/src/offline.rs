@@ -25,12 +25,16 @@ use tauri::{
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+#[path = "offline_queue.rs"]
+mod queue;
 #[path = "offline_sources.rs"]
 mod sources;
+use queue::{DownloadJob, JobState};
 use sources::Source;
 
 type Result<T> = std::result::Result<T, String>;
-const SCHEMA: &str = "haneoka-story-offline-v1";
+const SCHEMA: &str = "haneoka-story-offline-v2";
+const PLAYER_SCHEMA: &str = "haneoka-story-player-v2";
 const PROTOCOL: &str = "haneoka-story";
 const MAX_DESCRIPTOR: usize = 16 * 1024 * 1024;
 const MAX_PLAYER: u64 = 64 * 1024 * 1024;
@@ -44,25 +48,34 @@ struct Player {
     version: String,
     sha256: String,
     bytes: u64,
-    #[serde(default)]
-    portable_story: bool,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
 struct Episode {
     id: String,
     title: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    manifest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    thumbnail: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bytes: Option<u64>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
 struct Package {
     id: String,
     title: Value,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     manifest: String,
     bytes: u64,
     episodes: Vec<Episode>,
     #[serde(default, skip_serializing_if = "Value::is_null")]
     group: Value,
+    #[serde(rename = "groupId", skip_serializing_if = "Option::is_none")]
+    group_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    thumbnail: Option<String>,
     #[serde(default)]
     missing_media: usize,
 }
@@ -72,6 +85,8 @@ struct Catalog {
     schema: String,
     server: String,
     common: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    root_sha: Option<String>,
     packages: Vec<Package>,
 }
 
@@ -115,8 +130,55 @@ struct Chapter {
 }
 
 impl Chapter {
-    fn supports_player(&self, player: &Player) -> bool {
-        Source::parse(&self.server).is_none() || player.portable_story
+    fn presented_package(&self) -> Package {
+        let mut package = self.package.clone();
+        let fallback = self
+            .resources
+            .iter()
+            .find(|(path, row)| {
+                [
+                    "/bg/",
+                    "/scenario/background/",
+                    "/Adv/Stage/",
+                    "/game/background/",
+                ]
+                .iter()
+                .any(|prefix| path.contains(prefix))
+                    && self
+                        .objects
+                        .get(&row.sha256)
+                        .is_some_and(|object| thumbnail_type(&object.media_type))
+            })
+            .map(|(_, reference)| cover_url(&reference.sha256));
+        let cover = |value: &str| {
+            let url = Url::parse(value)
+                .or_else(|_| Url::parse("https://haneoka.org").unwrap().join(value))
+                .ok()?;
+            let key = path_key(url.path()).ok()?;
+            let full_key = url.query().map(|query| format!("{key}?{query}"));
+            let reference = full_key
+                .as_ref()
+                .and_then(|full| self.resources.get(full))
+                .or_else(|| self.resources.get(&key))?;
+            let object = self.objects.get(&reference.sha256)?;
+            thumbnail_type(&object.media_type).then(|| cover_url(&reference.sha256))
+        };
+        for episode in &mut package.episodes {
+            episode.thumbnail = episode.thumbnail.as_deref().and_then(&cover);
+            episode.manifest = None;
+        }
+        package.thumbnail = package
+            .thumbnail
+            .as_deref()
+            .and_then(&cover)
+            .or_else(|| {
+                package
+                    .episodes
+                    .iter()
+                    .find_map(|episode| episode.thumbnail.clone())
+            })
+            .or(fallback);
+        package
     }
 }
 
@@ -129,6 +191,8 @@ struct Library {
     rejected: Option<String>,
     chapters: BTreeMap<String, Chapter>,
     catalogs: BTreeMap<String, Catalog>,
+    queue: Vec<DownloadJob>,
+    queue_paused: bool,
 }
 
 struct Session {
@@ -155,6 +219,7 @@ pub struct Offline {
     transfer: Mutex<Option<Arc<Transfer>>>,
     session: Mutex<Option<Arc<Session>>>,
     action: tokio::sync::Mutex<()>,
+    queue_running: AtomicBool,
 }
 
 fn fail(error: impl std::fmt::Display) -> String {
@@ -375,7 +440,7 @@ fn verified_player(body: &[u8]) -> Result<Player> {
         )
         .map_err(fail)?;
     let player: Player = read_json(&manifest)?;
-    if player.schema != "haneoka-story-player-v1"
+    if player.schema != PLAYER_SCHEMA
         || !digest(&player.sha256)
         || !(1..=MAX_PLAYER).contains(&player.bytes)
         || !(1..=100).contains(&player.version.len())
@@ -425,16 +490,22 @@ fn extract_player(zip: &Path, target: &Path) -> Result<()> {
 
 impl Offline {
     pub fn new(root: PathBuf) -> Self {
-        let library = fs::read(root.join("library.json"))
+        let mut library: Library = fs::read(root.join("library.json"))
             .ok()
             .and_then(|bytes| read_json(&bytes).ok())
             .unwrap_or_default();
+        for job in &mut library.queue {
+            if job.state == JobState::Downloading {
+                job.state = JobState::Queued;
+            }
+        }
         Self {
             root,
             library: Mutex::new(library),
             transfer: Mutex::new(None),
             session: Mutex::new(None),
             action: tokio::sync::Mutex::new(()),
+            queue_running: AtomicBool::new(false),
         }
     }
 
@@ -526,35 +597,65 @@ impl Offline {
         {
             return Err("story_release".into());
         }
+        if let Some(catalog) = self
+            .library
+            .lock()
+            .unwrap()
+            .catalogs
+            .get(server)
+            .filter(|catalog| catalog.root_sha.as_ref() == Some(&pointer.sha256))
+            .cloned()
+        {
+            return Ok((pointer.release_id, catalog));
+        }
         let url = format!(
             "{base}/{}/manifests/{}.json",
             pointer.release_id, pointer.sha256
         );
-        let catalog: Catalog = read_json(&descriptor(client, &url, Some(&pointer.sha256)).await?)?;
+        let mut catalog: Catalog =
+            read_json(&descriptor(client, &url, Some(&pointer.sha256)).await?)?;
         if catalog.schema != SCHEMA || catalog.server != server || !digest(&catalog.common) {
             return Err("story_catalog".into());
         }
+        catalog.root_sha = Some(pointer.sha256);
         let mut library = self.library.lock().unwrap();
         library.catalogs.insert(server.to_owned(), catalog.clone());
         self.persist(&library)?;
         Ok((pointer.release_id, catalog))
     }
 
-    async fn install_chapter(
+    async fn install_episode(
         &self,
         origin: &str,
         server: &str,
         id: &str,
+        story: &str,
         transfer: &Transfer,
     ) -> Result<()> {
         let client = client()?;
         let base = format!("{origin}/downloads/stories/{server}");
         let (release_id, catalog) = self.latest(&client, &base, server).await?;
-        let package = catalog
+        let group = catalog
             .packages
             .into_iter()
             .find(|row| row.id == id)
             .ok_or("story_chapter")?;
+        let episode = group
+            .episodes
+            .into_iter()
+            .find(|entry| entry.id == story)
+            .ok_or("story_episode")?;
+        let package = Package {
+            id: episode.id.clone(),
+            title: episode.title.clone(),
+            manifest: episode.manifest.clone().ok_or("story_episode_manifest")?,
+            bytes: episode.bytes.unwrap_or(0),
+            group: group.title,
+            group_id: Some(group.id),
+            thumbnail: episode.thumbnail.clone(),
+            episodes: vec![episode],
+            missing_media: 0,
+        };
         if !digest(&package.manifest) {
             return Err("story_manifest".into());
         }
@@ -626,6 +727,9 @@ impl Offline {
             .buffer_unordered(6)
             .try_collect::<Vec<_>>()
             .await?;
+        if transfer.paused.load(Ordering::Relaxed) {
+            return Err("paused".into());
+        }
         self.commit_chapter(chapter)
     }
 
@@ -706,24 +810,26 @@ impl Offline {
             + directory_bytes(&self.root.join("players"))
             + directory_bytes(&self.root.join("partial-assets"));
         let installed: Vec<_> = library.chapters.iter().map(|(key, chapter)| {
-            json!({"key": key, "server": chapter.server, "package": chapter.package})
+            json!({"key": key, "server": chapter.server, "package": chapter.presented_package()})
         }).collect();
         json!({
             "installed": installed, "catalogs": library.catalogs, "bytes": bytes,
             "player": library.active.as_ref(),
             "pendingPlayer": library.pending.as_ref(),
             "transfer": self.transfer_status(),
+            "queue": library.queue,
+            "queuePaused": library.queue_paused,
         })
     }
 
-    fn player_present(&self, portable: bool) -> bool {
+    fn player_present(&self) -> bool {
         let library = self.library.lock().unwrap();
         library
             .active
             .iter()
             .chain(library.pending.iter())
             .chain(library.previous.iter())
-            .any(|player| !portable || player.portable_story)
+            .any(|player| player.schema == PLAYER_SCHEMA)
     }
 
     fn open(
@@ -752,7 +858,7 @@ impl Offline {
         let player = [&library.pending, &library.active, &library.previous]
             .into_iter()
             .flatten()
-            .find(|player| chapter.supports_player(player))
+            .find(|player| player.schema == PLAYER_SCHEMA)
             .ok_or("player_missing")?
             .clone();
         let candidate = library
@@ -838,7 +944,7 @@ impl Offline {
                         .active
                         .iter()
                         .chain(library.previous.iter())
-                        .find(|player| session.chapter.supports_player(player))
+                        .find(|player| player.schema == PLAYER_SCHEMA)
                         .cloned()
                 };
                 if let Some(active) = active {
@@ -914,11 +1020,13 @@ impl Offline {
                 return respond(200, "application/json", serde_json::to_vec(&json!({
                     "server": session.chapter.server, "releaseId": session.chapter.release_id, "episode": session.episode.id,
                     "title": title, "locale": session.locale, "returnUrl": crate::site::local_url("offline-stories.html").as_str(), "progress": progress,
+                    "chapterTitle": localized(&session.chapter.package.group, &session.locale),
+                    "chapter": session.chapter.package.group_id,
                     "token": session.token, "theme": session.theme,
                     "portableStory": Source::parse(&session.chapter.server).is_some(),
                 })).map_err(fail)?);
             }
-            ("POST", "offline/ready" | "offline/progress") => {
+            ("POST", "offline/ready" | "offline/detail-ready" | "offline/progress") => {
                 if request
                     .headers()
                     .get("X-Haneoka-Session")
@@ -927,7 +1035,9 @@ impl Offline {
                 {
                     return Err("player_session".into());
                 }
-                if key == "offline/ready" {
+                if key == "offline/detail-ready" {
+                    session.ready.store(true, Ordering::Release);
+                } else if key == "offline/ready" {
                     self.confirm(&session)?;
                 } else {
                     let ordinal = std::str::from_utf8(request.body())
@@ -1006,6 +1116,32 @@ impl Offline {
         )
     }
 
+    pub fn cover(&self, request: Request<Vec<u8>>) -> Response<Vec<u8>> {
+        let key = request.uri().path().trim_start_matches('/');
+        let object = if digest(key) && matches!(request.method().as_str(), "GET" | "HEAD") {
+            let library = self.library.lock().unwrap();
+            library.chapters.values().find_map(|chapter| {
+                chapter
+                    .objects
+                    .get(key)
+                    .filter(|object| thumbnail_type(&object.media_type))
+                    .cloned()
+            })
+        } else {
+            None
+        };
+        if let Some(object) = object {
+            if let Ok(response) = file_response(
+                &request,
+                self.root.join("objects").join(key),
+                &object.media_type,
+            ) {
+                return response;
+            }
+        }
+        respond(404, "text/plain", Vec::new()).unwrap()
+    }
+
     pub fn respond(&self, request: Request<Vec<u8>>) -> Response<Vec<u8>> {
         self.reply(request).unwrap_or_else(|error| {
             log::debug!("Offline story resource: {error}");
@@ -1020,6 +1156,9 @@ impl Offline {
         method: &str,
         args: &Value,
     ) -> Result<Value> {
+        if let Some(result) = self.queue_command(window, method, args).await {
+            return result;
+        }
         if method == "offlineStories" {
             return Ok(self.view());
         }
@@ -1076,40 +1215,7 @@ impl Offline {
             }
             return Ok(self.view());
         }
-        let id = args["chapter"].as_str().ok_or("story_chapter")?;
-        match method {
-            "offlineDownload" => {
-                self.transfer(|status| async move {
-                    let portable = source.is_some();
-                    if !self.player_present(portable) {
-                        self.install_player(origin, &status).await?;
-                        if !self.player_present(portable) {
-                            return Err("player_missing".into());
-                        }
-                    }
-                    if let Some(source) = source {
-                        self.install_portable_story(origin, server, source, id, &status)
-                            .await
-                    } else {
-                        self.install_chapter(origin, server, id, &status).await
-                    }
-                })
-                .await
-            }
-            "offlineDelete" => {
-                let mut library = self.library.lock().unwrap();
-                let key = format!("{server}/{id}");
-                if let Some(chapter) = library.chapters.remove(&key) {
-                    if let Err(error) = self.persist(&library) {
-                        library.chapters.insert(key, chapter);
-                        return Err(error);
-                    }
-                    self.collect_objects(&library);
-                }
-                Ok(Value::Null)
-            }
-            _ => Err("offline_method".into()),
-        }
+        Err("offline_method".into())
     }
 
     async fn transfer<F, Fut>(&self, run: F) -> Result<Value>
@@ -1124,6 +1230,22 @@ impl Offline {
         result?;
         Ok(self.view())
     }
+}
+
+fn thumbnail_type(mime: &str) -> bool {
+    matches!(
+        mime.split(';').next(),
+        Some("image/jpeg" | "image/png" | "image/webp")
+    )
+}
+
+fn cover_url(sha256: &str) -> String {
+    let origin = if cfg!(any(windows, target_os = "android")) {
+        "http://haneoka-cover.localhost"
+    } else {
+        "haneoka-cover://localhost"
+    };
+    format!("{origin}/{sha256}")
 }
 
 fn directory_bytes(directory: &Path) -> u64 {

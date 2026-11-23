@@ -11,20 +11,27 @@
 <body>
   <div id="bar"></div>
   <main class="page offline-stories">
-    <section id="storage" class="surface story-storage"></section>
+    <div class="story-main">
+    <section id="queue" class="surface story-panel" aria-labelledby="queue-title" hidden></section>
     <section id="installed" class="surface story-panel" aria-labelledby="library-title"></section>
-    <section class="surface story-panel story-browser" aria-labelledby="catalog-title">
-      <h2 class="section-title"><span id="catalog-icon" class="section-badge"></span><span id="catalog-title"></span></h2>
+    </div>
+    <aside class="story-tools">
+    <details class="surface story-browser" id="browser">
+      <summary class="section-title"><span id="catalog-icon" class="section-badge"></span><span class="grow" id="catalog-title"></span><span class="story-disclosure"></span></summary>
+      <div class="story-panel">
       <div class="story-filters" id="catalog-actions"></div>
       <label class="field" id="offline-search-field" hidden>
         <input type="search" id="offline-search" />
       </label>
       <div id="catalog"></div>
-    </section>
+      </div>
+    </details>
+    <section id="storage" class="surface story-storage"></section>
+    </aside>
   </main>
   <dialog id="delete-dialog" aria-labelledby="delete-label">
     <form method="dialog">
-      <h2 id="delete-label"></h2><p class="muted" id="delete-chapter"></p>
+      <h2 id="delete-label"></h2><ul class="story-delete-list" id="delete-chapter"></ul>
       <div class="dialog__actions">
         <button value="cancel" class="button button--text" id="delete-cancel"></button>
         <button value="delete" class="button button--text button--danger" id="delete-confirm"></button>

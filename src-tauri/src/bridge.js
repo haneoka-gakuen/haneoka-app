@@ -23,20 +23,14 @@
   const localBase = "__LOCAL__";
   const local = {
     openGameAccount: (args) => `save.html?key=${encodeURIComponent(args?.key ?? "")}${args?.fromAccount ? "&from=account" : ""}`,
-    openOfflineStories: (args) => {
-      const query = new URLSearchParams();
-      for (const key of ["server", "chapter", "episode"]) {
-        if (typeof args?.[key] === "string") query.set(key, args[key]);
-      }
-      return "offline-stories.html?" + query;
-    },
+    openOfflineStories: () => "offline-stories.html",
     addGameAccount: (args) => args?.fromAccount ? "import.html?from=account" : "import.html",
   };
   window.haneokaApp = Object.freeze({
     version: "__VERSION__",
     platform: "__PLATFORM__",
     capabilities: Object.freeze([
-      "accountKeysV1", "saveSnapshotV1", "songProgressCountsV1", "appUpdateV1", "saveAutomationV1", "saveAutomationV2", "offlineStoriesV1", "portableOfflineStoriesV1",
+      "accountKeysV1", "saveSnapshotV1", "songProgressCountsV1", "appUpdateV1", "saveAutomationV1", "saveAutomationV2", "offlineQueueV1",
       ...(["android", "ios"].includes("__PLATFORM__") ? ["audioPlaybackV1"] : []),
     ]),
     call(method, args) {
