@@ -1579,7 +1579,7 @@ dependencies = [
 
 [[package]]
 name = "haneoka"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "android_logger",
  "base64 0.22.1",
@@ -1612,7 +1612,7 @@ dependencies = [
 
 [[package]]
 name = "haneoka-core"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "aes",
  "base64 0.22.1",
@@ -4235,7 +4235,7 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-haneoka-device"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "serde",
  "serde_json",

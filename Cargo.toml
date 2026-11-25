@@ -3,7 +3,7 @@ resolver = "2"
 members = ["core", "plugins/device", "src-tauri"]
 
 [workspace.package]
-version = "0.4.2"
+version = "0.4.3"
 edition = "2021"
 license = "MPL-2.0"
 repository = "https://github.com/haneoka-gakuen/haneoka-app"
