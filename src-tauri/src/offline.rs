@@ -35,6 +35,7 @@ use sources::Source;
 type Result<T> = std::result::Result<T, String>;
 const SCHEMA: &str = "haneoka-story-offline-v2";
 const PLAYER_SCHEMA: &str = "haneoka-story-player-v2";
+const PLAYER_PUBLIC_KEY: &str = "RWTjkSdfWojdL1tLeZKJRLvGom8b9OWfYitVuFtllSr988tU7iOgCsfA";
 const PROTOCOL: &str = "haneoka-story";
 const MAX_DESCRIPTOR: usize = 16 * 1024 * 1024;
 const MAX_PLAYER: u64 = 96 * 1024 * 1024;
@@ -428,12 +429,7 @@ fn verified_player(body: &[u8]) -> Result<Player> {
     let manifest = STANDARD.decode(signed.manifest).map_err(fail)?;
     let signature =
         String::from_utf8(STANDARD.decode(signed.signature).map_err(fail)?).map_err(fail)?;
-    let config: Value = read_json(include_bytes!("../tauri.conf.json"))?;
-    let key = config["plugins"]["updater"]["pubkey"]
-        .as_str()
-        .ok_or("player_public_key")?;
-    let key = String::from_utf8(STANDARD.decode(key).map_err(fail)?).map_err(fail)?;
-    PublicKey::decode(&key)
+    PublicKey::from_base64(PLAYER_PUBLIC_KEY)
         .map_err(fail)?
         .verify(
             &manifest,
