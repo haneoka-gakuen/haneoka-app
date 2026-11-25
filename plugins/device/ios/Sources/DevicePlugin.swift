@@ -37,6 +37,17 @@ class DevicePlugin: Plugin {
       invoke.resolve()
     }
   }
+
+  @objc public func audioPlayback(_ invoke: Invoke) throws {
+    let args = try invoke.parseArgs(PlaybackArgs.self)
+    DispatchQueue.main.async {
+      do {
+        invoke.resolve(try Playback.shared.dispatch(args))
+      } catch {
+        invoke.reject("audio_playback", error: error)
+      }
+    }
+  }
 }
 
 extension UIColor {

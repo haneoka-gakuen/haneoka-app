@@ -1,6 +1,5 @@
-//! The phone's own access to the game's folder (Shizuku, or a folder grant
-//! on Android 8–12), and the system bars, fullscreen and orientation the
-//! page asks for. Android only; other platforms register nothing.
+//! Native device services for the web view: game saves on Android, window
+//! controls, and background music playback on Android and iOS.
 
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};

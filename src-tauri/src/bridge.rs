@@ -444,6 +444,29 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
             app.device().call::<Value, _>(method, args).await?;
             Ok(Value::Null)
         }
+        #[cfg(mobile)]
+        "audioPlayback" => {
+            if window.url().ok().as_ref().and_then(crate::site_origin).is_none() {
+                return Err("origin".into());
+            }
+            if let Some(queue) = args.get("queue").and_then(Value::as_array) {
+                for track in queue {
+                    for field in ["source", "artwork"] {
+                        let Some(raw) = text(track, field) else {
+                            if field == "artwork" { continue; }
+                            return Err("audio_url".into());
+                        };
+                        let url = url::Url::parse(raw).map_err(|_| "audio_url")?;
+                        if !matches!(url.scheme(), "http" | "https")
+                            || url.host_str().is_none() || !url.username().is_empty() || url.password().is_some()
+                        {
+                            return Err("audio_url".into());
+                        }
+                    }
+                }
+            }
+            app.device().call(method, args).await
+        }
         "systemBars" => {
             #[cfg(mobile)]
             app.device().call::<Value, _>(method, args).await?;

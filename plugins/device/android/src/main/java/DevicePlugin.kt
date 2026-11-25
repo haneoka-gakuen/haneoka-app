@@ -102,6 +102,7 @@ class OrientationArgs {
  */
 @TauriPlugin
 class DevicePlugin(private val activity: Activity) : Plugin(activity) {
+    private val playback = PlaybackConnection(activity)
     private val worker = Executors.newSingleThreadExecutor()
     private val errors = Executors.newSingleThreadExecutor()
     private val timeouts = Executors.newSingleThreadScheduledExecutor()
@@ -135,6 +136,7 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     override fun onDestroy(activity: AppCompatActivity) {
+        playback.close()
         Shizuku.removeRequestPermissionResultListener(permissionListener)
         finishPermission(false)
     }
@@ -342,6 +344,7 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
     @Command
     fun webViewProxy(invoke: Invoke) {
         val args = invoke.parseArgs(ProxyArgs::class.java)
+        PlaybackService.directProxyPort = args.port
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
             invoke.resolve(JSObject().put("applied", false))
             return
@@ -361,6 +364,12 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
         ProxyController.getInstance().setProxyOverride(config, { it.run() }) {
             invoke.resolve(JSObject().put("applied", true))
         }
+    }
+
+    @Command
+    fun audioPlayback(invoke: Invoke) {
+        val args = invoke.parseArgs(PlaybackArgs::class.java)
+        activity.runOnUiThread { playback.dispatch(args, invoke) }
     }
 
     @Command

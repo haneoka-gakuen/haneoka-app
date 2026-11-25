@@ -34,5 +34,8 @@ dependencies {
     implementation("dev.rikka.shizuku:aidl:13.1.5")
     // The web view's proxy override: the site goes through the app's own route.
     implementation("androidx.webkit:webkit:1.12.1")
+    implementation("androidx.media3:media3-exoplayer:1.9.4")
+    implementation("androidx.media3:media3-session:1.9.4")
+    implementation("androidx.media3:media3-datasource-okhttp:1.9.4")
     implementation(project(":tauri-android"))
 }
