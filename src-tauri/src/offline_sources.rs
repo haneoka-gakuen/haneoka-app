@@ -330,7 +330,7 @@ impl Offline {
             "provider": !matches!(source, Source::Community),
         });
         let mut pending = BTreeMap::new();
-        collect_urls(&mut document, &url, &mut pending, false, false);
+        collect_urls(&mut document, &url, &mut pending, false);
         for pin in portable.assets {
             let target = media_url(&url, &pin.url, false).ok_or("story_asset_url")?;
             if !digest(&pin.sha256) || pin.bytes > MAX_OBJECT {
@@ -341,11 +341,10 @@ impl Offline {
                 Asset {
                     url: target,
                     pin: Some(pin),
-                    optional: false,
                 },
             );
         }
-        let mut unavailable = BTreeMap::new();
+        let mut unavailable = BTreeSet::new();
         while !pending.is_empty() {
             if transfer.paused.load(Ordering::Relaxed) {
                 return Err("paused".into());
@@ -391,7 +390,7 @@ impl Offline {
                 .await?;
             for (key, asset, result) in saved {
                 let Some((mut hash, mut object)) = result else {
-                    unavailable.insert(key, fallback_media(&asset.url).unwrap_or(""));
+                    unavailable.insert(key);
                     continue;
                 };
                 let file = objects_dir.join(&hash);
@@ -422,10 +421,9 @@ impl Offline {
                 }
             }
             pending.retain(|key, _| {
-                !chapter.resources.contains_key(key) && !unavailable.contains_key(key)
+                !chapter.resources.contains_key(key) && !unavailable.contains(key)
             });
         }
-        replace_unavailable(&mut document, &url, &unavailable);
         chapter.package.missing_media = unavailable.len();
         if let Some(cover) = chapter
             .package
@@ -438,7 +436,6 @@ impl Offline {
                 let asset = Asset {
                     url: cover,
                     pin: None,
-                    optional: true,
                 };
                 match download_asset(&client, &asset, &objects_dir, &partial_dir, transfer).await {
                     Ok(Some((hash, object))) if thumbnail_type(&object.media_type) => {
@@ -554,7 +551,6 @@ fn media_key(url: &Url) -> Result<String> {
 struct Asset {
     url: Url,
     pin: Option<Pin>,
-    optional: bool,
 }
 
 fn collect_urls(
@@ -562,7 +558,6 @@ fn collect_urls(
     base: &Url,
     pending: &mut BTreeMap<String, Asset>,
     relative: bool,
-    optional: bool,
 ) {
     match value {
         Value::String(text) => {
@@ -580,35 +575,18 @@ fn collect_urls(
                         url.query().map(|q| format!("?{q}")).unwrap_or_default()
                     );
                 }
-                pending
-                    .entry(key)
-                    .and_modify(|asset| asset.optional &= optional)
-                    .or_insert(Asset {
-                        url,
-                        pin: None,
-                        optional,
-                    });
+                pending.entry(key).or_insert(Asset { url, pin: None });
             }
         }
         Value::Array(rows) => rows
             .iter_mut()
-            .for_each(|row| collect_urls(row, base, pending, relative, optional)),
+            .for_each(|row| collect_urls(row, base, pending, relative)),
         Value::Object(row) => row.iter_mut().for_each(|(key, value)| {
             if !matches!(
                 key.as_str(),
                 "sourcePath" | "raw" | "sourceDiagnostics" | "provenance"
             ) {
-                collect_urls(
-                    value,
-                    base,
-                    pending,
-                    relative,
-                    optional
-                        || matches!(
-                            key.as_str(),
-                            "thumbnail" | "episodeImage" | "faceImage" | "coverUrl"
-                        ),
-                );
+                collect_urls(value, base, pending, relative);
             }
         }),
         _ => {}
@@ -628,11 +606,11 @@ fn expand_asset(
         let mut data: Value = read_json(&fs::read(file).map_err(fail)?)?;
         let original = data.clone();
         if let Some(references) = data.get_mut("FileReferences") {
-            collect_urls(references, url, pending, true, false);
+            collect_urls(references, url, pending, true);
         } else if data.get("model").is_some() && data.get("textures").is_some() {
-            collect_urls(&mut data, url, pending, true, false);
+            collect_urls(&mut data, url, pending, true);
         } else if path.contains("/sources/") {
-            collect_urls(&mut data, url, pending, false, false);
+            collect_urls(&mut data, url, pending, false);
         }
         if original != data {
             return serde_json::to_vec(&data).map(Some).map_err(fail);
@@ -647,63 +625,12 @@ fn expand_asset(
             if line.is_empty() {
                 page_start = true;
             } else if page_start {
-                collect_urls(
-                    &mut Value::String(line.to_owned()),
-                    url,
-                    pending,
-                    true,
-                    false,
-                );
+                collect_urls(&mut Value::String(line.to_owned()), url, pending, true);
                 page_start = false;
             }
         }
     }
     Ok(None)
-}
-
-// Provider archives can list an audio cue or backdrop that their media server no longer serves.
-fn fallback_media(url: &Url) -> Option<&'static str> {
-    const EMPTY_BACKGROUND: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
-    let path = url.path();
-    let provider_asset =
-        path.starts_with("/api/v1/garupa/bestdori/") || path.starts_with("/api/v1/sekai/");
-    if !provider_asset {
-        return None;
-    }
-    if (path.contains("/sound/") || path.contains("/voice/"))
-        && (path.ends_with(".mp3") || path.ends_with(".wav") || path.ends_with(".ogg"))
-    {
-        return Some("");
-    }
-    if (path.contains("/bg/") || path.contains("/scenario/background/"))
-        && (path.ends_with(".png") || path.ends_with(".webp"))
-    {
-        return Some(EMPTY_BACKGROUND);
-    }
-    None
-}
-
-fn replace_unavailable(value: &mut Value, base: &Url, missing: &BTreeMap<String, &str>) {
-    if missing.is_empty() {
-        return;
-    }
-    match value {
-        Value::String(text) => {
-            if let Some(replacement) = media_url(base, text, false)
-                .and_then(|url| media_key(&url).ok())
-                .and_then(|key| missing.get(&key))
-            {
-                *text = (*replacement).to_owned();
-            }
-        }
-        Value::Array(rows) => rows
-            .iter_mut()
-            .for_each(|row| replace_unavailable(row, base, missing)),
-        Value::Object(row) => row
-            .values_mut()
-            .for_each(|value| replace_unavailable(value, base, missing)),
-        _ => {}
-    }
 }
 
 #[derive(Deserialize, Serialize)]
@@ -755,15 +682,19 @@ async fn download_asset(
     let url = &asset.url;
     if let Some(pin) = &asset.pin {
         transfer.total.fetch_add(pin.bytes, Ordering::Relaxed);
-        object_download(
+        if !object_download(
             client,
             url.as_str(),
             &objects.join(&pin.sha256),
             &pin.sha256,
             pin.bytes,
             transfer,
+            true,
         )
-        .await?;
+        .await?
+        {
+            return Ok(None);
+        }
         return Ok(Some((
             pin.sha256.clone(),
             Object {
@@ -855,7 +786,7 @@ async fn download_asset(
             }
             expected = Some(full_size);
         }
-        404 | 410 if asset.optional || fallback_media(url).is_some() => {
+        404 | 410 => {
             let _ = fs::remove_file(partial);
             let _ = fs::remove_file(tag_file);
             return Ok(None);

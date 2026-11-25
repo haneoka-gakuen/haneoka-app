@@ -37,7 +37,7 @@ const SCHEMA: &str = "haneoka-story-offline-v2";
 const PLAYER_SCHEMA: &str = "haneoka-story-player-v2";
 const PROTOCOL: &str = "haneoka-story";
 const MAX_DESCRIPTOR: usize = 16 * 1024 * 1024;
-const MAX_PLAYER: u64 = 64 * 1024 * 1024;
+const MAX_PLAYER: u64 = 96 * 1024 * 1024;
 const MAX_OBJECT: u64 = 128 * 1024 * 1024;
 const CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: data:; font-src 'self' data: blob:; connect-src 'self' blob:; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
@@ -317,11 +317,12 @@ async fn object_download(
     hash: &str,
     bytes: u64,
     transfer: &Transfer,
-) -> Result<()> {
+    allow_missing: bool,
+) -> Result<bool> {
     if file.is_file() {
         if matches_file(file, hash, bytes).await? {
             transfer.downloaded.fetch_add(bytes, Ordering::Relaxed);
-            return Ok(());
+            return Ok(true);
         }
         tokio::fs::remove_file(file).await.map_err(fail)?;
     }
@@ -342,12 +343,12 @@ async fn object_download(
         if offset > 0 {
             request = request.header("Range", format!("bytes={offset}-"));
         }
-        let mut response = request
-            .send()
-            .await
-            .map_err(fail)?
-            .error_for_status()
-            .map_err(fail)?;
+        let response = request.send().await.map_err(fail)?;
+        if allow_missing && matches!(response.status().as_u16(), 404 | 410) {
+            transfer.total.fetch_sub(bytes, Ordering::Relaxed);
+            return Ok(false);
+        }
+        let mut response = response.error_for_status().map_err(fail)?;
         match response.status().as_u16() {
             200 => offset = 0,
             206 if offset > 0 => {
@@ -396,7 +397,8 @@ async fn object_download(
         let _ = tokio::fs::remove_file(partial).await;
         return Err("object_digest".into());
     }
-    tokio::fs::rename(partial, file).await.map_err(fail)
+    tokio::fs::rename(partial, file).await.map_err(fail)?;
+    Ok(true)
 }
 
 async fn matches_file(path: &Path, expected: &str, size: u64) -> Result<bool> {
@@ -553,6 +555,7 @@ impl Offline {
                 &player.sha256,
                 player.bytes,
                 transfer,
+                false,
             )
             .await?;
             tokio::task::spawn_blocking(move || {
@@ -707,6 +710,20 @@ impl Offline {
                     .sum::<u64>(),
             Ordering::Relaxed,
         );
+        let catalog_key = format!("api/v1/servers/{server}/");
+        let essential = ["stories", "story-runtime", "characters", "bands"];
+        let mut required = BTreeSet::new();
+        for path in essential
+            .into_iter()
+            .map(str::to_owned)
+            .chain(std::iter::once(format!("stories/{story}")))
+        {
+            let reference = chapter
+                .resources
+                .get(&format!("{catalog_key}{path}"))
+                .ok_or("story_manifest")?;
+            required.insert(reference.sha256.as_str());
+        }
         let downloads: Vec<_> = chapter
             .objects
             .iter()
@@ -717,16 +734,31 @@ impl Offline {
                     format!("{base}/objects/{key}"),
                     key.clone(),
                     entry.bytes,
+                    !required.contains(key.as_str()),
                 )
             })
             .collect();
-        stream::iter(downloads)
-            .map(|(client, file, url, hash, bytes)| async move {
-                object_download(&client, &url, &file, &hash, bytes, transfer).await
-            })
+        let results = stream::iter(downloads)
+            .map(
+                |(client, file, url, hash, bytes, allow_missing)| async move {
+                    object_download(&client, &url, &file, &hash, bytes, transfer, allow_missing)
+                        .await
+                        .map(|present| (hash, present))
+                },
+            )
             .buffer_unordered(6)
             .try_collect::<Vec<_>>()
             .await?;
+        for (hash, present) in results {
+            if !present {
+                chapter.objects.remove(&hash);
+                chapter.package.missing_media += 1;
+            }
+        }
+        chapter
+            .resources
+            .retain(|_, reference| chapter.objects.contains_key(&reference.sha256));
+        chapter.package.bytes = chapter.objects.values().map(|object| object.bytes).sum();
         if transfer.paused.load(Ordering::Relaxed) {
             return Err("paused".into());
         }
