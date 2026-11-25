@@ -22,13 +22,6 @@
       <div class="start__panel" id="local-actions" hidden>
         <ul class="list">
           <li>
-            <a class="row" href="offline-stories.html">
-              <span class="row__lead" id="offline-icon"></span>
-              <span class="row__text"><span class="row__title" id="offline-label"></span></span>
-              <span class="row__trail" id="offline-trail"></span>
-            </a>
-          </li>
-          <li>
             <a class="row" href="saves.html" id="saves-link">
               <span class="row__lead" id="saves-icon"></span>
               <span class="row__text"><span class="row__title" id="saves-label"></span></span>
@@ -36,10 +29,10 @@
             </a>
           </li>
           <li>
-            <a class="row" href="import.html">
-              <span class="row__lead" id="import-icon"></span>
-              <span class="row__text"><span class="row__title" id="import-label"></span></span>
-              <span class="row__trail" id="import-trail"></span>
+            <a class="row" href="offline-stories.html">
+              <span class="row__lead" id="offline-icon"></span>
+              <span class="row__text"><span class="row__title" id="offline-label"></span></span>
+              <span class="row__trail" id="offline-trail"></span>
             </a>
           </li>
           <li>
@@ -193,7 +186,7 @@
       });
 
       await setup();
-      for (const [id, glyph, label] of [["offline", "download", "offlineStories"], ["saves", "sports_esports", "importedAccounts"], ["import", "sd_card", "readSave"]]) {
+      for (const [id, glyph, label] of [["saves", "sports_esports", "importedAccounts"], ["offline", "download", "offlineStories"]]) {
         document.getElementById(id + "-icon").innerHTML = icon(glyph);
         document.getElementById(id + "-label").textContent = t(label);
         document.getElementById(id + "-trail").innerHTML = icon("chevron_right");
