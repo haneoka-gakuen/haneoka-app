@@ -488,7 +488,7 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
             #[cfg(desktop)]
             sources.extend(["folder", "adb", "iosBackup"]);
             #[cfg(target_os = "android")]
-            sources.extend(["shizuku", "gameFolder"]);
+            sources.extend(["folder", "shizuku", "gameFolder"]);
             Ok(json!({ "sources": sources, "releases": GameRelease::ALL.iter().map(|r| r.package_id()).collect::<Vec<_>>() }))
         }
         "readFiles" => {
@@ -506,7 +506,27 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
                     .await
                     .map_err(|e| e.to_string())?
                 }
-                #[cfg(mobile)]
+                #[cfg(target_os = "android")]
+                {
+                    let picked: Value = app.device().call("grantGameFolder", json!({})).await?;
+                    let Some(uri) = text(&picked, "uri") else { return Ok(Value::Null) };
+                    let batch = app.device().folder_read(uri).await?;
+                    let id = batch.id;
+                    let collector = tauri::async_runtime::spawn_blocking(move || {
+                        let mut collector = SaveCollector::new();
+                        let mut source = haneoka_core::files::FileSource { collector: &mut collector, release };
+                        for file in batch.files {
+                            if let Ok(bytes) = std::fs::read(&file.path) {
+                                let modified = chrono::DateTime::from_timestamp_millis(file.modified).filter(|_| file.modified > 0);
+                                source.add_bytes(&bytes, &file.source, modified);
+                            }
+                        }
+                        collector
+                    }).await;
+                    app.device().release(&id).await;
+                    collector.map_err(|e| e.to_string())?
+                }
+                #[cfg(target_os = "ios")]
                 return Err("unsupported: folder".into());
             } else {
                 let Some(files) = pick_files(app).await else { return Ok(Value::Null) };

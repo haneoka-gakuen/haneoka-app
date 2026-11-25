@@ -235,18 +235,21 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
         invoke.resolve(JSObject().put("folders", folders))
     }
 
-    /** Opens the system folder picker on the game's folder; one tap grants it for good. */
+    /** Opens the directory picker. A named game folder is kept for reading again. */
     @Command
     fun grantGameFolder(invoke: Invoke) {
-        val args = invoke.parseArgs(PackageArgs::class.java)
-        if (args.packageId !in PACKAGES) {
+        val packageId = invoke.getArgs().getString("packageId", null)
+        if (packageId != null && packageId !in PACKAGES) {
             invoke.reject("unknown package")
             return
         }
-        val initial = DocumentsContract.buildDocumentUri(STORAGE, "primary:Android/data/${args.packageId}")
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
-            .putExtra(DocumentsContract.EXTRA_INITIAL_URI, initial)
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
+        if (packageId != null) {
+            val initial = DocumentsContract.buildDocumentUri(STORAGE, "primary:Android/data/$packageId")
+            intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, initial)
+                .addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+        }
         startActivityForResult(invoke, intent, "grantResult")
     }
 
@@ -255,7 +258,9 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
         val tree = result.data?.data
         try {
             if (result.resultCode == Activity.RESULT_OK && tree != null) {
-                activity.contentResolver.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                if (invoke.getArgs().getString("packageId", null) != null) {
+                    activity.contentResolver.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
                 invoke.resolve(JSObject().put("uri", tree.toString()))
             } else {
                 invoke.resolve(JSObject())
@@ -506,19 +511,22 @@ class DevicePlugin(private val activity: Activity) : Plugin(activity) {
             )
             val rows = ArrayList<Array<Any?>>()
             resolver.query(children, columns, null, null, null)?.use { c ->
-                while (c.moveToNext()) rows += arrayOf(c.getString(0), c.getString(1), c.getString(2), c.getLong(3), c.getLong(4))
+                while (c.moveToNext()) {
+                    val size = if (c.isNull(3)) null else c.getLong(3)
+                    rows += arrayOf(c.getString(0), c.getString(1), c.getString(2), size, c.getLong(4))
+                }
             }
             for (row in rows) {
                 val id = row[0] as String
                 val name = (row[1] as String?) ?: ""
                 val mime = row[2] as String?
-                val size = row[3] as Long
+                val size = row[3] as Long?
                 val modified = row[4] as Long
                 if (mime == Document.MIME_TYPE_DIR) {
                     if (name in SKIPPED) continue
                     if (packageId != null && name != "files" && !ACCOUNT_DIR.matches(name)) continue
                     walk(id, "$path/$name", depth + 1)
-                } else if (size in 1..MAX_FILE) {
+                } else if (size == null || size in 1..MAX_FILE) {
                     val target = File(folder, out.size.toString())
                     val complete = resolver.openInputStream(DocumentsContract.buildDocumentUriUsingTree(tree, id))?.use { input ->
                         target.outputStream().use { output -> copy(input, output) }

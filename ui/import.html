@@ -46,6 +46,8 @@
       let showDevices = false;
       const open = new Set();
       const platform = info.platform ?? "";
+      const canPickFolder = sources.includes("folder");
+      const folderPrimary = platform === "android" && canPickFolder;
 
       /** One way to reach the save: what it is, what it needs, its steps and its buttons. */
       const method = (id, { glyph, title, summary, steps, recommended = false, status = null, note = null, body = "", actions = [] }) => `
@@ -200,7 +202,10 @@
             summary: t("methodFilesSummary"),
             steps: t("methodFilesSteps"),
             recommended: platform === "ios",
-            actions: [sources.includes("folder") ? action("folder", t("chooseFolder")) : "", action("files", t("chooseFiles"), "tonal", "upload_file")],
+            actions: [
+              canPickFolder ? action("folder", t("chooseFolder"), folderPrimary ? "tonal" : "text", folderPrimary ? "folder_open" : "") : "",
+              action("files", t("chooseFiles"), folderPrimary ? "text" : "tonal", "upload_file"),
+            ],
           }),
         );
         const headline = updating ? t("updateSave") : t("importHeadline");
