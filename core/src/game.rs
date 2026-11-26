@@ -569,24 +569,68 @@ const PLAYER_COLLECTIONS: &[(u64, &str, &[(u64, &str)])] = &[
     (13, "_characterFriendships", &[(1, "_masterId"), (2, "_exp")]),
 ];
 
-/// The progress in a GetPlayerDataResponse, keyed as LocalCacheData's `_player`.
-pub fn decode_player_data(response: &[u8]) -> Result<Map<String, Value>, FormatError> {
+fn player_data(response: &[u8]) -> Result<&[u8], FormatError> {
     if response.len() > RESPONSE_LIMIT {
         return Err(FormatError("player_data_size"));
     }
-    let mut players = Vec::new();
+    let mut player = None;
     let mut reader = Reader::new(response);
     while let Some((number, field)) = reader.next()? {
         if let (1, Field::Bytes(value)) = (number, field) {
-            players.push(value);
+            if player.replace(value).is_some() {
+                return Err(FormatError("player_data_missing"));
+            }
         }
     }
-    if players.len() != 1 {
-        return Err(FormatError("player_data_missing"));
+    player.ok_or(FormatError("player_data_missing"))
+}
+
+fn tgw_points(player: &[u8]) -> Result<Option<u32>, FormatError> {
+    let mut points = None;
+    let mut reader = Reader::new(player);
+    while let Some((number, field)) = reader.next()? {
+        if number != 50 {
+            continue;
+        }
+        let Field::Bytes(vip) = field else { return Err(FormatError("player_data_vip")); };
+        // An observed Vip message may omit the proto3 default of zero points.
+        let value = scalars(vip, &[1])?.get(&1).copied().unwrap_or(0);
+        if value > i32::MAX as u64 || points.replace(value as u32).is_some() {
+            return Err(FormatError("player_data_vip"));
+        }
     }
+    Ok(points)
+}
+
+async fn read_player_data(save: &GameSave, proxy: Option<&Proxy>) -> Result<Vec<u8>, GameError> {
+    let (Some(session), Some(region)) = (session(save), Region::of(save)) else {
+        return Err(GameError("no_session"));
+    };
+    let (bytes, _) = authenticated(&session, region, "app.player.PlayerService/GetPlayerData", proxy).await?;
+    Ok(bytes)
+}
+
+pub async fn read_tgw_points(save: &GameSave, proxy: Option<&Proxy>) -> Result<Option<u32>, GameError> {
+    let response = read_player_data(save, proxy).await?;
+    Ok(tgw_points(player_data(&response)?)?)
+}
+
+const TGW_POINTS_KEY: &str = "haneokaTgwPoints";
+
+pub fn saved_tgw_points(save: &GameSave) -> Option<u32> {
+    let points = save.documents.get(&DocumentKind::Cache)?.data.get(TGW_POINTS_KEY)?.as_u64()?;
+    u32::try_from(points).ok()
+}
+
+/// The progress in a GetPlayerDataResponse, keyed as LocalCacheData's `_player`.
+pub fn decode_player_data(response: &[u8]) -> Result<Map<String, Value>, FormatError> {
+    decode_player(player_data(response)?)
+}
+
+fn decode_player(player: &[u8]) -> Result<Map<String, Value>, FormatError> {
     let mut out: Map<String, Value> = PLAYER_COLLECTIONS.iter().map(|(_, key, _)| ((*key).to_owned(), json!([]))).collect();
     let mut records = 0;
-    let mut reader = Reader::new(players[0]);
+    let mut reader = Reader::new(player);
     while let Some((number, field)) = reader.next()? {
         let Some((_, key, spec)) = PLAYER_COLLECTIONS.iter().find(|(n, _, _)| *n == number) else { continue };
         let Field::Bytes(value) = field else { continue };
@@ -622,10 +666,7 @@ fn ids(rows: Option<&Value>) -> std::collections::HashSet<String> {
 /// GetPlayerDataResponse.playerData (1) → PlayerData.playerMissionData (24)
 /// → PlayerMissionData.missionCounters (1).
 pub async fn read_mission_counters(save: &GameSave, proxy: Option<&Proxy>) -> Result<Vec<Value>, GameError> {
-    let (Some(session), Some(region)) = (session(save), Region::of(save)) else {
-        return Err(GameError("no_session"));
-    };
-    let (bytes, _) = authenticated(&session, region, "app.player.PlayerService/GetPlayerData", proxy).await?;
+    let bytes = read_player_data(save, proxy).await?;
     let mut counters = Vec::new();
     let mut response = Reader::new(&bytes);
     while let Some((field, value)) = response.next()? {
@@ -659,12 +700,9 @@ pub async fn read_mission_counters(save: &GameSave, proxy: Option<&Proxy>) -> Re
 /// game server's current ones. A response missing cards the save already has
 /// is refused: cards are never lost in the game.
 pub async fn refresh(save: &GameSave, proxy: Option<&Proxy>) -> Result<GameSave, GameError> {
-    let (session, region) = match (session(save), Region::of(save)) {
-        (Some(s), Some(r)) => (s, r),
-        _ => return Err(GameError("no_session")),
-    };
-    let (bytes, _) = authenticated(&session, region, "app.player.PlayerService/GetPlayerData", proxy).await?;
-    let fresh = decode_player_data(&bytes)?;
+    let response = read_player_data(save, proxy).await?;
+    let observed = player_data(&response)?;
+    let fresh = decode_player(observed)?;
     let player = save.player().cloned().unwrap_or_default();
     for key in ["_memberCards", "_supportCards"] {
         let known = ids(player.get(key));
@@ -682,6 +720,11 @@ pub async fn refresh(save: &GameSave, proxy: Option<&Proxy>) -> Result<GameSave,
         next.insert(key, value);
     }
     cache.insert("_player".into(), Value::Object(next));
+    if let Ok(Some(points)) = tgw_points(observed) {
+        cache.insert(TGW_POINTS_KEY.into(), json!(points));
+    } else {
+        cache.remove(TGW_POINTS_KEY);
+    }
     updated.documents.insert(
         DocumentKind::Cache,
         SaveDocument { kind: DocumentKind::Cache, data: cache, modified_at: Some(chrono::Utc::now()) },

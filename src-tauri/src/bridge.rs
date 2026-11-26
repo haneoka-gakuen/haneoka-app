@@ -62,7 +62,7 @@ fn imported(app: &AppHandle, window: &WebviewWindow, collector: SaveCollector) -
             let app = app.clone();
             tauri::async_runtime::spawn(async move {
                 for job in &jobs {
-                    for action in job.actions.iter().filter(|action| matches!(action.as_str(), "songs" | "history")) {
+                    for action in job.actions.iter().filter(|action| matches!(action.as_str(), "team" | "songs" | "history")) {
                         let _ = prepare_save_import(&app, &job.id, action).await;
                     }
                 }
@@ -130,14 +130,20 @@ fn adb(app: &AppHandle) -> Result<haneoka_core::adb::Adb> {
 
 /// Reads a save's current progress from the game server when it carries a
 /// session; the stored save is updated. Failures keep the stored progress.
-async fn refreshed(app: &AppHandle, save: GameSave) -> GameSave {
+async fn refreshed(app: &AppHandle, save: GameSave) -> (GameSave, Option<u32>) {
     if game::session(&save).is_none() {
-        return save;
+        return (save, None);
     }
-    match game::refresh(&save, platform::game_proxy().as_ref()).await {
-        Ok(updated) => state(app).accounts.put(updated).unwrap_or(save),
-        Err(_) => save,
+    if let Ok(updated) = game::refresh(&save, platform::game_proxy().as_ref()).await {
+        let points = game::saved_tgw_points(&updated);
+        (state(app).accounts.put(updated).unwrap_or(save), points)
+    } else {
+        (save, None)
     }
+}
+
+fn box_import(save: &GameSave, points: Option<u32>) -> Value {
+    json!({ "server": save.server(), "key": save.key(), "text": export::team_package(save), "tgwPoints": points })
 }
 
 /// The reader's site session, as the web view holds it.
@@ -208,7 +214,7 @@ async fn song_progress(save: &GameSave) -> Value {
 
 async fn prepare_save_import(app: &AppHandle, id: &str, action: &str) -> Result<Value> {
     let state = state(app);
-    let cache = matches!(action, "songs" | "history");
+    let cache = matches!(action, "team" | "songs" | "history");
     let _reads = if cache { Some(state.save_import_reads.lock().await) } else { None };
     let jobs = crate::save_import::jobs(&state);
     let job = jobs.iter().find(|job| job.id == id && job.actions.iter().any(|value| value == action)).ok_or("save_import_obsolete")?;
@@ -222,7 +228,13 @@ async fn prepare_save_import(app: &AppHandle, id: &str, action: &str) -> Result<
     }
     let server = save.server().filter(|server| *server == job.server.as_str()).ok_or("save_import_server")?;
     let result = match action {
-        "team" => Ok(json!({ "server": server, "key": save.key(), "text": export::team_package(&save) })),
+        "team" => {
+            let points = game::read_tgw_points(&save, platform::game_proxy().as_ref()).await.ok().flatten();
+            if state.accounts.find(&job.key).is_none_or(|current| current.modified_at() != save.modified_at()) {
+                return Err("save_import_obsolete".to_owned());
+            }
+            Ok(box_import(&save, points))
+        }
         "save" => Ok(json!({ "server": server, "key": save.key(), "name": save.name, "rank": save.player_rank(),
             "text": String::from_utf8(export::full(&save)).map_err(|error| error.to_string())? })),
         "songs" => Ok(song_progress(&save).await),
@@ -303,16 +315,16 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
             } else {
                 export::snapshot(&save)
             };
-            Ok(json!({ "text": snapshot }))
+            Ok(json!({ "text": snapshot, "tgwPoints": game::saved_tgw_points(&save) }))
         }
         "boxAccount" => {
             let server = text(args, "server");
             let Some(save) = choose(app, args, |s| server.is_none_or(|server| s.server() == Some(server)))? else {
                 return Ok(Value::Null);
             };
-            let save = refreshed(app, save).await;
+            let (save, points) = refreshed(app, save).await;
             accounts_changed(&window);
-            Ok(json!({ "text": export::team_package(&save), "key": save.key() }))
+            Ok(box_import(&save, points))
         }
         "songProgress" => {
             let server = text(args, "server");
@@ -411,8 +423,8 @@ async fn dispatch(app: &AppHandle, window: &WebviewWindow, method: &str, args: &
         "sendBox" => {
             let save = state(app).accounts.find(text(args, "key").ok_or("key")?).ok_or("save_not_found")?;
             let server = save.server().ok_or("save_import_server")?;
-            let save = refreshed(app, save).await;
-            state(app).pending.lock().unwrap().box_import = Some(json!({ "server": server, "key": save.key(), "text": export::team_package(&save) }));
+            let (save, points) = refreshed(app, save).await;
+            state(app).pending.lock().unwrap().box_import = Some(box_import(&save, points));
             Ok(json!({ "server": server }))
         }
         "sendSongProgress" => {
